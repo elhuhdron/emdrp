@@ -9,6 +9,9 @@ out/
 *.dill
 *.pkl
 
+# anything starting with tmp always ignore
+tmp*
+
 ###########
 # python
 ###########
