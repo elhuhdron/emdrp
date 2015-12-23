@@ -12,6 +12,10 @@ out*/
 # anything starting with tmp always ignore
 tmp*
 
+# ignore top level scripts for invoking
+run_*.sh
+run_*.py
+
 ###########
 # python
 ###########
