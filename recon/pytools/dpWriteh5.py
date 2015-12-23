@@ -1,17 +1,28 @@
 #!/usr/bin/env python
 
-'''
-Extends python hdf5 load class to write (new or append) hdf5 data in a subset of a whole dataset.
-pwatkins, created Mar 13, 2015
+# The MIT License (MIT)
+# 
+# Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-xxx - clean up the whole in / out thing (was once one in the same and moved away from this)
-
-Example invokations:
-
-dpWriteh5.py --srcfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_supervoxels.h5 --dataset voxel_type --outfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_gala3_supervoxels.h5 --size 128 128 128 --chunk 17 19 2 --dpWriteh5-verbose
-
-
-'''
+# Extends python hdf5 load class to write (new or append) hdf5 data in a subset of a whole dataset.
 
 import h5py
 import numpy as np

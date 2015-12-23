@@ -1,21 +1,32 @@
 #!/usr/bin/env python
-'''
-Top level for EM supervoxel classifier that learns merge / no merge classification based on some feature set.
-Featured Region Adjacency Graph (dpFRAG.py) creates the graph of neighboring supervoxels and their features.
 
-There is no iteration in this procedure, typically referred to as "flat learning" in the context of merging superpixels.
+# The MIT License (MIT)
+# 
+# Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-Created pwatkins, Dec 7, 2015
+# Top level for EM supervoxel classifier that learns merge / no merge classification based on some feature set.
+# Featured Region Adjacency Graph (dpFRAG.py) creates the graph of neighboring supervoxels and their features.
+#
+# There is no iteration in this procedure, typically referred to as "flat learning" in the context of merging superpixels.
 
-Example invocations:
-
-./dpSupervoxelClassifier.py --cfgfile config/svox_M0007_huge_egmini.ini --test-chunks 0 --dpSupervoxelClassifier-verbose 
-
-./dpSupervoxelClassifier.py --cfgfile config/svox_M0007_huge.ini --test-chunks 0 --dpSupervoxelClassifier-verbose 
-
-./dpSupervoxelClassifier.py --cfgfile config/svox_M0007_huge.ini --test-chunks 0 --dpSupervoxelClassifier-verbose --trainin out_train.dill
-
-'''
 
 import h5py
 import numpy as np

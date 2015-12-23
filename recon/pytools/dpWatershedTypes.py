@@ -1,20 +1,36 @@
 #!/usr/bin/env python
-'''
-Python object for reading EM voxel type probabilities and watershedding probabilities to create labels or supervoxels. 
-    This method was forked off of watershedEMprobs.py and labelEMComponents.py, dropping the affinity approach and
-    using the iterative threshold approach with "peak-detection", but instead on each foreground class separately.
-    This is normally ICS and ECS. Also assumes that probability hdf5 contains a single background label type. This is
-    normally the MEMbrane type.
-Supervoxels generated at each threshold iteration are saved to the output hdf5.
-Assumes that probabilities from multiple networks have been merged (averged) into a single probability for each class.
-    This can be done without any other frills using mergeEMprobs.py.
 
-pwatkins, forked Nov 30, 2015
+# The MIT License (MIT)
+# 
+# Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-Example invokations:
+# Python object for reading EM voxel type probabilities and watershedding probabilities to create labels or supervoxels. 
+#     This method was forked off of watershedEMprobs.py and labelEMComponents.py, dropping the affinity approach and
+#     using the iterative threshold approach with "peak-detection", but instead on each foreground class separately.
+#     This is normally ICS and ECS. Also assumes that probability hdf5 contains a single background label type. This is
+#     normally the MEMbrane type.
+# Supervoxels generated at each threshold iteration are saved to the output hdf5.
+# Assumes that probabilities from multiple networks have been merged (averged) into a single probability for each class.
+#     This can be done without any other frills using mergeEMprobs.py.
 
-
-'''
 
 #import os, sys
 import argparse

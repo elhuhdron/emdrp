@@ -1,21 +1,30 @@
 #!/usr/bin/env python
 
-'''
-Python object for reading labrainth data stored in large hdf5 files based on cube index.
-Code is based on hdf5 parsing for EM data backend for cuda convnets (parseEMdata.py)
-Original shared code was forked for use with backend only as toolset for manipulating hdf5 after voxel classifier.
-pwatkins, created Jan 7, 2015
-    forked Dec 1, 2015
+# The MIT License (MIT)
+# 
+# Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-Example invokations:
-
-dpLoadh5.py --srcfile ~/Data/mouse_retina/k0725_27cubes/k0725_mag1_8x8x5chunks_128x128x128chunksize_Forder.h5 --dataset data --chunk 2 2 0 --dpLoadh5-verbose
-
-dpLoadh5.py --srcfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_supervoxels.h5 --data-type uint32 --dataset labels --chunk 17 19 2 --subgroups with_background 0.99950000 --outraw '/Data/pwatkins/tmp/supervoxels.nrrd' --dpLoadh5-verbose
-
-dpLoadh5.py --srcfile /Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5 --size 128 128 128 --dataset data_mag1 --chunk 17 19 2 --outraw ~/Downloads/outraw.nrrd --dpLoadh5-verbose
-
-'''
+# Python object for reading labrainth data stored in large hdf5 files based on cube index.
+# Code is based on hdf5 parsing for EM data backend for cuda convnets (parseEMdata.py)
+# Original shared code was forked for use with backend only as toolset for manipulating hdf5 after voxel classifier.
 
 import h5py
 import numpy as np

@@ -1,33 +1,38 @@
 #!/usr/bin/env python
-'''
-Create a Featured Region Adjacency Graph (FRAG) for an oversegmentation (supervoxels) from inputs:
-  (1) supervoxels
-  (2) probabilities
-  (3) raw EM data
-  
-Output either:
-  (1) training set by providing ground truth labels. training set exported in scikit-learn data format.
-  (2) agglomerated labels by providing testing data set targets also in scikit-learn data format.
 
-NOTE: instead of debugging / validating with original label inputs, use relabel-seq option to dpLoadh5.py.
+# The MIT License (MIT)
+# 
+# Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-pwatkins, created Dec 2, 2015
+# Create a Featured Region Adjacency Graph (FRAG) for an oversegmentation (supervoxels) from inputs:
+#   (1) supervoxels
+#   (2) probabilities
+#   (3) raw EM data
+#   
+# Output either:
+#   (1) training set by providing ground truth labels. training set exported in scikit-learn data format.
+#   (2) agglomerated labels by providing testing data set targets also in scikit-learn data format.
+# 
+# NOTE: instead of debugging / validating with original label inputs, use relabel-seq option to dpLoadh5.py.
 
-Example invokations:
-
-Small test examples:
-
-dpFRAG.py --srcfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_supervoxels.h5 --chunk 17 19 2 --size 32 32 32 --offset 48 48 48 --subgroups with_background 0.99950000 --probfile /Data/pwatkins/full_datasets/newestECSall/huge_probs.h5 --rawfile /Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5 --raw-dataset data_mag1 --gtfile ~/Data/M0007_33/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5 --trainout train.dill --dpFRAG-verbose
-
-dpFRAG.py --srcfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_supervoxels.h5 --chunk 17 19 2 --size 32 32 32 --offset 48 48 48 --subgroups with_background 0.99950000 --testin train.dill --outfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_flatagglo.h5 --dpFRAG-verbose
-
-GT cube sized test examples:
-
-dpFRAG.py --srcfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_supervoxels.h5 --chunk 17 19 2 --size 128 128 128 --subgroups with_background 0.99950000 --probfile /Data/pwatkins/full_datasets/newestECSall/huge_probs.h5 --rawfile /Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5 --raw-dataset data_mag1 --gtfile ~/Data/M0007_33/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5 --trainout train.dill --dpFRAG-verbose
-
-dpFRAG.py --srcfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_supervoxels.h5 --chunk 17 19 2 --size 128 128 128 --subgroups with_background 0.99950000 --testin train.dill --outfile /Data/pwatkins/full_datasets/newestECSall/20151001/huge_flatagglo.h5 --dpFRAG-verbose
-
-'''
 
 #import os, sys
 import argparse
