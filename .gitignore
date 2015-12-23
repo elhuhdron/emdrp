@@ -3,7 +3,7 @@
 ###########
 
 # out always used locally to store image / temp outputs
-out/
+out*/
 
 # dill or pickle always used to save temp states
 *.dill
