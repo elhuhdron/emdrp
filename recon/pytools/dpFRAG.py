@@ -97,22 +97,25 @@ class dpFRAG(emLabels):
         # print out all initialized variables in verbose mode
         #if self.dpFRAG_verbose: print('dpFRAG, verbose mode:\n'); print(vars(self))
 
-    def loadData(self):
-        if self.dpFRAG_verbose:
-            print('Loading data'); t = time.time()
-            
-        # amount for zero padding around edges
-        spad = tuple((np.ones((3,2),dtype=np.int32)*self.eperim[:,None]).tolist())
-    
+    def loadSupervoxels(self):
         # load the supervoxel label data
         self.readCubeToBuffers()
         if self.remove_ECS:
             self.data_cube[self.data_cube > self.data_attrs['types_nlabels'][0]] = 0
         relabel, fw, inv = relabel_sequential(self.data_cube)
         self.nsupervox = inv.size - 1; self.data_cube = np.zeros((0,))
-        self.supervoxels = np.lib.pad(relabel, spad, 'constant',constant_values=0).astype(self.data_type_out, 
+        self.supervoxels = np.lib.pad(relabel, self.spad, 'constant',constant_values=0).astype(self.data_type_out, 
             copy=False)
 
+    def loadData(self):
+        if self.dpFRAG_verbose:
+            print('Loading data'); t = time.time()
+            
+        # amount for zero padding around edges
+        spad = tuple((np.ones((3,2),dtype=np.int32)*self.eperim[:,None]).tolist()); self.spad = spad
+
+        self.loadSupervoxels()
+    
         # load the probability data
         if self.probfile:
             self.probs = [None]*self.ntypes

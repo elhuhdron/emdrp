@@ -266,7 +266,7 @@ params = {
 # 3d compare gala
 nblocks = 1; ngroups = 3;
 params = {
-    'groups' : ['huge', 'huge_gala', 'huge_flatagglo_lda_9f'],
+    'groups' : ['huge', 'huge_gala', 'huge_flatagglo_lda_9f_iter0p5'],
     'groups_vals' : [5, 10, 15],
     #'groups_vals' : [5, 10],
     'groups_xlim' : [0,20],
