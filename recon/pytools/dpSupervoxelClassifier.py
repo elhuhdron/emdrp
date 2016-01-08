@@ -58,6 +58,7 @@ from matplotlib import pylab as pl
 from matplotlib import pyplot as plt
 import matplotlib as mpl
 from matplotlib import colors
+from cycler import cycler
 
 from dpFRAG import dpFRAG
 from metrics import pixel_error_fscore
@@ -65,7 +66,7 @@ from metrics import pixel_error_fscore
 class dpSupervoxelClassifier():
 
     # Constants
-    LIST_ARGS = ['test_chunks', 'label_subgroups', 'label_subgroups_out']
+    LIST_ARGS = ['test_chunks', 'label_subgroups', 'label_subgroups_out', 'iterate_merge_perc']
     n_jobs = 8
     #n_jobs = 1
     
@@ -111,16 +112,15 @@ class dpSupervoxelClassifier():
         self.ini_str = out.getvalue(); out.close()
 
         # Options / Inits
-        if len(self.threshold_subgroups) == 0:
-            self.threshold_subgroups = self.thresholds
-        else:
-            assert( len(self.thresholds) == len(self.threshold_subgroups) )
-
+        
         self.doplots = (self.show_plots or self.export_plots)
 
         # default is to have sklearn calculate the priors        
         self.priors = None
         if self.merge_prior > 0: self.priors = np.array([1-self.merge_prior, self.merge_prior],dtype=np.double)
+        
+        # keep the list of merge percentages, use original to store current iteration value
+        self.iterate_merge_perc_list = self.iterate_merge_perc
 
         # initialize for "chunkrange" or "chunklist" mode if these parameters are not empty.
         # this code was modified from that in the em data parser for cuda-convnets2.
@@ -180,6 +180,16 @@ class dpSupervoxelClassifier():
         self.iterative_mode = (self.iterate_count > 0)
         self.iterative_frag = [None] * self.nchunks
         self.iterative_mode_count = 0
+
+        # xxx - clean this up at some point, basically hack for legacy metric comparison scripts
+        if len(self.threshold_subgroups) == 0:
+            if self.iterative_mode:
+                self.threshold_subgroups = np.arange(1,self.iterate_count+1,dtype=np.double)
+            else:
+                self.threshold_subgroups = self.thresholds
+        else:
+            assert( len(self.thresholds) == len(self.threshold_subgroups) )
+
 
     def train(self):
 
@@ -253,7 +263,8 @@ class dpSupervoxelClassifier():
 
             # train a classifier
             if self.classifier == 'lda':
-                self.clf = LinearDiscriminantAnalysis(solver='svd', store_covariance=True, priors=self.priors)
+                self.clf = LinearDiscriminantAnalysis(solver='svd', store_covariance=False, priors=self.priors)
+                #self.clf = LinearDiscriminantAnalysis(solver='eigen', store_covariance=True, priors=self.priors)
             elif self.classifier == 'qda':
                 self.clf = QuadraticDiscriminantAnalysis(priors=self.priors)
             elif self.classifier == 'rf':
@@ -374,6 +385,9 @@ class dpSupervoxelClassifier():
                 try:
                     # predict merge or not on testing cube and write outputs at specified probability thresholds
                     frag.threshold_agglomerate(self.clf.predict_proba(sdata), self.thresholds, self.threshold_subgroups)
+                    # there's an issue here if there are no mergers left, would be better to just copy the current
+                    #   agglomeration, xxx - deal with this later. handled this explicitly in other locations.
+                    #except AttributeError:
                 except:
                     # if the classifier doesn't do probabilities just export single prediction
                     frag.subgroups_out += ['single_' + self.classifier]
@@ -402,10 +416,12 @@ class dpSupervoxelClassifier():
         # each iteration loop trains on the current supervoxels and 
         #   then performs a merge (test) based with a normal sklearn predict based on a small merge prior.
         self.classifierin = ''; self.trainin = ''; self.trainout = ''; self.testin = ''; self.testout = ''
-        print('Iterative mode with merge percentage %.4f / merge prior %.4f' % (self.iterate_merge_perc, 
-            self.merge_prior,))
+        print('Iterative mode with merge prior %.4f' % (self.merge_prior,))
         for i in range(self.iterate_count):
-            self.iterative_mode_count = i; print('Iteration %d' % (self.iterative_mode_count,))
+            self.iterate_merge_perc = self.iterate_merge_perc_list[i] if i < len(self.iterate_merge_perc_list) \
+                else self.iterate_merge_perc_list[-1]
+            self.iterative_mode_count = i; print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,
+                self.iterate_merge_perc))
             if self.clfs[i] is None: self.train(); self.clfs[i] = self.clf
             else: self.clf = self.clfs[i]
             self.test()
@@ -420,11 +436,14 @@ class dpSupervoxelClassifier():
         # use the merge percentage to merge only this percentage of the most confident mergers.
         # do not use any potential mergers that are against the classifier predict().
         if self.iterate_merge_perc > 0:
-            clf_prob = self.clf.predict_proba(data)[:,1]
-            c = int(ntargets*self.iterate_merge_perc)
-            if c > 0:
-                thr = np.sort(clf_prob)[::-1][c]
-                clf_predict = np.logical_and(clf_predict, clf_prob > thr)
+            clf_probs = self.clf.predict_proba(data)
+            # xxx - figure out how to handle no mergers left more gracefully, just stop at this iteration?
+            assert(clf_probs.ndim > 1 and clf_probs.shape[1] > 1) # ran out of mergers
+            # use merge percentage as percentage of estimated yes merges remaining
+            nmerge = (clf_predict==1).sum(dtype=np.int64); clf_probs = clf_probs[:,1]
+            if nmerge > 0:
+                thr = np.sort(clf_probs)[::-1][int(nmerge*self.iterate_merge_perc)]
+                clf_predict = np.logical_and(clf_predict, clf_probs >= thr)
         return clf_predict, thr
                 
     def get_chunk_inds(self, chunk):
@@ -442,14 +461,15 @@ class dpSupervoxelClassifier():
     def plotClfFeatures(target,sdata,clf,export_path,name='clf',figno=100,thr=-1):
         ntargets = target.size; nfeatures = sdata.shape[1]
         bins = [np.arange(-5,5.1,0.1)] * nfeatures
+        
+        pl.figure(figno); plt.clf();
         dpSupervoxelClassifier.plotFeatures(target,sdata,export_path=None,show_plot=False,bins=bins,figno=figno)
-
         nx, ny = 100, 100
         for x in range(nfeatures):
             for y in range(x+1,nfeatures):
-                pl.figure(figno); pl.subplot(nfeatures-1,nfeatures-1,x*(nfeatures-1)+y)
+                pl.subplot(nfeatures-1,nfeatures-1,x*(nfeatures-1)+y)
 
-                # class 0 and 1 : areas
+                # class 0 and 1 : get boundaries between classes, depending on classifier
                 x_min, x_max = plt.gca().get_xlim()
                 y_min, y_max = plt.gca().get_ylim()
                 xx, yy = np.meshgrid(np.linspace(x_min, x_max, nx),
@@ -457,68 +477,82 @@ class dpSupervoxelClassifier():
                 Y = np.zeros((nx*ny,nfeatures)); Y[:,[y,x]] = np.c_[xx.ravel(), yy.ravel()]
                 ZZ = clf.predict(Y)
                 try:
+                    # use predict_proba with target merge percentage method to plot boundaries (if available)
                     Z = clf.predict_proba(Y)
                     if thr > 0:
                         Z = np.logical_and(ZZ,(Z[:,1] > thr)).astype(np.double).reshape(xx.shape)
                     else:
                         Z = Z[:, 1].reshape(xx.shape)
-                except AttributeError:
+                except:
+                    # otherwise just use regular predict to plot boundaries
                     Z = ZZ.astype(np.double).reshape(xx.shape)
                 
                 if nfeatures==2:
+                    # if there are only two features, overlay probabilities from above with the feature densities
                     img = 1-np.abs(Z-0.5);
                     pl.imshow(img,interpolation='nearest',extent=(x_min,x_max,y_min,y_max), 
                         aspect=(y_max-y_min)/(x_max-x_min), origin='lower', alpha=0.3, cmap='gray',)
-                    plt.contour(xx, yy, Z, [0.5], linewidths=1., colors='w')
-                else:
-                    plt.contour(xx, yy, Z, [0.5], linewidths=2., colors='w')
+                
+                # overlay the boundaries between the features        
+                plt.contour(xx, yy, Z, [0.5], linewidths=2., colors='w')
 
                 try:
+                    # plot the class means if available in the classifier (LDA)
                     plt.scatter(clf.means_[0][y], clf.means_[0][x], s=2, color='r', edgecolors='w')
                     plt.scatter(clf.means_[1][y], clf.means_[1][x], s=2, color='g', edgecolors='w')
                 except AttributeError:
                     pass
 
-                try:
-                    for i in range(clf.n_clusters):
-                        plt.scatter(clf.cluster_centers_[i][y], clf.cluster_centers_[i][x], s=2, color='w')
-                except AttributeError:
-                    pass
-
+        # calculate ROC / PR style metrics using classifier predict (with target merge percentage method) and print
         clf_probs = None; clf_preds = clf.predict(sdata)
         if thr > 0:
             clf_probs = clf.predict_proba(sdata)
-            clf_preds = np.logical_and(clf_preds,(clf_probs[:,1] > thr))
+            # avoid error if there are no predictions left that predict yes merge
+            if clf_probs.ndim > 1 and clf_probs.shape[1] > 1:
+                clf_preds = np.logical_and(clf_preds,(clf_probs[:,1] > thr))
         yesmerge = (target==1); notmerge = (target==0); 
         nyes = yesmerge.sum(dtype=np.int64); nnot = notmerge.sum(dtype=np.int64)
-        try:
-            pl.figure(figno+1)
-            pbins = np.arange(0,1.01,0.01); binw = (pbins[1]-pbins[0])/2; cbins = pbins[:-1]+binw
-            if clf_probs is None: clf_probs = clf.predict_proba(sdata)
-            tphist,tmp = np.histogram(clf_probs[np.logical_and(yesmerge,clf_preds==1),1],bins=pbins)
-            tphist = tphist.astype(np.double)/nyes
-            fphist,tmp = np.histogram(clf_probs[np.logical_and(notmerge,clf_preds==1),1],bins=pbins)
-            fphist = fphist.astype(np.double)/nnot
-            tnhist,tmp = np.histogram(1-clf_probs[np.logical_and(notmerge,clf_preds==0),0],bins=pbins)
-            tnhist = tnhist.astype(np.double)/nnot
-            fnhist,tmp = np.histogram(1-clf_probs[np.logical_and(yesmerge,clf_preds==0),0],bins=pbins)
-            fnhist = fnhist.astype(np.double)/nyes
-            pl.plot(cbins,tphist,'g'); pl.plot(cbins,fphist,'g--')
-            pl.plot(cbins,tnhist,'r'); pl.plot(cbins,fnhist,'r--')
-            #pl.plot(cbins,np.log10(tphist),'g'); pl.plot(cbins,np.log10(fphist),'g--')
-            #pl.plot(cbins,np.log10(tnhist),'r'); pl.plot(cbins,np.log10(fnhist),'r--')
-            plt.xlim([-0.05,1.05]); plt.ylim([-0.05,1.05])
-            plt.xlabel('P(merge)')
-        except AttributeError:
-            pass
-
         fScore, tpr_recall, precision, pixel_error, tp,tn,fp,fn = pixel_error_fscore( target.astype(np.bool), 
             clf_preds.astype(np.bool) )
         print('p=%d, n=%d, tp=%d, tn=%d, fp=%d, fn=%d, rec=%.4f, prec=%.4f, fscore=%.4f' % (nyes,nnot,tp,tn,fp,fn,
             tpr_recall,precision,fScore))
 
+        # some plots that only work with certain classifiers, skip for non-relevant classifiers
+               
+        pl.figure(figno+1); plt.clf()
+        try:
+            # plot if the classifier implements predict_proba
+            axes = pl.subplot(1,2,1)
+            pbins = np.arange(0,1.01,0.01); binw = (pbins[1]-pbins[0])/2; cbins = pbins[:-1]+binw
+            if clf_probs is None: clf_probs = clf.predict_proba(sdata)
+            tnhist,tmp = np.histogram(1-clf_probs[np.logical_and(notmerge,clf_preds==0),0],bins=pbins)
+            tnhist = tnhist.astype(np.double)/nnot
+            fnhist,tmp = np.histogram(1-clf_probs[np.logical_and(yesmerge,clf_preds==0),0],bins=pbins)
+            fnhist = fnhist.astype(np.double)/nyes
+            # avoid error if there are no predictions left that predict yes merge
+            if clf_probs.ndim > 1 and clf_probs.shape[1] > 1:
+                tphist,tmp = np.histogram(clf_probs[np.logical_and(yesmerge,clf_preds==1),1],bins=pbins)
+                tphist = tphist.astype(np.double)/nyes
+                fphist,tmp = np.histogram(clf_probs[np.logical_and(notmerge,clf_preds==1),1],bins=pbins)
+                fphist = fphist.astype(np.double)/nnot
+            else:
+                tphist = np.zeros_like(tnhist); fphist = np.zeros_like(fnhist)
+            pl.plot(cbins,tphist,'g'); pl.plot(cbins,fphist,'g--')
+            pl.plot(cbins,tnhist,'r'); pl.plot(cbins,fnhist,'r--')
+            plt.xlim([-0.05,1.05]); plt.ylim([-0.05,1.05])
+            plt.xlabel('P(merge)'); plt.ylabel('density'); plt.title('tp/fn Y(%d), tn/fp N(%d)' % (nyes,nnot))
+            
+            # plot for LDA classifier only
+            axes = pl.subplot(1,2,2)
+            plt.xticks(range(nfeatures),rotation=45); axes.set_xticklabels(dpFRAG.FEATURES_NAMES)
+            pl.plot(clf.scalings_[:,0],'k')
+            d = clf.decision_function(clf.means_)   # distance from means to the decision boundary
+            pl.title('dist: not %.5f yes %.5f' % (d[0],d[1]))
+        except AttributeError:
+            pass
+
         if export_path:
-            figna = ['merge_features_%s.png' % (name,), 'merge_probs_%s.png' % (name,)]
+            figna = [x % (name,) for x in ['merge_features_%s.png', 'merge_probs_eigen_%s.png']]
             nfigna = len(figna)
             for f,i in zip(range(figno, figno+nfigna), range(nfigna)):
                 pl.figure(f)
@@ -538,9 +572,11 @@ class dpSupervoxelClassifier():
                 np.arange(0,1.025,0.025), np.arange(0,1.025,0.025), np.arange(0,1.025,0.025)]
         nbins = [x.size-1 for x in bins]; print(nbins)
         binw = [(x[1]-x[0])/2 for x in bins]; cbins = [x[:-1]+y for x,y in zip(bins,binw)]
+        pl.figure(figno)
+        if show_plot: plt.clf()
         for x in range(nfeatures):
             for y in range(x+1,nfeatures):
-                pl.figure(figno); pl.subplot(nfeatures-1,nfeatures-1,x*(nfeatures-1)+y)
+                pl.subplot(nfeatures-1,nfeatures-1,x*(nfeatures-1)+y)
 
                 img = np.zeros((nbins[x],nbins[y],3),dtype=np.double)
                 img[:,:,1] = np.histogram2d(fdata[yesmerge, x], fdata[yesmerge, y], bins=(bins[x],bins[y]))[0]/nyes
@@ -603,7 +639,9 @@ class dpSupervoxelClassifier():
         p.add_argument('--trainin', nargs=1, type=str, default='', help='Input file for loading training data (dill)')
         p.add_argument('--classifier', nargs=1, type=str, default='lda', help='Which sklearn classifier to use')
         p.add_argument('--classifierin', nargs=1, type=str, default='', 
-            help='Input file for loading trained classifier (dill)')
+            help='Input file for loading trained classifier(s) (dill)')
+        p.add_argument('--classifierout', nargs=1, type=str, default='', 
+            help='Output file for saving trained classifier(s) (dill)')
         p.add_argument('--testin', nargs=1, type=str, default='', help='Input file for loading testing data (dill)')
         p.add_argument('--test-chunks', nargs='*', type=int, default=[], 
             metavar='CHUNKS', help='Chunks to use for test (override from .ini)')

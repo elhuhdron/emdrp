@@ -264,12 +264,13 @@ params = {
 
 #'''
 # 3d compare gala
-nblocks = 1; ngroups = 3;
+nblocks = 6; ngroups = 4;
 params = {
-    'groups' : ['huge', 'huge_gala', 'huge_flatagglo_lda_9f_iter0p5'],
-    'groups_vals' : [5, 10, 15],
+    #'groups' : ['huge', 'huge_gala', 'huge_flatagglo_lda_9f_iter0p05'],
+    'groups' : ['huge', 'huge_agglo_perfect', 'huge_flatagglo_lda_23f_iter0p05', 'huge_flatagglo_rf_23f_iter0p05'],
+    'groups_vals' : [5, 10, 15, 20],
     #'groups_vals' : [5, 10],
-    'groups_xlim' : [0,20],
+    'groups_xlim' : [0,15],
     'groups_xlbl' : 'groups', 
     'blocks' : range(1,nblocks+1),
     'inpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed',
@@ -277,16 +278,18 @@ params = {
     'outpath' : '/Data/pwatkins/full_datasets/newestECSall/20151001',
     'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbitsgt' : 16, 'lblbits' : 32,  
     #'size' : [64,64,64], 'offset' : [32,32,32], 'lblbitsgt' : 16, 'lblbits' : 32, 
-    #'chunks' : [ 
-    #    [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-    #    [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-    #    [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-    #    ], 
     'chunks' : [ 
-        [[17,19,2]],     # super
-        [[17,19,2]],     # lda 2f
-        [[17,19,2]],     # rf 2f
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
         ], 
+    #'chunks' : [ 
+    #    [[17,19,2]],     
+    #    [[17,19,2]],     
+    #    [[17,19,2]],     
+    #    [[17,19,2]],     
+    #    ], 
     'thrRng' : [0.3, 0.999, 0.1], 
     'thrHi' : [0.95, 0.975, 0.99, 0.995, 0.999, 0.9995, 0.9999, 0.99995, 0.99999, 0.999995, 0.999999],
     'thrLo' : [],
@@ -302,6 +305,7 @@ params = {
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
+        'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
         ],
     'gt_ECS_label' : 1,
     'out_name_probs' : '_probs.h5',
@@ -312,6 +316,7 @@ params = {
     'sel_watershed' : [],
     'export_raw' : False,
     'raw_data' : [
+        '/Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5',
         '/Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5',
         '/Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5',
         '/Data/big_datasets/M0007_33_39x35x7chunks_Forder.h5',

@@ -38,8 +38,9 @@
 import argparse
 import time
 import numpy as np
+from numpy import linalg as nla
 from scipy import ndimage as nd
-from scipy import linalg as la
+from scipy import linalg as sla
 #from skimage import morphology as morph
 from skimage.segmentation import relabel_sequential
 import networkx as nx
@@ -53,7 +54,9 @@ from typesh5 import emLabels, emProbabilities, emVoxelType
 
 try:
     from progressbar import ProgressBar, Percentage, Bar, ETA, RotatingMarker
+    # xxx - make as option
     _dpFRAG__useProgressBar = True
+    #_dpFRAG__useProgressBar = False
 except:
     _dpFRAG__useProgressBar = False                            
 
@@ -63,8 +66,18 @@ class dpFRAG(emLabels):
     
     # different features setups / options... xxx - work on this
     log_size = True
-    FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 'mean_grayscale':3,
-        'mean_prob_MEM':4, 'mean_prob_ICS':5, 'angle0':6, 'angle1':7, 'angle2':8}
+    #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 'mean_grayscale':3,
+    #    'mean_prob_MEM':4, 'mean_prob_ICS':5, 'angle0':6, 'angle1':7, 'angle2':8}
+    FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
+        'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
+        'ang_centroids':6, 'dist_centroid_small':7, 'dist_centroid_large':8, 
+        'pca_angle0':9, 'pca_angle1':10, 'pca_angle2':11,
+        'pca_angle_small0':12, 'pca_angle_small1':13, 'pca_angle_small2':14,
+        'pca_angle_large0':15, 'pca_angle_large1':16, 'pca_angle_large2':17,
+        'size_ovlp_small':18, 'size_ovlp_large':19,
+        'rad_std_ovlp':20, 'ang_std_ovlp':21, 'conv_overlap':22,
+        }
+        
     #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
     FEATURES = OrderedDict(sorted(FEATURES.items(), key=lambda t: t[1]))
     FEATURES_NAMES = list(FEATURES.keys())
@@ -72,9 +85,6 @@ class dpFRAG(emLabels):
     # making this fixed for now, otherwise need "optional" features
     types = ['MEM','ICS']
     #types = ['MEM']
-
-    # number of angles to measure between neighboring object orientations
-    nangles = 3
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -202,49 +212,135 @@ class dpFRAG(emLabels):
                         # use the binary overlap between the two dilations as the boundary for these neighbors.
                         svox_ovlp = np.logical_and(svox_sel_out, nd.morphology.binary_dilation((svox_cur == j), 
                             structure=self.bwconn, iterations=self.perim))
+                        svox_ovlp_size = svox_ovlp.sum(dtype=np.int64)
+                        lsvox_ovlp_size = self.voxel_size_xform(svox_ovlp_size)
                     
-                        # calculate average features in the overlap area between the neighbors
+                        # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
                         for k in range(self.ntypes):
                             mean_probs[k] = self.probs[k][pbnd][svox_ovlp].mean(dtype=np.double)
                         mean_grayscale = self.raw[pbnd][svox_ovlp].mean(dtype=np.double)
-                    
-                        # use another bounding box around the perimeter to get features of the neighboring objects that
-                        #   are to be merged in a local region near the boundary between them.
-                        obnd = nd.measurements.find_objects(svox_ovlp)
+
+                        # MORE COMPLEX FEATURES: based on another bounding box arond the overlap area.
+                        #   this gets features of the objects and the overlap in the local neighborhood of the overlap.
+
+                        # get masks within the overlap bounding box for the neighbors and the overlap.
+                        obnd = nd.measurements.find_objects(svox_ovlp)[0]
                         # convert back to volume space and then grab a new volume around the overlap area
-                        obnd = tuple([slice(x.start+y.start-self.operim[k],x.stop+y.start+self.operim[k]) \
-                            for x,y,k in zip(obnd[0],pbnd,range(dpLoadh5.ND))])
-                        ovlp_svox_cur = self.supervoxels[obnd]
-                        
-                        # axes of the principal components
-                        sampling = self.data_attrs['scale'] if 'scale' in self.data_attrs else None
-                        #Vo = dpFRAG.getSelPCAAxes(svox_ovlp,sampling)  # xxx - did not find this useful
-                        Vi = dpFRAG.getSelPCAAxes(ovlp_svox_cur == i,sampling)
-                        Vj = dpFRAG.getSelPCAAxes(ovlp_svox_cur == j,sampling)
-                        # angles between primary components, use some out of range default if pca fails (small object)
-                        adef = (1.0+1.0/9)*np.pi; angles = np.zeros((3,),np.double)
-                        for k in range(self.nangles):
-                            try: angles[k] = np.arctan2(la.norm(np.cross(Vi[:,k],Vj[:,k])), np.dot(Vi[:,k],Vj[:,k]))
-                            except ValueError: angles[k] = adef
-                            
-                        self.FRAG[i][j]['features'] = {
-                            self.FEATURES['size_small']:lsvox_size,
-                            self.FEATURES['size_overlap']:self.voxel_size_xform(svox_ovlp.sum(dtype=np.int64)),
-                            self.FEATURES['mean_grayscale']:mean_grayscale,
-                            self.FEATURES['angle0']:angles[0], 
-                            self.FEATURES['angle1']:angles[1], 
-                            self.FEATURES['angle2']:angles[2], 
+                        ovlp_svox_cur = self.supervoxels[tuple([slice(x.start+y.start-self.operim[k],
+                            x.stop+y.start+self.operim[k]) for x,y,k in zip(obnd,pbnd,range(dpLoadh5.ND))])]
+                        # get overlap within the same bounding box
+                        ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
+                        ovlp_cur[tuple([slice(x,-x) for x in self.operim])] = svox_ovlp[obnd]
+
+                        # get the point coordinates for each object and for the overlap within the overlap bounding box.
+                        # use the sampling resolution for the points if available.
+                        sampling = self.data_attrs['scale'] if 'scale' in self.data_attrs else [1,1,1]
+                        iovlp_svox_cur = (ovlp_svox_cur == i); jovlp_svox_cur = (ovlp_svox_cur == j)
+                        ipts = np.transpose(np.nonzero(iovlp_svox_cur)).astype(np.double)*sampling
+                        jpts = np.transpose(np.nonzero(jovlp_svox_cur)).astype(np.double)*sampling
+                        opts = np.transpose(np.nonzero(ovlp_cur)).astype(np.double)*sampling
+
+                        # get the centroids for each object and the overlap
+                        Ci = np.mean(ipts, axis=0); Cj = np.mean(jpts, axis=0); Co = np.mean(opts, axis=0)
+                        # centered version of the points around the centroid
+                        iCpts = ipts-Ci; jCpts = jpts-Cj; oCpts = opts-Co;
+
+                        ''' POOR method:
+                        # center, then pca with svd to get principal component axes
+                        U, S, Vi = sla.svd(ipts-Ci,overwrite_a=True,full_matrices=False)
+                        U, S, Vj = sla.svd(jpts-Cj,overwrite_a=True,full_matrices=False)
+                        U, S, Vo = sla.svd(opts-Co,overwrite_a=True,full_matrices=False)
+                        adef = 1.1*np.pi    # out of range rangle to use if pca fails (i.e., small object)
+                        # get all combinations of angles between PCA axes
+                        angles_ij = np.zeros((dpLoadh5.ND,),np.double)
+                        angles_io = np.zeros((dpLoadh5.ND,),np.double)
+                        angles_jo = np.zeros((dpLoadh5.ND,),np.double)
+                        for k in range(dpLoadh5.ND):
+                            try: angles_ij[k] = np.arctan2(nla.norm(np.cross(Vi[:,k],Vj[:,k])), np.dot(Vi[:,k],Vj[:,k]))
+                            except ValueError: angles_ij[k] = adef
+                            try: angles_io[k] = np.arctan2(nla.norm(np.cross(Vi[:,k],Vo[:,k])), np.dot(Vi[:,k],Vo[:,k]))
+                            except ValueError: angles_io[k] = adef
+                            try: angles_jo[k] = np.arctan2(nla.norm(np.cross(Vj[:,k],Vo[:,k])), np.dot(Vj[:,k],Vo[:,k]))
+                            except ValueError: angles_jo[k] = adef
+                        '''
+
+                        # get the principal axes of each set of points.
+                        # force degenerate cases (co-linear, co-planar) to have 3 eigenvectors.
+                        Vi = dpFRAG.getOrthoAxes(iCpts, sampling)
+                        Vj = dpFRAG.getOrthoAxes(jCpts, sampling)
+                        Vo = dpFRAG.getOrthoAxes(oCpts, sampling)
+                        # do a rigid transform between the orthonormal vectors to get a 3d rotation matrix:
+                        #       https://en.wikipedia.org/wiki/Kabsch_algorithm
+                        #       http://nghiaho.com/?page_id=671
+                        Rij, tij = dpFRAG.rigid_transform_3D(Vi, Vj)
+                        Rio, tio = dpFRAG.rigid_transform_3D(Vi, Vo)
+                        Rjo, tjo = dpFRAG.rigid_transform_3D(Vj, Vo)
+                        # then decompose the rotation matrix into 3 angles:
+                        #       https://en.wikipedia.org/wiki/Euler_angles
+                        #       http://nghiaho.com/?page_id=846
+                        angles_ij = dpFRAG.decompose_rotation(Rij)
+                        angles_io = dpFRAG.decompose_rotation(Rio)
+                        angles_jo = dpFRAG.decompose_rotation(Rjo)
+
+                        # angle / distance of vectors from overlap centroid to object centroids
+                        Vi = Ci - Co; Vj = Cj - Co
+                        # https://newtonexcelbach.wordpress.com/2014/03/01/the-angle-between-two-vectors-python-version/
+                        anglec = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
+                        distci = nla.norm(Vi); distcj = nla.norm(Vj)
+
+                        # radial standard deviation of the overlap from the centroid
+                        Vpts = opts - Co; ovlp_rmom = np.std(nla.norm(Vpts, axis=1))
+                        # angular standard deviation of the overlap around the first principle component
+                        ovlp_amom = np.std(np.arctan2(nla.norm(np.cross(Vpts,Vo[:,0]),axis=1), np.dot(Vpts,Vo[:,0])))
+
+                        # simple "convexity" measure, compare size of overlap with that of overlap bounding box
+                        ovlp_conv = svox_ovlp_size / np.array([x.stop-x.start for x in obnd]).prod(dtype=np.double)
+                        assert(ovlp_conv <= 1)
+
+                        # set all the features except the size of the neighbor label for current object
+                        F = self.FEATURES
+                        f = {
+                            F['size_overlap']:lsvox_ovlp_size,
+                            F['mean_grayscale']:mean_grayscale,
+                            F['ang_centroids']:anglec, 
+                            F['rad_std_ovlp']:ovlp_rmom,
+                            F['ang_std_ovlp']:ovlp_amom,
+                            F['conv_overlap']:ovlp_conv,
+                            # these features might need to be swapped depending on which object is larger
+                            F['size_small']:lsvox_size,
+                            F['dist_centroid_small']:distci, 
+                            F['dist_centroid_large']:distcj, 
+                            F['size_ovlp_small']:self.voxel_size_xform(iovlp_svox_cur.sum(dtype=np.int64)),
+                            F['size_ovlp_large']:self.voxel_size_xform(jovlp_svox_cur.sum(dtype=np.int64)),
                             }
+                        for k in range(dpLoadh5.ND):
+                            f[F['pca_angle' + str(k)]] = angles_ij[k]
+                            # these features might need to be swapped depending on which object is larger
+                            f[F['pca_angle_small' + str(k)]] = angles_io[k]
+                            f[F['pca_angle_large' + str(k)]] = angles_jo[k]
                         for k in range(self.ntypes):
-                            self.FRAG[i][j]['features'][self.FEATURES['mean_prob_' + self.types[k]]] = mean_probs[k]
+                            f[F['mean_prob_' + self.types[k]]] = mean_probs[k]
+                        self.FRAG[i][j]['features'] = f
                     else:
-                        if self.FRAG[i][j]['features'][self.FEATURES['size_small']] <= lsvox_size:
-                            self.FRAG[i][j]['features'][self.FEATURES['size_large']] = lsvox_size
+                        f = self.FRAG[i][j]['features']; F = self.FEATURES
+                        
+                        # features are stored with size sorted by large / small object, so set features accordingly.
+                        if f[F['size_small']] <= lsvox_size:
+                            # set the size of the neighbor label for current object, current is larger.
+                            f[F['size_large']] = lsvox_size
                         else:
-                            self.FRAG[i][j]['features'][self.FEATURES['size_large']] = \
-                                self.FRAG[i][j]['features'][self.FEATURES['size_small']]
-                            self.FRAG[i][j]['features'][self.FEATURES['size_small']] = lsvox_size
-                                                    
+                            # set the size of the neighbor label for current object, current is smaller.
+                            f[F['size_large']] = f[F['size_small']]; f[F['size_small']] = lsvox_size
+                            
+                            # features that were set originally with i object as small, j is actually smaller, so swap
+                            f[F['dist_centroid_small']], f[F['dist_centroid_large']] = \
+                                f[F['dist_centroid_large']], f[F['dist_centroid_small']]
+                            f[F['size_ovlp_small']], f[F['size_ovlp_large']] = \
+                                f[F['size_ovlp_large']], f[F['size_ovlp_small']]
+                            for k in range(dpLoadh5.ND):
+                                str_small = 'pca_angle_small' + str(k); str_large = 'pca_angle_large' + str(k)
+                                f[F[str_small]], f[F[str_large]] = f[F[str_large]], f[F[str_small]]
+                                
                         # overlap features here should be the same as done before, can verify with asserts for debug
                         #if self.FRAG[i][j]['features']['overlap'] != size_ovlp:
                         #    print(i,j,size_ovlp,self.FRAG[i][j]['features']['overlap']); assert(False)
@@ -423,16 +519,51 @@ class dpFRAG(emLabels):
 
     def voxel_size_xform(self, size):
         return np.log10(size.astype(np.double)) if self.log_size else size.astype(np.double)
-    
-    @staticmethod
-    def getSelPCAAxes(sel, sampling):
-        inds = np.transpose(np.nonzero(sel)).astype(np.double)
-        if sampling is not None: inds *= sampling
-        # center, then pca with svd to get principal axes
-        inds -= inds.mean(axis=0,dtype=np.double)
-        U, S, V = la.svd(inds,overwrite_a=True,full_matrices=False)
-        return V
 
+    # this is just svd to get eigenvectors of points, but handling degenerate cases by forcing each voxel into 3d by
+    #   expanding each point to 6 points at the center of each voxel face (based on voxel size, sampling).
+    @staticmethod
+    def getOrthoAxes(pts, sampling):
+        assert(pts.shape[1] == 3)     # coordinates along axis 1
+        if pts.shape[0] > 3:
+            U, S, V = sla.svd(pts,overwrite_a=False,full_matrices=False)
+            convertPts = (V.shape[0] < 3)
+        else:
+            convertPts = True
+        if convertPts:
+            newpts = np.vstack((pts,pts,pts,pts,pts,pts)); npts = pts.shape[0]; cnt = 0
+            for d in range(pts.shape[1]):
+                for sign in [-1,1]:
+                    newpts[cnt:cnt+npts,d] += sign*sampling[d]/2; cnt = cnt + npts
+            U, S, V = sla.svd(newpts,overwrite_a=True,full_matrices=False)
+            assert(V.shape[0] == 3 and V.shape[1] == 3)
+        return V
+    
+    # modified from http://nghiaho.com/uploads/code/rigid_transform_3D.py_
+    # Input: expects Nx3 matrix of points
+    # t = 3x1 column vector
+    # returns R = 3x3 rotation matrix
+    @staticmethod
+    def rigid_transform_3D(A, B):
+        #assert len(A) == len(B)
+        cA = A.mean(axis=0, dtype=np.double); cB = B.mean(axis=0, dtype=np.double)
+        AA = A - cA; BB = B - cB
+        U, S, V = sla.svd(np.dot(AA.T,BB),overwrite_a=True,full_matrices=False)
+
+        I = np.identity(3)
+        if nla.det(np.dot(V,U.T)) < 0: I[2,2] = -1
+        R = np.dot(np.dot(V,I),U.T); t = -R*cA.T + cB.T
+        return R, t
+
+    # modified from http://nghiaho.com/uploads/code/rotation_matrix_demo.m    
+    @staticmethod
+    def decompose_rotation(R):
+        A = np.zeros((3,),np.double)    # xyz
+        A[0] = np.arctan2(R[2,1], R[2,2])
+        A[1] = np.arctan2(-R[2,0], np.sqrt(R[2,1]*R[2,1] + R[2,2]*R[2,2]))
+        A[2] = np.arctan2(R[1,0], R[0,0])
+        return A
+        
     @classmethod
     def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, gtfile, 
             subgroups=[], G=None, verbose=False):
@@ -526,7 +657,7 @@ class dpFRAG(emLabels):
         p.add_argument('--testin', nargs=1, type=str, default='', help='Input file for loading testing data (dill)')
         p.add_argument('--perim', nargs=1, type=int, default=[1], choices=range(1,20),
             help='Size of perimeter around supervoxels for calculating boundary features')
-        p.add_argument('--operim', nargs=3, type=int, default=[12,12,6], choices=range(1,20),
+        p.add_argument('--operim', nargs=3, type=int, default=[16,16,8], choices=range(1,20),
             help='Size of bounding box around overlap for object features')
         p.add_argument('--remove-ECS', dest='remove_ECS', action='store_true', 
             help='Set to remove ECS supervoxels (set to 0)')
