@@ -16,6 +16,9 @@ tmp*
 run_*.sh
 run_*.py
 
+# mac stuff
+.DS_Store
+
 ###########
 # python
 ###########
