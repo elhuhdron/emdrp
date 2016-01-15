@@ -45,31 +45,45 @@ params = {
     'gth5' : '/home/watkinspv/Data/M0007_33/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
     'gt_ECS_label' : 1,
     #
-    'segpath' : '/Data/pwatkins/full_datasets/newestECSall/20151001',
+    #'segpath' : '/Data/pwatkins/full_datasets/newestECSall/20151001',
+    'segpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out/20151006',
     'segmentations' : [
         'huge_agglo_perfect_supervoxels.h5', 
         'huge_supervoxels.h5', 
-        'huge_flatagglo_lda_23f_25iter_supervoxels.h5'
+        'huge_flatagglo_lda_20f_35iter_test_supervoxels.h5',
+        #'huge_flatagglo_lda_14f_35iter_supervoxels.h5',
         ],
     'seglbls' : [
         'perfect',
         'watershed',
-        'lda_25iters',
+        'lda_35iters',
+        #'lda_14feat',
         ],
     'subgroups' : [
         ['with_background',],
         ['with_background',],
         ['agglomeration',],
+        #['agglomeration',],
         ],
     'segparams' : [
         np.array([0.3]),
-        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
-            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
-        np.arange(1,26,dtype=np.double),
+        np.array([0.3, 0.4, 0.5, 0.6, 0.61, 0.62, 0.63, 0.64,
+            0.65, 0.66, 0.67, 0.68, 0.69, 0.7, 0.71, 0.72,
+            0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79, 0.8,
+            0.81, 0.82, 0.83, 0.84, 0.85, 0.86, 0.87, 0.88,
+            0.89, 0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96,
+            0.97, 0.98, 0.99, 0.995, 0.999, 0.9995, 0.9999,
+            0.99995, 0.99999, 0.999995, 0.999999,
+            ]),
+        #np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
+        #    0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
+        np.arange(1,35,dtype=np.double),
+        #np.arange(1,35,dtype=np.double),
         ],
     #
     'size' : [128, 128, 128], 'offset' : [0, 0, 0],
     'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+    #'chunks' : [[17,19,2], [17,23,1], [22,23,1]],
     #'chunks' : [[17,19,2],],
     'figno' : 5000,
     'plot_only':True,
@@ -140,6 +154,13 @@ else:
 # calculations based on parameters
 vi_gala = split_vi_gala.sum(axis=3)
 
+print('mean VI')
+print(vi_gala[1,:,:].mean(axis=0))
+print('mean ARE')
+print(are_gala[1,:,:].mean(axis=0))
+print('mean ARE rec')
+print(are_precrec_gala[1,:,:,1].mean(axis=0))
+
 # mins across params
 min_are_gala = are_gala.min(axis=2)
 amin_are_gala = are_gala.argmin(axis=2)
@@ -195,7 +216,7 @@ if do_plots:
     ylims = [[-0.01,0.12], [-0.1,1.4], ]
     plsize = [1,2]
     dostats = [False, False]
-    plot_setlims = True
+    plot_setlims = False
 
     scatter_err_plots(errs, strs, ylims, plsize, dostats)
 
@@ -209,7 +230,7 @@ if do_plots:
     titles = ['Adapted Rand', 'Split Variation of Information',  ]
     plsize = [1,2]
     plot_mean = True
-    plot_setlims = True
+    plot_setlims = False
         
     for i in range(len(errs)):
         if plot_setlims: 

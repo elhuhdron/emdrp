@@ -66,7 +66,8 @@ from metrics import pixel_error_fscore
 class dpSupervoxelClassifier():
 
     # Constants
-    LIST_ARGS = ['test_chunks', 'label_subgroups', 'label_subgroups_out', 'iterate_merge_perc']
+    LIST_ARGS = ['test_chunks', 'label_subgroups', 'label_subgroups_out', 'iterate_merge_perc', 
+        'thresholds', 'threshold_subgroups']
     n_jobs = 8
     #n_jobs = 1
     
@@ -186,9 +187,13 @@ class dpSupervoxelClassifier():
             if self.iterative_mode:
                 self.threshold_subgroups = np.arange(1,self.iterate_count+1,dtype=np.double)
             else:
-                self.threshold_subgroups = self.thresholds
+                self.threshold_subgroups = np.sort(self.thresholds)[::-1]
         else:
-            assert( len(self.thresholds) == len(self.threshold_subgroups) )
+            self.threshold_subgroups = np.sort(self.threshold_subgroups)[::-1]
+            if self.iterative_mode:
+                assert( self.iterate_count == len(self.threshold_subgroups) )
+            else:
+                assert( len(self.thresholds) == len(self.threshold_subgroups) )
 
 
     def train(self):
@@ -318,9 +323,9 @@ class dpSupervoxelClassifier():
                 self.iterative_frag[chunk].subgroups = self.iterative_frag[chunk].subgroups_out
 
         if self.doplots: 
-            dpSupervoxelClassifier.plotClfFeatures(target,sdata,self.clf,self.export_plots,
-                name=self.classifier + '_train_' + ' '.join([str(x) for x in self.test_chunks]) + \
-                '_iter_' + str(self.iterative_mode_count), thr=thr)
+            return dpSupervoxelClassifier.createPlots(target,sdata,self.clf,self.export_plots,
+                name=self.classifier + '_train_' + '_'.join([str(x) for x in self.test_chunks]) + \
+                '_iter_' + str(self.iterative_mode_count), thr=thr, plot_features=self.plot_features)
 
     def test(self):
         if self.dpSupervoxelClassifier_verbose: 
@@ -340,7 +345,7 @@ class dpSupervoxelClassifier():
                 with open(self.testin, 'rb') as f: data = dill.load(f)
                 FRAG = data['FRAG']; data = data['data']
 
-            frag = None; subgroups_out= self.label_subgroups_out
+            frag = None; subgroups_out= list(self.label_subgroups_out)
             if self.iterative_mode:
                 if self.iterative_frag[chunk] is None: subgroups_out += ['thr']
                 else: frag = self.iterative_frag[chunk]; frag.loadSupervoxels()
@@ -394,9 +399,9 @@ class dpSupervoxelClassifier():
                     frag.agglomerate(self.clf.predict(sdata))
 
             if self.doplots: 
-                dpSupervoxelClassifier.plotClfFeatures(data['target'],sdata,self.clf,self.export_plots,
-                    name=self.classifier + '_test_' + ' '.join([str(x) for x in self.test_chunks]) + \
-                    '_iter_' + str(self.iterative_mode_count), thr=thr)
+                return dpSupervoxelClassifier.createPlots(data['target'],sdata,self.clf,self.export_plots,
+                    name=self.classifier + '_test_' + '_'.join([str(x) for x in self.test_chunks]) + \
+                    '_iter_' + str(self.iterative_mode_count), thr=thr, plot_features=self.plot_features)
 
     def iterative_classify(self):
         assert(self.iterative_mode)
@@ -410,8 +415,8 @@ class dpSupervoxelClassifier():
         else:
             self.clfs = [None] * self.iterate_count
 
-        # xxx - hack for using legacy scripts to compare supervoxels
-        self.threshold_subgroups = np.sort(self.threshold_subgroups)[::-1]
+        # save the ROC-style metrics for later analysis / plotting
+        train_metrics = [None] * self.iterate_count; test_metrics = [None] * self.iterate_count
 
         # each iteration loop trains on the current supervoxels and 
         #   then performs a merge (test) based with a normal sklearn predict based on a small merge prior.
@@ -422,12 +427,15 @@ class dpSupervoxelClassifier():
                 else self.iterate_merge_perc_list[-1]
             self.iterative_mode_count = i; print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,
                 self.iterate_merge_perc))
-            if self.clfs[i] is None: self.train(); self.clfs[i] = self.clf
-            else: self.clf = self.clfs[i]
-            self.test()
+            if self.clfs[i] is None: 
+                train_metrics[i] = self.train(); self.clfs[i] = self.clf
+            else: 
+                self.clf = self.clfs[i]
+            test_metrics[i] = self.test()
 
-        if self.classifierout:
-            with open(self.classifierout, 'wb') as f: dill.dump({'classifiers':self.clfs}, f)
+            if self.classifierout:
+                with open(self.classifierout, 'wb') as f: 
+                    dill.dump({'classifiers':self.clfs,'train_metrics':train_metrics,'test_metrics':test_metrics}, f)
 
     def get_merge_predict_thr(self,data):
         thr = -1; ntargets = data.shape[0]
@@ -458,51 +466,52 @@ class dpSupervoxelClassifier():
 
     # this method assumes binary classification
     @staticmethod
-    def plotClfFeatures(target,sdata,clf,export_path,name='clf',figno=100,thr=-1):
+    def createPlots(target,sdata,clf,export_path,plot_features=False,name='clf',figno=100,thr=-1):
         ntargets = target.size; nfeatures = sdata.shape[1]
         bins = [np.arange(-5,5.1,0.1)] * nfeatures
         
         pl.figure(figno); plt.clf();
-        dpSupervoxelClassifier.plotFeatures(target,sdata,export_path=None,show_plot=False,bins=bins,figno=figno)
-        nx, ny = 100, 100
-        for x in range(nfeatures):
-            for y in range(x+1,nfeatures):
-                pl.subplot(nfeatures-1,nfeatures-1,x*(nfeatures-1)+y)
+        if plot_features:
+            dpSupervoxelClassifier.plotFeatures(target,sdata,export_path=None,show_plot=False,bins=bins,figno=figno)
+            nx, ny = 100, 100
+            for x in range(nfeatures):
+                for y in range(x+1,nfeatures):
+                    pl.subplot(nfeatures-1,nfeatures-1,x*(nfeatures-1)+y)
 
-                # class 0 and 1 : get boundaries between classes, depending on classifier
-                x_min, x_max = plt.gca().get_xlim()
-                y_min, y_max = plt.gca().get_ylim()
-                xx, yy = np.meshgrid(np.linspace(x_min, x_max, nx),
-                                     np.linspace(y_min, y_max, ny))
-                Y = np.zeros((nx*ny,nfeatures)); Y[:,[y,x]] = np.c_[xx.ravel(), yy.ravel()]
-                ZZ = clf.predict(Y)
-                try:
-                    # use predict_proba with target merge percentage method to plot boundaries (if available)
-                    Z = clf.predict_proba(Y)
-                    if thr > 0:
-                        Z = np.logical_and(ZZ,(Z[:,1] > thr)).astype(np.double).reshape(xx.shape)
-                    else:
-                        Z = Z[:, 1].reshape(xx.shape)
-                except:
-                    # otherwise just use regular predict to plot boundaries
-                    Z = ZZ.astype(np.double).reshape(xx.shape)
-                
-                if nfeatures==2:
-                    # if there are only two features, overlay probabilities from above with the feature densities
-                    img = 1-np.abs(Z-0.5);
-                    pl.imshow(img,interpolation='nearest',extent=(x_min,x_max,y_min,y_max), 
-                        aspect=(y_max-y_min)/(x_max-x_min), origin='lower', alpha=0.3, cmap='gray',)
-                
-                # overlay the boundaries between the features        
-                plt.contour(xx, yy, Z, [0.5], linewidths=2., colors='w')
-
-                try:
-                    # plot the class means if available in the classifier (LDA)
-                    plt.scatter(clf.means_[0][y], clf.means_[0][x], s=2, color='r', edgecolors='w')
-                    plt.scatter(clf.means_[1][y], clf.means_[1][x], s=2, color='g', edgecolors='w')
-                except AttributeError:
-                    pass
-
+                    # class 0 and 1 : get boundaries between classes, depending on classifier
+                    x_min, x_max = plt.gca().get_xlim()
+                    y_min, y_max = plt.gca().get_ylim()
+                    xx, yy = np.meshgrid(np.linspace(x_min, x_max, nx),
+                                         np.linspace(y_min, y_max, ny))
+                    Y = np.zeros((nx*ny,nfeatures)); Y[:,[y,x]] = np.c_[xx.ravel(), yy.ravel()]
+                    ZZ = clf.predict(Y)
+                    try:
+                        # use predict_proba with target merge percentage method to plot boundaries (if available)
+                        Z = clf.predict_proba(Y)
+                        if thr > 0:
+                            Z = np.logical_and(ZZ,(Z[:,1] > thr)).astype(np.double).reshape(xx.shape)
+                        else:
+                            Z = Z[:, 1].reshape(xx.shape)
+                    except:
+                        # otherwise just use regular predict to plot boundaries
+                        Z = ZZ.astype(np.double).reshape(xx.shape)
+                    
+                    if nfeatures==2:
+                        # if there are only two features, overlay probabilities from above with the feature densities
+                        img = 1-np.abs(Z-0.5);
+                        pl.imshow(img,interpolation='nearest',extent=(x_min,x_max,y_min,y_max), 
+                            aspect=(y_max-y_min)/(x_max-x_min), origin='lower', alpha=0.3, cmap='gray',)
+                    
+                    # overlay the boundaries between the features        
+                    plt.contour(xx, yy, Z, [0.5], linewidths=2., colors='w')
+    
+                    try:
+                        # plot the class means if available in the classifier (LDA)
+                        plt.scatter(clf.means_[0][y], clf.means_[0][x], s=2, color='r', edgecolors='w')
+                        plt.scatter(clf.means_[1][y], clf.means_[1][x], s=2, color='g', edgecolors='w')
+                    except AttributeError:
+                        pass
+    
         # calculate ROC / PR style metrics using classifier predict (with target merge percentage method) and print
         clf_probs = None; clf_preds = clf.predict(sdata)
         if thr > 0:
@@ -548,7 +557,7 @@ class dpSupervoxelClassifier():
             pl.plot(clf.scalings_[:,0],'k')
             d = clf.decision_function(clf.means_)   # distance from means to the decision boundary
             pl.title('dist: not %.5f yes %.5f' % (d[0],d[1]))
-        except AttributeError:
+        except (AttributeError, TypeError) as e:
             pass
 
         if export_path:
@@ -561,6 +570,12 @@ class dpSupervoxelClassifier():
                 plt.savefig(os.path.join(export_path,figna[i]), dpi=72)
         else:
             pl.show()
+        
+        # return the ROC style metrics
+        metrics = {}
+        for i in ('nyes', 'nnot', 'tp', 'tn', 'fp', 'fn', 'tpr_recall', 'precision', 'fScore', 'pixel_error'):
+            metrics[i] = locals()[i]
+        return metrics
 
     @staticmethod
     def plotFeatures(target,fdata,export_path,show_plot=True,bins=None,figno=100):
@@ -648,6 +663,8 @@ class dpSupervoxelClassifier():
         p.add_argument('--show-plots', action='store_true', help='Show various plots')
         p.add_argument('--export-plots', nargs=1, type=str, default='', 
             help='Export various plots to this path (default no plots)')
+        p.add_argument('--plot-features', action='store_true', help='If plotting, whether to include feature plots')
+        p.add_argument('--outfile', nargs=1, type=str, default='', help='Override output file for agglomerations')
         
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true', 
             help='Debugging output for dpSupervoxelClassifier')

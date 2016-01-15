@@ -68,21 +68,33 @@ class dpFRAG(emLabels):
     log_size = True
     #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 'mean_grayscale':3,
     #    'mean_prob_MEM':4, 'mean_prob_ICS':5, 'angle0':6, 'angle1':7, 'angle2':8}
+    #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
+    #    'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
+    #    'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
+    #    'angc_ovlp':9, 'distc_ovlp_small':10, 'distc_ovlp_large':11, 
+    #    'size_ovlp_small':12, 'size_ovlp_large':13,
+    #    'conv_overlap':14, 'rad_std_ovlp':15, 'ang_std_ovlp':16, 
+    #    'pca_angle0':17, 'pca_angle1':18, 'pca_angle2':19,
+    #    'pca_angle_small0':20, 'pca_angle_small1':21, 'pca_angle_small2':22,
+    #    'pca_angle_large0':23, 'pca_angle_large1':24, 'pca_angle_large2':25,
+    #    }
     FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
         'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
-        'ang_centroids':6, 'dist_centroid_small':7, 'dist_centroid_large':8, 
-        'pca_angle0':9, 'pca_angle1':10, 'pca_angle2':11,
-        'pca_angle_small0':12, 'pca_angle_small1':13, 'pca_angle_small2':14,
-        'pca_angle_large0':15, 'pca_angle_large1':16, 'pca_angle_large2':17,
-        'size_ovlp_small':18, 'size_ovlp_large':19,
-        'rad_std_ovlp':20, 'ang_std_ovlp':21, 'conv_overlap':22,
+        'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
+        'angc_ovlp':9, 'distc_ovlp_small':10, 'distc_ovlp_large':11, 
+        'size_ovlp_small':12, 'size_ovlp_large':13,
+        'conv_overlap':14, 'rad_std_ovlp':15, 'ang_std_ovlp':16, 
+        'pca_angle0':17, 'pca_angle_small0':18, 'pca_angle_large0':19,
         }
         
     #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
     FEATURES = OrderedDict(sorted(FEATURES.items(), key=lambda t: t[1]))
     FEATURES_NAMES = list(FEATURES.keys())
     
-    # making this fixed for now, otherwise need "optional" features
+    # number of pca eigenvector angles to measure
+    npcaang = 1 
+    
+    # the probability types to use for features
     types = ['MEM','ICS']
     #types = ['MEM']
 
@@ -169,6 +181,7 @@ class dpFRAG(emLabels):
 
         # other inits for the supervoxel iteration loop
         mean_probs = [None]*self.ntypes
+        sampling = self.data_attrs['scale'] if 'scale' in self.data_attrs else [1,1,1]
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
@@ -191,6 +204,10 @@ class dpFRAG(emLabels):
 
             # do not add edges to background or to the same supervoxel
             nbrlbls = nbrlbls[np.logical_and(nbrlbls != i, nbrlbls != 0)]
+
+            # FEATURES relating to entirety of both objects (ones below are only within bounding box around overlap)
+            cpts = np.transpose(np.nonzero(svox_sel)).astype(np.double)*sampling
+            Cc = np.mean(cpts, axis=0) + np.array([x.start for x in pbnd])  # centroid of whole current supervoxel
             
             # udpate the progress bar based on the current supervoxel size divided by its number of neighbors.
             # add all remainders to last update for this supervoxel.
@@ -225,16 +242,16 @@ class dpFRAG(emLabels):
 
                         # get masks within the overlap bounding box for the neighbors and the overlap.
                         obnd = nd.measurements.find_objects(svox_ovlp)[0]
+                        aobnd = tuple([slice(x.start+y.start-self.operim[k],
+                            x.stop+y.start+self.operim[k]) for x,y,k in zip(obnd,pbnd,range(dpLoadh5.ND))])
                         # convert back to volume space and then grab a new volume around the overlap area
-                        ovlp_svox_cur = self.supervoxels[tuple([slice(x.start+y.start-self.operim[k],
-                            x.stop+y.start+self.operim[k]) for x,y,k in zip(obnd,pbnd,range(dpLoadh5.ND))])]
+                        ovlp_svox_cur = self.supervoxels[aobnd]
                         # get overlap within the same bounding box
                         ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
                         ovlp_cur[tuple([slice(x,-x) for x in self.operim])] = svox_ovlp[obnd]
 
                         # get the point coordinates for each object and for the overlap within the overlap bounding box.
                         # use the sampling resolution for the points if available.
-                        sampling = self.data_attrs['scale'] if 'scale' in self.data_attrs else [1,1,1]
                         iovlp_svox_cur = (ovlp_svox_cur == i); jovlp_svox_cur = (ovlp_svox_cur == j)
                         ipts = np.transpose(np.nonzero(iovlp_svox_cur)).astype(np.double)*sampling
                         jpts = np.transpose(np.nonzero(jovlp_svox_cur)).astype(np.double)*sampling
@@ -244,31 +261,16 @@ class dpFRAG(emLabels):
                         Ci = np.mean(ipts, axis=0); Cj = np.mean(jpts, axis=0); Co = np.mean(opts, axis=0)
                         # centered version of the points around the centroid
                         iCpts = ipts-Ci; jCpts = jpts-Cj; oCpts = opts-Co;
-
-                        ''' POOR method:
-                        # center, then pca with svd to get principal component axes
-                        U, S, Vi = sla.svd(ipts-Ci,overwrite_a=True,full_matrices=False)
-                        U, S, Vj = sla.svd(jpts-Cj,overwrite_a=True,full_matrices=False)
-                        U, S, Vo = sla.svd(opts-Co,overwrite_a=True,full_matrices=False)
-                        adef = 1.1*np.pi    # out of range rangle to use if pca fails (i.e., small object)
-                        # get all combinations of angles between PCA axes
-                        angles_ij = np.zeros((dpLoadh5.ND,),np.double)
-                        angles_io = np.zeros((dpLoadh5.ND,),np.double)
-                        angles_jo = np.zeros((dpLoadh5.ND,),np.double)
-                        for k in range(dpLoadh5.ND):
-                            try: angles_ij[k] = np.arctan2(nla.norm(np.cross(Vi[:,k],Vj[:,k])), np.dot(Vi[:,k],Vj[:,k]))
-                            except ValueError: angles_ij[k] = adef
-                            try: angles_io[k] = np.arctan2(nla.norm(np.cross(Vi[:,k],Vo[:,k])), np.dot(Vi[:,k],Vo[:,k]))
-                            except ValueError: angles_io[k] = adef
-                            try: angles_jo[k] = np.arctan2(nla.norm(np.cross(Vj[:,k],Vo[:,k])), np.dot(Vj[:,k],Vo[:,k]))
-                            except ValueError: angles_jo[k] = adef
-                        '''
-
+                        
+                        # centroid of overlap in coordinates of all supervoxels
+                        Cao = Co + np.array([x.start for x in aobnd])  
+                        
                         # get the principal axes of each set of points.
                         # force degenerate cases (co-linear, co-planar) to have 3 eigenvectors.
                         Vi = dpFRAG.getOrthoAxes(iCpts, sampling)
                         Vj = dpFRAG.getOrthoAxes(jCpts, sampling)
                         Vo = dpFRAG.getOrthoAxes(oCpts, sampling)
+                        '''
                         # do a rigid transform between the orthonormal vectors to get a 3d rotation matrix:
                         #       https://en.wikipedia.org/wiki/Kabsch_algorithm
                         #       http://nghiaho.com/?page_id=671
@@ -281,17 +283,26 @@ class dpFRAG(emLabels):
                         angles_ij = dpFRAG.decompose_rotation(Rij)
                         angles_io = dpFRAG.decompose_rotation(Rio)
                         angles_jo = dpFRAG.decompose_rotation(Rjo)
+                        '''
+                        # calculate angles between corresponding eigenvectors for each object and for overlap
+                        angles_ij = np.zeros((self.npcaang,),np.double)
+                        angles_io = np.zeros((self.npcaang,),np.double)
+                        angles_jo = np.zeros((self.npcaang,),np.double)
+                        for k in range(self.npcaang):
+                            angles_ij[k] = np.arctan2(nla.norm(np.cross(Vi[k,:],Vj[k,:])), np.dot(Vi[k,:],Vj[k,:]))
+                            angles_io[k] = np.arctan2(nla.norm(np.cross(Vi[k,:],Vo[k,:])), np.dot(Vi[k,:],Vo[k,:]))
+                            angles_jo[k] = np.arctan2(nla.norm(np.cross(Vj[k,:],Vo[k,:])), np.dot(Vj[k,:],Vo[k,:]))
 
                         # angle / distance of vectors from overlap centroid to object centroids
                         Vi = Ci - Co; Vj = Cj - Co
                         # https://newtonexcelbach.wordpress.com/2014/03/01/the-angle-between-two-vectors-python-version/
-                        anglec = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
-                        distci = nla.norm(Vi); distcj = nla.norm(Vj)
+                        oanglec = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
+                        odistci = nla.norm(Vi); odistcj = nla.norm(Vj)
 
                         # radial standard deviation of the overlap from the centroid
-                        Vpts = opts - Co; ovlp_rmom = np.std(nla.norm(Vpts, axis=1))
-                        # angular standard deviation of the overlap around the first principle component
-                        ovlp_amom = np.std(np.arctan2(nla.norm(np.cross(Vpts,Vo[:,0]),axis=1), np.dot(Vpts,Vo[:,0])))
+                        ovlp_rmom = np.std(nla.norm(oCpts, axis=1))
+                        # angular standard deviation of the overlap from the first principle component
+                        ovlp_amom = np.std(np.arctan2(nla.norm(np.cross(oCpts,Vo[0,:]),axis=1), np.dot(oCpts,Vo[0,:])))
 
                         # simple "convexity" measure, compare size of overlap with that of overlap bounding box
                         ovlp_conv = svox_ovlp_size / np.array([x.stop-x.start for x in obnd]).prod(dtype=np.double)
@@ -302,18 +313,21 @@ class dpFRAG(emLabels):
                         f = {
                             F['size_overlap']:lsvox_ovlp_size,
                             F['mean_grayscale']:mean_grayscale,
-                            F['ang_centroids']:anglec, 
+                            F['angc_ovlp']:oanglec, 
                             F['rad_std_ovlp']:ovlp_rmom,
                             F['ang_std_ovlp']:ovlp_amom,
                             F['conv_overlap']:ovlp_conv,
                             # these features might need to be swapped depending on which object is larger
                             F['size_small']:lsvox_size,
-                            F['dist_centroid_small']:distci, 
-                            F['dist_centroid_large']:distcj, 
+                            F['distc_ovlp_small']:odistci, 
+                            F['distc_ovlp_large']:odistcj, 
                             F['size_ovlp_small']:self.voxel_size_xform(iovlp_svox_cur.sum(dtype=np.int64)),
                             F['size_ovlp_large']:self.voxel_size_xform(jovlp_svox_cur.sum(dtype=np.int64)),
+                            # features requiring more calculation based on other neighbor
+                            F['ang_cntr']:Cao,
+                            F['dist_cntr_small']:Cc,
                             }
-                        for k in range(dpLoadh5.ND):
+                        for k in range(self.npcaang):
                             f[F['pca_angle' + str(k)]] = angles_ij[k]
                             # these features might need to be swapped depending on which object is larger
                             f[F['pca_angle_small' + str(k)]] = angles_io[k]
@@ -321,8 +335,18 @@ class dpFRAG(emLabels):
                         for k in range(self.ntypes):
                             f[F['mean_prob_' + self.types[k]]] = mean_probs[k]
                         self.FRAG[i][j]['features'] = f
-                    else:
+                    else: # if edge already in graph
                         f = self.FRAG[i][j]['features']; F = self.FEATURES
+
+                        # features requiring more calculation based on other neighbor
+                        # distance and angles from centers of entire neighboring supervoxels to the overlap
+                        Ci = f[F['dist_cntr_small']]; Co = f[F['ang_cntr']]; Cj = Cc
+                        Vi = Ci - Co; Vj = Cj - Co
+                        # https://newtonexcelbach.wordpress.com/2014/03/01/the-angle-between-two-vectors-python-version/
+                        f[F['ang_cntr']] = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
+                        # set the global distances from centroid to overlap based on current neighbor is larger.
+                        #   do swap same as other swaps below if not.
+                        f[F['dist_cntr_small']] = nla.norm(Vi); f[F['dist_cntr_large']] = nla.norm(Vj)
                         
                         # features are stored with size sorted by large / small object, so set features accordingly.
                         if f[F['size_small']] <= lsvox_size:
@@ -333,11 +357,13 @@ class dpFRAG(emLabels):
                             f[F['size_large']] = f[F['size_small']]; f[F['size_small']] = lsvox_size
                             
                             # features that were set originally with i object as small, j is actually smaller, so swap
-                            f[F['dist_centroid_small']], f[F['dist_centroid_large']] = \
-                                f[F['dist_centroid_large']], f[F['dist_centroid_small']]
+                            f[F['distc_ovlp_small']], f[F['distc_ovlp_large']] = \
+                                f[F['distc_ovlp_large']], f[F['distc_ovlp_small']]
                             f[F['size_ovlp_small']], f[F['size_ovlp_large']] = \
                                 f[F['size_ovlp_large']], f[F['size_ovlp_small']]
-                            for k in range(dpLoadh5.ND):
+                            f[F['dist_cntr_small']], f[F['dist_cntr_large']] = \
+                                f[F['dist_cntr_large']], f[F['dist_cntr_small']]
+                            for k in range(self.npcaang):
                                 str_small = 'pca_angle_small' + str(k); str_large = 'pca_angle_large' + str(k)
                                 f[F[str_small]], f[F[str_large]] = f[F[str_large]], f[F[str_small]]
                                 
@@ -522,12 +548,16 @@ class dpFRAG(emLabels):
 
     # this is just svd to get eigenvectors of points, but handling degenerate cases by forcing each voxel into 3d by
     #   expanding each point to 6 points at the center of each voxel face (based on voxel size, sampling).
+    # NOTE IMPORTANT: from scipy, svd different from matlab:
+    #   "The SVD is commonly written as a = U S V.H. The v returned by this function is V.H and u = U."
+    # pts is Nx3
+    # returns Vt, the eigenvectors along the rows (along axis 0, i.e., Nx3 where N=3 with full rank)
     @staticmethod
     def getOrthoAxes(pts, sampling):
         assert(pts.shape[1] == 3)     # coordinates along axis 1
         if pts.shape[0] > 3:
-            U, S, V = sla.svd(pts,overwrite_a=False,full_matrices=False)
-            convertPts = (V.shape[0] < 3)
+            U, S, Vt = sla.svd(pts,overwrite_a=False,full_matrices=False)
+            convertPts = (Vt.shape[0] < 3)
         else:
             convertPts = True
         if convertPts:
@@ -535,9 +565,9 @@ class dpFRAG(emLabels):
             for d in range(pts.shape[1]):
                 for sign in [-1,1]:
                     newpts[cnt:cnt+npts,d] += sign*sampling[d]/2; cnt = cnt + npts
-            U, S, V = sla.svd(newpts,overwrite_a=True,full_matrices=False)
-            assert(V.shape[0] == 3 and V.shape[1] == 3)
-        return V
+            U, S, Vt = sla.svd(newpts,overwrite_a=True,full_matrices=False)
+            assert(Vt.shape[0] == 3)
+        return Vt
     
     # modified from http://nghiaho.com/uploads/code/rigid_transform_3D.py_
     # Input: expects Nx3 matrix of points
@@ -545,14 +575,15 @@ class dpFRAG(emLabels):
     # returns R = 3x3 rotation matrix
     @staticmethod
     def rigid_transform_3D(A, B):
-        #assert len(A) == len(B)
+        assert len(A) == len(B)
         cA = A.mean(axis=0, dtype=np.double); cB = B.mean(axis=0, dtype=np.double)
         AA = A - cA; BB = B - cB
-        U, S, V = sla.svd(np.dot(AA.T,BB),overwrite_a=True,full_matrices=False)
+        U, S, Vt = sla.svd(np.dot(AA.T,BB),overwrite_a=True,full_matrices=False); V = Vt.T
 
-        I = np.identity(3)
-        if nla.det(np.dot(V,U.T)) < 0: I[2,2] = -1
-        R = np.dot(np.dot(V,I),U.T); t = -R*cA.T + cB.T
+        R = np.dot(V,U.T)
+        if nla.det(R) < 0: 
+            V[:,2] = -V[:,2]; R = np.dot(V,U.T)
+        t = -R*cA.T + cB.T
         return R, t
 
     # modified from http://nghiaho.com/uploads/code/rotation_matrix_demo.m    
