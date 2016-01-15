@@ -133,8 +133,10 @@ class dpWriteh5(dpLoadh5):
         
     def loadFromRaw(self):
         # xxx - this always assumes raw file is in F-order, add something here for C-order if we need it
-        if os.path.splitext(self.inraw)[1][1:] == 'nrrd':
+        ext = os.path.splitext(self.inraw)[1][1:]
+        if ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
+            # xxx - new version is available as of early 2016, try migrating to it
             with open(self.inraw,'rb') as nrrdfile:
                 headerSize = 0
                 for raw_line in iter(nrrdfile):
@@ -149,9 +151,46 @@ class dpWriteh5(dpLoadh5):
                 # xxx - get this from the header? what if not consistent with data-size instantiated for this object?
                 data = np.fromfile(nrrdfile,dtype=np.uint16).reshape(self.size[::-1]).transpose((2,1,0)).\
                     astype(self.data_type)
+        elif ext == 'gipl':
+            data = dpWriteh5.gipl_read_volume(self.inraw)
         else:
             data = np.fromfile(self.inraw,dtype=self.data_type).reshape(self.size[::-1]).transpose((2,1,0))
         self.data_cube = data
+
+    # xxx - move this as a utility or a GIPL class?
+    # translated from matlab toolbox http://www.mathworks.com/matlabcentral/fileexchange/16407-gipl-toolbox
+
+    @staticmethod
+    def gipl_read_header(fname):
+        hdr, info = dpLoadh5.gipl_generate_header()
+        fh = open(fname, 'rb')
+
+        # add the file size and name to the info struct
+        fh.seek(0, os.SEEK_END); info['filesize'] = fh.tell(); fh.seek(0); info['filename'] = fname
+
+        # read binary header with correct order / data types, gipl format is big-endian!!!
+        for field in info['hdr_fields']: 
+            hdr[field] = np.fromfile(fh, dtype=hdr[field].dtype, count=hdr[field].size).byteswap(True)
+            #print('\t',field,'\tsize',hdr[field].size,'\ttell ',fh.tell())
+        assert( fh.tell() == info['hdr_size_bytes'] )
+        assert( hdr['magic_number'] == info['magic_number'] )
+        fh.close()
+
+        return hdr, info
+
+    @staticmethod
+    def gipl_read_volume(fname):
+        hdr, info = dpWriteh5.gipl_read_header(fname)
+        
+        dtype = info['numpy_types'][hdr['image_type'][0]]
+        datasize = hdr['sizes'].prod(dtype=np.int64)
+        
+        # read data, gipl format is big-endian!!!
+        fh = open(fname, 'rb')
+        fh.seek(info['hdr_size_bytes'])
+        V = np.fromfile(fh, dtype=dtype, count=datasize).byteswap(True).reshape((hdr['sizes'][:3]))
+        
+        return V
 
     @classmethod
     def writeData(cls, outfile, dataset, chunk, offset, size, data_type, datasize, chunksize, fillvalue=None, data=None, 
