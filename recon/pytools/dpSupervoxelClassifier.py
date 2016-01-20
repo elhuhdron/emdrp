@@ -27,6 +27,8 @@
 #
 # There is no iteration in this procedure, typically referred to as "flat learning" in the context of merging 
 #   supervoxels.
+# After investigating flat learning, added a simple iterative procedure that agglomerates some percentage of the most
+#   confident mergers and continues for set number of iterations.
 
 
 import h5py
@@ -232,12 +234,12 @@ class dpSupervoxelClassifier():
                             ['training','thr'], verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
-                        frag = self.iterative_frag[chunk]; frag.loadSupervoxels()
+                        frag = self.iterative_frag[chunk]; #frag.loadSupervoxels()
                 else:
                     frag = dpFRAG.makeTrainingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
                         self.raw_dataset, self.gtfile, self.label_subgroups, 
                         verbose=self.dpSupervoxelClassifier_verbose)
-                frag.createFRAG(); data = frag.createDataset()
+                frag.createFRAG(update = self.iterative_mode); data = frag.createDataset()
                 ntargets[chunk] = data['target'].shape[0]
                 target[cnt_targets:cnt_targets+ntargets[chunk]] = data['target']
                 fdata[cnt_targets:cnt_targets+ntargets[chunk],:] = data['data']
@@ -348,7 +350,7 @@ class dpSupervoxelClassifier():
             frag = None; subgroups_out= list(self.label_subgroups_out)
             if self.iterative_mode:
                 if self.iterative_frag[chunk] is None: subgroups_out += ['thr']
-                else: frag = self.iterative_frag[chunk]; frag.loadSupervoxels()
+                else: frag = self.iterative_frag[chunk]; #frag.loadSupervoxels()
 
             if frag is None:
                 if self.doplots:
@@ -364,7 +366,7 @@ class dpSupervoxelClassifier():
                 frag.isTraining = False; self.iterative_frag[chunk] = frag
             
             if not (len(self.test_chunks) == 1 and self.testin):
-                frag.createFRAG(); data = frag.createDataset(train=self.doplots)
+                frag.createFRAG(update = self.iterative_mode); data = frag.createDataset(train=self.doplots)
 
                 if self.testout:
                     if self.dpSupervoxelClassifier_verbose: 
