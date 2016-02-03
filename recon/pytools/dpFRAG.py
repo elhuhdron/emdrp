@@ -54,9 +54,7 @@ from typesh5 import emLabels, emProbabilities, emVoxelType
 
 try:
     from progressbar import ProgressBar, Percentage, Bar, ETA, RotatingMarker
-    # xxx - make as option
     _dpFRAG__useProgressBar = True
-    #_dpFRAG__useProgressBar = False
 except:
     _dpFRAG__useProgressBar = False                            
 
@@ -66,25 +64,14 @@ class dpFRAG(emLabels):
     
     # different features setups / options... xxx - work on this
     log_size = True
-    #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 'mean_grayscale':3,
-    #    'mean_prob_MEM':4, 'mean_prob_ICS':5, 'angle0':6, 'angle1':7, 'angle2':8}
-    #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
-    #    'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
-    #    'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
-    #    'angc_ovlp':9, 'distc_ovlp_small':10, 'distc_ovlp_large':11, 
-    #    'size_ovlp_small':12, 'size_ovlp_large':13,
-    #    'conv_overlap':14, 'rad_std_ovlp':15, 'ang_std_ovlp':16, 
-    #    'pca_angle0':17, 'pca_angle1':18, 'pca_angle2':19,
-    #    'pca_angle_small0':20, 'pca_angle_small1':21, 'pca_angle_small2':22,
-    #    'pca_angle_large0':23, 'pca_angle_large1':24, 'pca_angle_large2':25,
-    #    }
     FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
         'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
         'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
-        'angc_ovlp':9, 'distc_ovlp_small':10, 'distc_ovlp_large':11, 
-        'size_ovlp_small':12, 'size_ovlp_large':13,
-        'conv_overlap':14, 'rad_std_ovlp':15, 'ang_std_ovlp':16, 
-        'pca_angle0':17, 'pca_angle_small0':18, 'pca_angle_large0':19,
+        'size_ovlp_small':9, 'size_ovlp_large':10, 'labeled_ovlp':11,
+        'conv_overlap':12, 'rad_std_ovlp':13, 'ang_std_ovlp':14, 
+        'pca_angle0':15, 'pca_angle_small0':16, 'pca_angle_large0':17,
+        'pca_angle1':18, 'pca_angle_small1':19, 'pca_angle_large1':20,
+        'pca_angle2':21, 'pca_angle_small2':22, 'pca_angle_large2':23,
         }
         
     #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
@@ -92,11 +79,27 @@ class dpFRAG(emLabels):
     FEATURES_NAMES = list(FEATURES.keys())
     
     # number of pca eigenvector angles to measure
-    npcaang = 1 
+    npcaang = 3 
     
     # the probability types to use for features
     types = ['MEM','ICS']
     #types = ['MEM']
+
+    # how much to dilate supervoxels in order to find neighbors.
+    # xxx - never found it useful to include neighbors that are further out than adjacent voxels.
+    neighbor_perim = 1
+
+    # for optimizations that prevent some feature variables from being recalculated
+    #   if they did not change during an agglomeration.
+
+    # these are items that are calculated during createFRAG for features.
+    # some of them can be saved between agglomerations as an optimization for speed.
+    # these are lists of local variables that are saved in some instances where all of the features can not be
+    #   preserved, but some of the overlap calculations can still be preserved.
+    svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out','svox_sel_nbr']
+    sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
+    #ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_cur','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
+    ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -109,7 +112,7 @@ class dpFRAG(emLabels):
 
         self.ntypes = len(self.types)
         self.nfeatures = len(self.FEATURES)
-        self.bperim = 2*self.perim
+        self.bperim = 2*max([self.perim, dpFRAG.neighbor_perim])
         # external perimeter used to pad all volumes
         self.eperim = self.operim + self.bperim
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
@@ -130,6 +133,9 @@ class dpFRAG(emLabels):
         self.supervoxels_noperim = relabel
         self.supervoxels = np.lib.pad(relabel, self.spad, 'constant',
             constant_values=0).astype(self.data_type_out, copy=False)
+            
+        # supervoxel sizes are needed in advance for createFRAG (ignore background size).
+        self.svox_sizes = emLabels.getSizesMax(self.supervoxels_noperim, self.nsupervox)[1:]
 
     def loadData(self):
         if self.dpFRAG_verbose:
@@ -191,19 +197,30 @@ class dpFRAG(emLabels):
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
-            useProgressBar = __useProgressBar and features
+            useProgressBar = __useProgressBar and features and self.progress_bar
             if useProgressBar:
-                running_size = 0; total_size = (self.supervoxels > 0).sum(dtype=np.int64)
+                running_size = 0
+                #total_size = (self.supervoxels > 0).sum(dtype=np.int64)  # use svox volume
+                total_size = self.nsupervox     # use number of supervoxels
                 widgets = [RotatingMarker(), ' ', Percentage(), ' ', Bar(marker='='), ' ', ETA()]
                 pbar = ProgressBar(widgets=widgets, maxval=total_size).start()
 
+        # because of the way these features are calculated, with the first pass requiring the most computations,
+        #   it's much faster to run in increasing order of supervoxel size.
+        #svox_order = range(1,self.nsupervox+1)     # given order, much slower
+        #svox_order = np.argsort(self.svox_sizes)[::-1] + 1    # order of decreasing supervoxel size, slowest
+        svox_order = np.argsort(self.svox_sizes) + 1    # order of increasing supervoxel size, fastest
+        assert( svox_order.size == self.nsupervox )     # supervoxel count/sizes not updated properly
+
         # iterate over supervoxels and get neighbors (edges) and add features for each neighbor
-        for i in range(1,self.nsupervox+1):
+        for i in svox_order:
             # if this is a FRAG update, then skip if all the edges coming out of this node have features.
             # also can't have any features that are in first_pass.
             # NOTE: if there are no neighbors left for this supervoxel, no need to compute supervoxel attributes.
             #   In this special case the supervoxel is skipped because all([]) evaluates to True.
-            if update and all([('features' in x and not x['first_pass']) for x in self.FRAG[i].values()]): continue
+            if update:
+                if all([('features' in x and not x['first_pass']) for x in self.FRAG[i].values()]): continue
+                previ = self.nsupervox_prev + i
 
             # if the supervoxel itself has not changed but some neighbors have, load from node attributes.
             if update and 'svox_attrs' in self.FRAG.node[i]:
@@ -217,41 +234,42 @@ class dpFRAG(emLabels):
                 svox_cur = self.supervoxels[pbnd]
             
                 # select the curent supervoxel and dilate it out by perim
-                svox_sel = (svox_cur == i); svox_size = svox_sel.sum(dtype=np.int64)
+                svox_sel = (svox_cur == i)
+                #svox_size = svox_sel.sum(dtype=np.int64); assert( self.svox_sizes[i-1] == svox_size )
+                svox_size = self.svox_sizes[i-1]    # optimization for speed with sizes kept updated
                 lsvox_size = self.voxel_size_xform(svox_size)
-                svox_sel_out = nd.morphology.binary_dilation(svox_sel, structure=self.bwconn, iterations=self.perim)
+                svox_sel_out = nd.morphology.binary_dilation(svox_sel, structure=self.bwconn, 
+                    iterations=dpFRAG.neighbor_perim)
 
-                # what to save in node attributes, only save what is needed below in feature calculations
-                svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out']
-
-                # FEATURES relating to entirety of both objects (ones below are only within bounding box around overlap)
-                if features:
-                    cpts = np.transpose(np.nonzero(svox_sel)).astype(np.double)*sampling
-                    # centroid of whole current supervoxel
-                    Cc = np.mean(cpts, axis=0) + np.array([x.start for x in pbnd])
-                    
-                    # add features to save in node attributes when features are being calculated
-                    svox_attrs += ['Cc']
+                # Important: in order to get all the neighbors that could overlap based on their dilation, 
+                #   need to dilate the current supervoxel again by the same amount. Otherwise some neighbors will be
+                #   missed. NOTE: this can still work with this, but causes inconsistent overlap attribute information.
+                #svox_sel_nbr = nd.morphology.binary_dilation(svox_sel_out, structure=self.bwconn, 
+                #    iterations=dpFRAG.neighbor_perim)
+                svox_sel_nbr = 0
 
                 # save the variables in svox_attrs to node attributes
-                d = locals(); n = { k:d[k] for k in svox_attrs }; self.FRAG.node[i]['svox_attrs'] = n
+                d = locals(); n = { k:d[k] for k in dpFRAG.svox_attrs }; self.FRAG.node[i]['svox_attrs'] = n
 
             # get the neighbors for this supervoxel
-            nbrlbls = np.unique(svox_cur[n['svox_sel_out']])
+            nbrlbls = np.unique(svox_cur[n['svox_sel_out']])   # wrong
+            #nbrlbls = np.unique(svox_cur[n['svox_sel_nbr']])
             # do not add edges to background or to the same supervoxel
             nbrlbls = nbrlbls[np.logical_and(nbrlbls != i, nbrlbls != 0)]
             
             # udpate the progress bar based on the current supervoxel size divided by its number of neighbors.
             # add all remainders to last update for this supervoxel.
-            if self.dpFRAG_verbose and useProgressBar:
-                if nbrlbls.size > 0:
-                    bar_update = n['svox_size'] // nbrlbls.size
-                    bar_final = n['svox_size'] - bar_update * (nbrlbls.size-1)
-                else:
-                    running_size += n['svox_size']
+            #if self.dpFRAG_verbose and useProgressBar:
+            #    if nbrlbls.size > 0:
+            #        bar_update = n['svox_size'] // nbrlbls.size
+            #        bar_final = n['svox_size'] - bar_update * (nbrlbls.size-1)
+            #    else:
+            #        running_size += n['svox_size']
                 
             # add each corresponding neighbor label to the FRAG
             for j in nbrlbls:
+                if update: prevj = self.nsupervox_prev + j
+                
                 if not features:
                     # only make RAG without features (like for agglomeration without fit)
                     if not self.FRAG.has_edge(i,j):
@@ -265,116 +283,137 @@ class dpFRAG(emLabels):
                     #   of updating features in the current FRAG.
                     if has_features: assert(update)
                     else: self.FRAG.add_edge(i,j)
-                    
-                    # dilate the other supervoxel by the same perimeter amount within this bounding box.
-                    # use the binary overlap between the two dilations as the boundary for these neighbors.
-                    svox_ovlp = np.logical_and(n['svox_sel_out'], nd.morphology.binary_dilation((svox_cur == j), 
-                        structure=self.bwconn, iterations=self.perim))
-                    svox_ovlp_size = svox_ovlp.sum(dtype=np.int64)
-                    lsvox_ovlp_size = self.voxel_size_xform(svox_ovlp_size)
-                    
-                    # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
-                    for k in range(self.ntypes):
-                        mean_probs[k] = self.probs[k][n['pbnd']][svox_ovlp].mean(dtype=np.double)
-                    mean_grayscale = self.raw[n['pbnd']][svox_ovlp].mean(dtype=np.double)
 
-                    # MORE COMPLEX FEATURES: based on another bounding box arond the overlap area.
-                    #   this gets features of the objects and the overlap in the local neighborhood of the overlap.
+                    # if this edge contains overlap info that means the FRAG was updated to preserve this overlap.
+                    # this is the case if the overlap itself didn't change, but the neighboring supervoxels did not.
+                    loadovlp = update and 'ovlp_attrs' in self.FRAG[i][j]
+                    if loadovlp:
+                        m = self.FRAG[i][j]['ovlp_attrs']; mo = m
 
-                    # get masks within the overlap bounding box for the neighbors and the overlap.
-                    obnd = nd.measurements.find_objects(svox_ovlp)[0]
-                    aobnd = tuple([slice(x.start+y.start-self.operim[k],
-                        x.stop+y.start+self.operim[k]) for x,y,k in zip(obnd,n['pbnd'],range(dpLoadh5.ND))])
-                    # convert back to volume space and then grab a new volume around the overlap area
-                    ovlp_svox_cur = self.supervoxels[aobnd]
-                    # get overlap within the same bounding box
-                    ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
-                    ovlp_cur[tuple([slice(x,-x) for x in self.operim])] = svox_ovlp[obnd]
+                        # this has to be redone because some of the neighbors 
+                        #   inside of the bounding box may have changed.
+                        ovlp_svox_cur = self.supervoxels[m['aobnd']]
+                    else:
+                        # dilate the other supervoxel by the same perimeter amount within this bounding box.
+                        # use the binary overlap between the two dilations as the boundary for these neighbors.
+                        svox_ovlp = np.logical_and(n['svox_sel_out'], nd.morphology.binary_dilation((svox_cur == j), 
+                            structure=self.bwconn, iterations=dpFRAG.neighbor_perim))
+                            
+                        # create another bounding box arond the overlap area. this is simply an optimization for the
+                        #   mean features, as this will be a smaller cropped area. in addition, used to calculate
+                        #   more completex features of the objects and the overlap in the local overlap volume.
+                        obnd = nd.measurements.find_objects(svox_ovlp)[0]
+                        # convert bounding box back to entire volume space.
+                        aobnd = tuple([slice(x.start+y.start-self.operim[k],
+                            x.stop+y.start+self.operim[k]) for x,y,k in zip(obnd,n['pbnd'],range(dpLoadh5.ND))])
 
-                    # get the point coordinates for each object and for the overlap within the overlap bounding box.
-                    # use the sampling resolution for the points if available.
-                    iovlp_svox_cur = (ovlp_svox_cur == i); jovlp_svox_cur = (ovlp_svox_cur == j)
-                    ipts = np.transpose(np.nonzero(iovlp_svox_cur)).astype(np.double)*sampling
-                    jpts = np.transpose(np.nonzero(jovlp_svox_cur)).astype(np.double)*sampling
-                    opts = np.transpose(np.nonzero(ovlp_cur)).astype(np.double)*sampling
-
-                    # get the centroids for each object and the overlap
-                    Ci = np.mean(ipts, axis=0); Cj = np.mean(jpts, axis=0); Co = np.mean(opts, axis=0)
-                    # centered version of the points around the centroid
-                    iCpts = ipts-Ci; jCpts = jpts-Cj; oCpts = opts-Co;
+                        # get the supervoxels within the overlap bounding box.                            
+                        ovlp_svox_cur = self.supervoxels[aobnd]
                         
-                    # centroid of overlap in coordinates of all supervoxels
-                    Cao = Co + np.array([x.start for x in aobnd])  
+                        # convert the overlap to within the same bounding box.
+                        ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
+                        ovlp_cur[tuple([slice(x,-x) for x in self.operim])] = svox_ovlp[obnd]
+
+                        # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
+
+                        # optionally further dilate the overlap in order to increase averaging area for boundaries.
+                        if self.perim > 0:
+                            ovlp_cur_dilate = nd.morphology.binary_dilation(ovlp_cur, structure=self.bwconn, 
+                                iterations=self.perim)
+                        else:
+                            ovlp_cur_dilate = ovlp_cur
                         
-                    # get the principal axes of each set of points.
-                    # force degenerate cases (co-linear, co-planar) to have 3 eigenvectors.
-                    Vi = dpFRAG.getOrthoAxes(iCpts, sampling)
-                    Vj = dpFRAG.getOrthoAxes(jCpts, sampling)
-                    Vo = dpFRAG.getOrthoAxes(oCpts, sampling)
-                    '''
-                    # do a rigid transform between the orthonormal vectors to get a 3d rotation matrix:
-                    #       https://en.wikipedia.org/wiki/Kabsch_algorithm
-                    #       http://nghiaho.com/?page_id=671
-                    Rij, tij = dpFRAG.rigid_transform_3D(Vi, Vj)
-                    Rio, tio = dpFRAG.rigid_transform_3D(Vi, Vo)
-                    Rjo, tjo = dpFRAG.rigid_transform_3D(Vj, Vo)
-                    # then decompose the rotation matrix into 3 angles:
-                    #       https://en.wikipedia.org/wiki/Euler_angles
-                    #       http://nghiaho.com/?page_id=846
-                    angles_ij = dpFRAG.decompose_rotation(Rij)
-                    angles_io = dpFRAG.decompose_rotation(Rio)
-                    angles_jo = dpFRAG.decompose_rotation(Rjo)
-                    '''
-                    # calculate angles between corresponding eigenvectors for each object and for overlap
-                    angles_ij = np.zeros((self.npcaang,),np.double)
-                    angles_io = np.zeros((self.npcaang,),np.double)
-                    angles_jo = np.zeros((self.npcaang,),np.double)
-                    for k in range(self.npcaang):
-                        angles_ij[k] = np.arctan2(nla.norm(np.cross(Vi[k,:],Vj[k,:])), np.dot(Vi[k,:],Vj[k,:]))
-                        angles_io[k] = np.arctan2(nla.norm(np.cross(Vi[k,:],Vo[k,:])), np.dot(Vi[k,:],Vo[k,:]))
-                        angles_jo[k] = np.arctan2(nla.norm(np.cross(Vj[k,:],Vo[k,:])), np.dot(Vj[k,:],Vo[k,:]))
+                        for k in range(self.ntypes):
+                            mean_probs[k] = self.probs[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+                        mean_grayscale = self.raw[aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+
+                        # MORE COMPLEX FEATURES: object attributes within the overlap bounding box.
+                        mo = self.getOvlpAttrs(ovlp_cur, sampling, return_Cpts=True)
+
+                        # percentage of voxels in the overlap area that are labeled (not background).
+                        # base this also on the dilated overlap.
+                        ovlp_labeled = (ovlp_svox_cur[ovlp_cur_dilate] > 0).sum(dtype=np.double)/mo['sel_size']
+
+                        # radial standard deviation of the overlap from the centroid
+                        ovlp_rmom = np.std(nla.norm(mo['Cpts'], axis=1))
+                        # angular standard deviation of the overlap from the first principle component
+                        ovlp_amom = np.std(np.arctan2(nla.norm(np.cross(mo['Cpts'],mo['V'][0,:]),axis=1), 
+                            np.dot(mo['Cpts'],mo['V'][0,:])))
+
+                        # simple "convexity" measure, compare size of overlap with that of overlap bounding box
+                        ovlp_conv = mo['sel_size']/np.array([x.stop-x.start for x in obnd]).prod(dtype=np.double)
+                        #assert(ovlp_conv <= 1)     # silly sanity check
+
+                        # save the variables in ovlp_attrs to edge attributes
+                        d = locals(); m = { k:d[k] for k in dpFRAG.ovlp_attrs }
+                        # concatenate sovlp_attrs and ovlp_attrs for the overlap
+                        self.FRAG[i][j]['ovlp_attrs'] = {**m, **mo}
+
+                    # more complicated optimization. if the overlap is preserved then calculations on one of the
+                    #   supervoxels might also be preserved if it was not agglomerated in the previous iteration.
+                    loadi = False; loadj = False
+                    if update and 'sovlp_attrs' in self.FRAG[i][j]:
+                        # avoid second pass to renumber nodes in agglomerate because of relabel
+                        loadi = previ in self.FRAG[i][j]['sovlp_attrs']; loadj = prevj in self.FRAG[i][j]['sovlp_attrs']
+                        assert( not loadi or not loadj )     # both sovlp_attrs should not happen
+                        assert( (not loadi and not loadj) or loadovlp )     # sovlp_attrs without ovlp_attrs
+                    else:
+                        self.FRAG[i][j]['sovlp_attrs'] = {}
+                    if loadi:
+                        mi = self.FRAG[i][j]['sovlp_attrs'][previ]
+                        self.FRAG[i][j]['sovlp_attrs'] = {i:mi}     # move to current supervoxel value
+                    else:
+                        mi = self.getOvlpAttrs(ovlp_svox_cur == i, sampling, Vother=mo['V'])
+                        self.FRAG[i][j]['sovlp_attrs'][i] = mi
+                    if loadj:
+                        mj = self.FRAG[i][j]['sovlp_attrs'][prevj]
+                        self.FRAG[i][j]['sovlp_attrs'] = {j:mj}     # move to current supervoxel value
+                    else:
+                        mj = self.getOvlpAttrs(ovlp_svox_cur == j, sampling, Vother=mo['V'])
+                        self.FRAG[i][j]['sovlp_attrs'][j] = mj
+                    
+                    # calculate angles between corresponding supervoxel eigenvectors within overlap box
+                    angles_ij = np.zeros((dpFRAG.npcaang,),np.double)
+                    for k in range(dpFRAG.npcaang):
+                        angles_ij[k] = np.arctan2(nla.norm(np.cross(mi['V'][k,:],mj['V'][k,:])), 
+                            np.dot(mi['V'][k,:],mj['V'][k,:]))
 
                     # angle / distance of vectors from overlap centroid to object centroids
-                    Vi = Ci - Co; Vj = Cj - Co
+                    Vi = mi['C'] - mo['C']; Vj = mj['C'] - mo['C']
                     # https://newtonexcelbach.wordpress.com/2014/03/01/the-angle-between-two-vectors-python-version/
                     oanglec = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
                     odistci = nla.norm(Vi); odistcj = nla.norm(Vj)
 
-                    # radial standard deviation of the overlap from the centroid
-                    ovlp_rmom = np.std(nla.norm(oCpts, axis=1))
-                    # angular standard deviation of the overlap from the first principle component
-                    ovlp_amom = np.std(np.arctan2(nla.norm(np.cross(oCpts,Vo[0,:]),axis=1), np.dot(oCpts,Vo[0,:])))
-
-                    # simple "convexity" measure, compare size of overlap with that of overlap bounding box
-                    ovlp_conv = svox_ovlp_size / np.array([x.stop-x.start for x in obnd]).prod(dtype=np.double)
-                    assert(ovlp_conv <= 1)
+                    # is this useful? rather costly and requires m['ovlp_cur'] saved
+                    ## total number of other labels in the overlap area
+                    #otherlbls = np.unique(ovlp_svox_cur[m['ovlp_cur']])
+                    ## do not count background or the labels currently involved in this edge
+                    #otherlbls = otherlbls[np.logical_and(np.logical_and(otherlbls != i, otherlbls != j),otherlbls != 0)]
 
                     # set all the features except the size of the neighbor label for current object
                     F = self.FEATURES
                     f = {
-                        F['size_overlap']:lsvox_ovlp_size,
-                        F['mean_grayscale']:mean_grayscale,
-                        F['angc_ovlp']:oanglec, 
-                        F['rad_std_ovlp']:ovlp_rmom,
-                        F['ang_std_ovlp']:ovlp_amom,
-                        F['conv_overlap']:ovlp_conv,
+                        F['size_overlap']:mo['lsel_size'],
+                        F['mean_grayscale']:m['mean_grayscale'],
+                        F['ang_cntr']:oanglec, 
+                        F['rad_std_ovlp']:m['ovlp_rmom'],
+                        F['ang_std_ovlp']:m['ovlp_amom'],
+                        F['conv_overlap']:m['ovlp_conv'],
+                        F['labeled_ovlp']:m['ovlp_labeled'],
                         # these features might need to be swapped depending on which object is larger
                         F['size_small']:n['lsvox_size'],
-                        F['distc_ovlp_small']:odistci, 
-                        F['distc_ovlp_large']:odistcj, 
-                        F['size_ovlp_small']:self.voxel_size_xform(iovlp_svox_cur.sum(dtype=np.int64)),
-                        F['size_ovlp_large']:self.voxel_size_xform(jovlp_svox_cur.sum(dtype=np.int64)),
-                        # features requiring more calculation based on other neighbor
-                        F['ang_cntr']:Cao,
-                        F['dist_cntr_small']:n['Cc'],
+                        F['dist_cntr_small']:odistci, 
+                        F['dist_cntr_large']:odistcj, 
+                        F['size_ovlp_small']:mi['lsel_size'],
+                        F['size_ovlp_large']:mj['lsel_size'],
                         }
-                    for k in range(self.npcaang):
+                    for k in range(dpFRAG.npcaang):
                         f[F['pca_angle' + str(k)]] = angles_ij[k]
                         # these features might need to be swapped depending on which object is larger
-                        f[F['pca_angle_small' + str(k)]] = angles_io[k]
-                        f[F['pca_angle_large' + str(k)]] = angles_jo[k]
+                        f[F['pca_angle_small' + str(k)]] = mi['angles'][k]
+                        f[F['pca_angle_large' + str(k)]] = mj['angles'][k]
                     for k in range(self.ntypes):
-                        f[F['mean_prob_' + self.types[k]]] = mean_probs[k]
+                        f[F['mean_prob_' + self.types[k]]] = m['mean_probs'][k]
                     self.FRAG[i][j]['features'] = f; self.FRAG[i][j]['first_pass'] = True
                 else: # if edge already in graph
                     # if this is update mode and the edge is there and not marked as first pass, 
@@ -387,16 +426,6 @@ class dpFRAG(emLabels):
                     # update this edge for second pass (the other neighbor is now the current neighbor)
                     f = self.FRAG[i][j]['features']; F = self.FEATURES; self.FRAG[i][j]['first_pass'] = False
 
-                    # features requiring more calculation based on other neighbor
-                    # distance and angles from centers of entire neighboring supervoxels to the overlap
-                    Ci = f[F['dist_cntr_small']]; Co = f[F['ang_cntr']]; Cj = n['Cc']
-                    Vi = Ci - Co; Vj = Cj - Co
-                    # https://newtonexcelbach.wordpress.com/2014/03/01/the-angle-between-two-vectors-python-version/
-                    f[F['ang_cntr']] = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
-                    # set the global distances from centroid to overlap based on current neighbor is larger.
-                    #   do swap same as other swaps below if not.
-                    f[F['dist_cntr_small']] = nla.norm(Vi); f[F['dist_cntr_large']] = nla.norm(Vj)
-                        
                     # features are stored with size sorted by large / small object, so set features accordingly.
                     if f[F['size_small']] <= n['lsvox_size']:
                         # set the size of the neighbor label for current object, current is larger.
@@ -406,23 +435,28 @@ class dpFRAG(emLabels):
                         f[F['size_large']] = f[F['size_small']]; f[F['size_small']] = n['lsvox_size']
                             
                         # features that were set originally with i object as small, j is actually smaller, so swap
-                        f[F['distc_ovlp_small']], f[F['distc_ovlp_large']] = \
-                            f[F['distc_ovlp_large']], f[F['distc_ovlp_small']]
+                        f[F['dist_cntr_small']], f[F['dist_cntr_large']] = \
+                            f[F['dist_cntr_large']], f[F['dist_cntr_small']]
                         f[F['size_ovlp_small']], f[F['size_ovlp_large']] = \
                             f[F['size_ovlp_large']], f[F['size_ovlp_small']]
                         f[F['dist_cntr_small']], f[F['dist_cntr_large']] = \
                             f[F['dist_cntr_large']], f[F['dist_cntr_small']]
-                        for k in range(self.npcaang):
+                        for k in range(dpFRAG.npcaang):
                             str_small = 'pca_angle_small' + str(k); str_large = 'pca_angle_large' + str(k)
                             f[F[str_small]], f[F[str_large]] = f[F[str_large]], f[F[str_small]]
-                                
+
+                    # xxx - this sanity check was used during development of this function.
+                    #   would need some major updates to verify overlap is the same in both directions...
                     # overlap features here should be the same as done before, can verify with asserts for debug
                     #if self.FRAG[i][j]['features']['overlap'] != size_ovlp:
                     #    print(i,j,size_ovlp,self.FRAG[i][j]['features']['overlap']); assert(False)
     
                 # update progress bar based on size of all neighbors added so far
-                if self.dpFRAG_verbose and useProgressBar:
-                    running_size += (bar_update if j != nbrlbls[-1] else bar_final); pbar.update(running_size)
+                #if self.dpFRAG_verbose and useProgressBar:
+                #    running_size += (bar_update if j != nbrlbls[-1] else bar_final); pbar.update(running_size)
+
+            if self.dpFRAG_verbose and useProgressBar:
+                running_size += 1; pbar.update(running_size)
                 
         if self.dpFRAG_verbose: 
             if useProgressBar: pbar.finish()                        
@@ -519,13 +553,15 @@ class dpFRAG(emLabels):
         # get connected component nodes, create supervoxel mapping and update FRAG based on agglomerated components
         supervox_map = np.zeros((self.nsupervox+1,),dtype=self.data_type_out)
         compsG = nx.connected_components(aggloG); ncomps = 0
+        svox_sizes = np.zeros((self.nsupervox,),dtype=np.int64)
         for nodes in compsG:
-            ncomps += 1; supervox_map[np.array(tuple(nodes),dtype=np.int64)] = ncomps
+            # supervoxel mapping from previous to new agglomerated supervoxels, update supervoxel sizes
+            npnodes = np.array(tuple(nodes),dtype=np.int64); svox_sizes[ncomps] = self.svox_sizes[npnodes-1].sum()
+            ncomps += 1; supervox_map[npnodes] = ncomps
             
             # update the FRAG by creating a new agglomerated node and moving neighboring edges to this node
             newnode = ncomps+self.nsupervox; self.FRAG.add_node(newnode)
-
-            if len(nodes) == 1: 
+            if len(nodes) == 1:
                 # singleton nodes do not contain any mergers.
                 # this is the only time that features may be copied over from old FRAG.
                 # i.e., this supervoxel did not change.
@@ -535,7 +571,7 @@ class dpFRAG(emLabels):
                 # this saves time in recalculating them in createFRAG as this supervoxel itself has not changed.
                 # NOTE: if there are no neighbors left for this supervoxel, no need to compute supervoxel attributes.
                 #   In this special case the supervoxel is skipped in the createFRAG loop.
-                #   So they will not have been saved in the node attributes.
+                #   So no need to save the supervoxel attributes in the node.
                 if len(self.FRAG[node]) > 0: self.FRAG.node[newnode]['svox_attrs'] = self.FRAG.node[node]['svox_attrs']
 
                 # for each neighbor of this node (edge in FRAG)
@@ -546,27 +582,68 @@ class dpFRAG(emLabels):
                     # edges not requiring feature updates are marked by having features copied over from previous FRAG.
                     # only copy the features if the other node was already visited and was also singleton (has features)
                     #   or if the other node was not visited yet (neighbor node <= previous nsupervox).
-                    if neighbor <= self.nsupervox or 'features' in self.FRAG[node][neighbor]:
-                        self.FRAG[neighbor][newnode]['features'] = self.FRAG[node][neighbor]['features']
+                    if neighbor <= self.nsupervox or 'features' in f:
+                        features_copied = True
+                        self.FRAG[neighbor][newnode]['features'] = f['features']
                         self.FRAG[neighbor][newnode]['first_pass'] = False
+                    else:
+                        features_copied = False
+
+                    '''
+                    # copy over overlap attributes but only if features are not copied over to final new edge.
+                    if neighbor <= self.nsupervox or not features_copied:
+                        # if the overlap attributes are present, then copy them over to the new edge.
+                        if 'ovlp_attrs' in f: 
+                            self.FRAG[neighbor][newnode]['ovlp_attrs'] = f['ovlp_attrs']
+                        # copy the supervoxel overlap attributes over for this singleton node
+                        if 'sovlp_attrs' in f and node in f['sovlp_attrs']:
+                            self.FRAG[neighbor][newnode]['sovlp_attrs'] = {newnode: f['sovlp_attrs'][node]}
+                            assert( 'ovlp_attrs' in f )     # should not have sovlp_attrs without ovlp_attrs
+                    '''
                 
                 # remove the old singleton node
                 self.FRAG.remove_node(node)
             else:
+                # copy over overlap attributes for neighbors that border on only one of the nodes in the agglomerate.
+                # in this case the overlap area has not changed. need two passes to check for this.
+                neighbors = {}
+            
                 # each node in connected component (that compose the agglomerated newnode)
                 for node in nodes:
                     # for each neighbor of this node (edge in FRAG)
+                    for neighbor in self.FRAG[node].keys():
+                        # skip neighbors that are other nodes of this component.
+                        if neighbor not in nodes:
+                            # if the edge is missing, then log this new neighbor and add edge.
+                            if not self.FRAG.has_edge(neighbor, newnode):
+                                self.FRAG.add_edge(neighbor, newnode)   # move this edge to newnode
+                                assert( neighbor not in neighbors )
+                                neighbors[neighbor] = 1
+                            else:
+                                # neighbor must have already been present for another node of the agglomerate.
+                                # increment the count for this neighbor.
+                                neighbors[neighbor] += 1
+
+                for node in nodes:
+                    '''
+                    # for each neighbor of this node (edge in FRAG)
                     for neighbor,f in self.FRAG[node].items():
-                        # do not add neighbors that are other nodes of this component.
-                        # skip neighbors that were already added (by another component of the agglomerated newnode).
-                        if not self.FRAG.has_edge(neighbor, newnode) and neighbor not in nodes:
-                            self.FRAG.add_edge(neighbor, newnode)   # move this edge to newnode
+                        # copy over overlap attributes for neighbors that border on only one of agglomerated nodes.
+                        if neighbor not in nodes and neighbors[neighbor] == 1:
+                            if 'ovlp_attrs' in f: 
+                                self.FRAG[neighbor][newnode]['ovlp_attrs'] = f['ovlp_attrs'] 
+                            # copy the neighbor supervoxel overlap attributes over.
+                            # they might be preservable in this case if the neighbor is a singleton node.
+                            if 'sovlp_attrs' in f and neighbor in f['sovlp_attrs']:
+                                self.FRAG[neighbor][newnode]['sovlp_attrs'] = {neighbor: f['sovlp_attrs'][neighbor]}
+                                assert( 'ovlp_attrs' in f )     # should not have sovlp_attrs without ovlp_attrs
                     # after visiting, remove this old node that makes up part of the agglomerated node.
+                    '''
                     self.FRAG.remove_node(node)
                 
         # sanity checks
         assert( ncomps == self.FRAG.number_of_nodes() )
-        assert( self.nsupervox+ncomps == max(self.FRAG.nodes()) )
+        assert( self.nsupervox+ncomps == max(self.FRAG.nodes()) )  # commented for speed
 
         # relabel the FRAG starting at supervoxel 1
         self.FRAG = nx.relabel_nodes(self.FRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
@@ -574,13 +651,15 @@ class dpFRAG(emLabels):
         # create/write the new supervoxels from the supervoxel_map containing mapping from old nodes to agglo nodes.
         self.data_cube = supervox_map[self.supervoxels_noperim]
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = self.dpFRAG_verbose;
+        self.data_attrs['types_nlabels'] = [ncomps]
         self.writeCube(); self.dpWriteh5_verbose = verbose
 
         # other self updates for the new supervoxels
         self.supervoxels_noperim = self.data_cube
         self.supervoxels = np.lib.pad(self.data_cube, self.spad, 'constant',
             constant_values=0).astype(self.data_type_out, copy=False)
-        self.nsupervox = ncomps; self.data_cube = np.zeros((0,))
+        self.nsupervox_prev = self.nsupervox; self.nsupervox = ncomps; self.data_cube = np.zeros((0,))
+        self.svox_sizes = svox_sizes[:ncomps]
 
         if self.dpFRAG_verbose:
             print('\tnsupervox',ncomps)
@@ -608,9 +687,10 @@ class dpFRAG(emLabels):
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = False;
 
         if self.dpFRAG_verbose:
+            useProgressBar = __useProgressBar and self.progress_bar
             print('Threshold agglomeration for thresholds %s' % (' '.join([str(x) for x in thresholds]),))
             t = time.time()
-            if __useProgressBar:
+            if useProgressBar:
                 widgets = [RotatingMarker(), ' ', Percentage(), ' ', Bar(marker='='), ' ', ETA()]
                 pbar = ProgressBar(widgets=widgets, maxval=nthresholds).start()
 
@@ -633,18 +713,20 @@ class dpFRAG(emLabels):
             supervox_map = np.zeros((self.nsupervox+1,),dtype=self.data_type_out)
             compsG = nx.connected_components(aggloG); ncomps = 0
             for nodes in compsG:
+                # supervoxel mapping from previous to new agglomerated supervoxels
                 ncomps += 1; supervox_map[np.array(tuple(nodes),dtype=np.int64)] = ncomps
             # create the new supervoxels from the supervoxel_map containing mapping from agglo nodes to new nodes
             self.data_cube = supervox_map[self.supervoxels_noperim]
 
             if self.dpFRAG_verbose: 
                 print('nsupervox',ncomps)
-                if __useProgressBar: pbar.update(i)
+                if useProgressBar: pbar.update(i)
             #print(self.offset, self.size, self.chunk, self.data_type, self.data_type_out)
+            self.data_attrs['types_nlabels'] = [ncomps]
             self.writeCube()
                 
         if self.dpFRAG_verbose: 
-            if __useProgressBar: pbar.finish()                        
+            if useProgressBar: pbar.finish()                        
             print('\n\tdone in %.4f s' % (time.time() - t))
         
         self.subgroups_out = self_subgroups_out
@@ -652,6 +734,42 @@ class dpFRAG(emLabels):
 
     def voxel_size_xform(self, size):
         return np.log10(size.astype(np.double)) if self.log_size else size.astype(np.double)
+
+    # macro for computing attributes of supervoxels and overlap that are within the overlap bounding box.
+    # these are used for the more complex features in createFRAG.
+    # called for the two neighboring supervoxels and the overlap area.
+    def getOvlpAttrs(self, sel, sampling, Vother=None, return_Cpts=False):
+        # size of supervoxel or overlap selection
+        sel_size = sel.sum(dtype=np.int64)
+        lsel_size = self.voxel_size_xform(sel_size)
+
+        # get the point coordinates within the overlap bounding box.
+        # use the sampling resolution for the points if available.
+        pts = np.transpose(np.nonzero(sel)).astype(np.double)*sampling
+
+        # get the centroid and center points
+        C = np.mean(pts, axis=0); Cpts = pts-C
+                        
+        # get the principal axes.
+        V = dpFRAG.getOrthoAxes(Cpts, sampling)
+
+        # only return points if needed
+        if not return_Cpts: Cpts = None
+                    
+        # calculate angles between corresponding eigenvectors
+        if Vother is None:
+            angles = None
+        else:
+            angles = np.zeros((dpFRAG.npcaang,),np.double)
+            for k in range(dpFRAG.npcaang):
+                angles[k] = np.arctan2(nla.norm(np.cross(V[k,:],Vother[k,:])), np.dot(V[k,:],Vother[k,:]))
+
+            # rigid transform rotation decomposed to Euler angles.
+            # xxx - this method did not work as well for classification. look at this again in the future?
+            #R, t = dpFRAG.rigid_transform_3D(V, Vother); angles = dpFRAG.decompose_rotation(R)
+
+        # save the variables in dict to return
+        d = locals(); return { k:d[k] for k in dpFRAG.sovlp_attrs }
 
     # this is just svd to get eigenvectors of points, but handling degenerate cases by forcing each voxel into 3d by
     #   expanding each point to 6 points at the center of each voxel face (based on voxel size, sampling).
@@ -677,6 +795,8 @@ class dpFRAG(emLabels):
         return Vt
     
     # modified from http://nghiaho.com/uploads/code/rigid_transform_3D.py_
+    #       https://en.wikipedia.org/wiki/Kabsch_algorithm
+    #       http://nghiaho.com/?page_id=671
     # Input: expects Nx3 matrix of points
     # t = 3x1 column vector
     # returns R = 3x3 rotation matrix
@@ -694,6 +814,8 @@ class dpFRAG(emLabels):
         return R, t
 
     # modified from http://nghiaho.com/uploads/code/rotation_matrix_demo.m    
+    #       https://en.wikipedia.org/wiki/Euler_angles
+    #       http://nghiaho.com/?page_id=846
     @staticmethod
     def decompose_rotation(R):
         A = np.zeros((3,),np.double)    # xyz
@@ -704,7 +826,7 @@ class dpFRAG(emLabels):
         
     @classmethod
     def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, gtfile, 
-            subgroups=[], G=None, verbose=False):
+            subgroups=[], G=None, progressBar=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -720,6 +842,7 @@ class dpFRAG(emLabels):
         arg_str += ' --gtfile ' + gtfile
         
         if verbose: arg_str += ' --dpFRAG-verbose '
+        if progressBar: arg_str += ' --progress-bar '
         if verbose: print(arg_str)
         args = parser.parse_args(arg_str.split())
         frag = cls(args); 
@@ -729,7 +852,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, outfile, subgroups=[], 
-            subgroups_out=[], G=None, verbose=False):
+            subgroups_out=[], G=None, progressBar=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -746,6 +869,7 @@ class dpFRAG(emLabels):
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         
         if verbose: arg_str += ' --dpFRAG-verbose '
+        if progressBar: arg_str += ' --progress-bar '
         if verbose: print(arg_str)
         args = parser.parse_args(arg_str.split())
         frag = cls(args); 
@@ -755,7 +879,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeBothFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, gtfile, outfile,
-            subgroups=[], subgroups_out=None, G=None, verbose=False):
+            subgroups=[], subgroups_out=None, G=None, progressBar=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -773,6 +897,7 @@ class dpFRAG(emLabels):
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         
         if verbose: arg_str += ' --dpFRAG-verbose '
+        if progressBar: arg_str += ' --progress-bar '
         if verbose: print(arg_str)
         args = parser.parse_args(arg_str.split())
         frag = cls(args); 
@@ -793,8 +918,8 @@ class dpFRAG(emLabels):
             help='Path/name of ground truth (GT) labels (create training data)')
         p.add_argument('--trainout', nargs=1, type=str, default='', help='Output file for dumping training data (dill)')
         p.add_argument('--testin', nargs=1, type=str, default='', help='Input file for loading testing data (dill)')
-        p.add_argument('--perim', nargs=1, type=int, default=[1], choices=range(1,20),
-            help='Size of perimeter around supervoxels for calculating boundary features')
+        p.add_argument('--perim', nargs=1, type=int, default=[0], choices=range(0,20),
+            help='Size of perimeter around supervoxel overlap for calculating boundary features')
         p.add_argument('--operim', nargs=3, type=int, default=[16,16,8], choices=range(1,20),
             help='Size of bounding box around overlap for object features')
         p.add_argument('--remove-ECS', dest='remove_ECS', action='store_true', 
@@ -806,6 +931,7 @@ class dpFRAG(emLabels):
             help='Connectivity for binary morphology operations')
         p.add_argument('--keep-subgroups', action='store_true', 
             help='Keep subgroups for labels in path for subgroups-out')
+        p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
 
 if __name__ == '__main__':

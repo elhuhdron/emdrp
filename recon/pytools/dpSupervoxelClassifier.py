@@ -230,16 +230,18 @@ class dpSupervoxelClassifier():
                 if self.iterative_mode:
                     if self.iterative_frag[chunk] is None:
                         frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
-                            self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, 
-                            ['training','thr'], verbose=self.dpSupervoxelClassifier_verbose)
+                            self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, ['training','thr'], 
+                            progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
                         frag = self.iterative_frag[chunk]; #frag.loadSupervoxels()
                 else:
                     frag = dpFRAG.makeTrainingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
                         self.raw_dataset, self.gtfile, self.label_subgroups, 
-                        verbose=self.dpSupervoxelClassifier_verbose)
-                frag.createFRAG(update = self.iterative_mode); data = frag.createDataset()
+                        progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
+                frag.createFRAG(update = self.iterative_mode)
+                #frag.createFRAG(update = False)
+                data = frag.createDataset()
                 ntargets[chunk] = data['target'].shape[0]
                 target[cnt_targets:cnt_targets+ntargets[chunk]] = data['target']
                 fdata[cnt_targets:cnt_targets+ntargets[chunk],:] = data['data']
@@ -356,17 +358,19 @@ class dpSupervoxelClassifier():
                 if self.doplots:
                     frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
                         self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out, 
-                        G=FRAG, verbose=self.dpSupervoxelClassifier_verbose)
+                        G=FRAG, progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
                 else:
                     frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
                         self.raw_dataset, self.outfile, self.label_subgroups, subgroups_out, G=FRAG,
-                        verbose=self.dpSupervoxelClassifier_verbose)
+                        progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
 
             if self.iterative_mode and self.iterative_frag[chunk] is None:
                 frag.isTraining = False; self.iterative_frag[chunk] = frag
             
             if not (len(self.test_chunks) == 1 and self.testin):
-                frag.createFRAG(update = self.iterative_mode); data = frag.createDataset(train=self.doplots)
+                frag.createFRAG(update = self.iterative_mode)
+                #frag.createFRAG(update = False)
+                data = frag.createDataset(train=self.doplots)
 
                 if self.testout:
                     if self.dpSupervoxelClassifier_verbose: 
@@ -667,6 +671,7 @@ class dpSupervoxelClassifier():
             help='Export various plots to this path (default no plots)')
         p.add_argument('--plot-features', action='store_true', help='If plotting, whether to include feature plots')
         p.add_argument('--outfile', nargs=1, type=str, default='', help='Override output file for agglomerations')
+        p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
         
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true', 
             help='Debugging output for dpSupervoxelClassifier')

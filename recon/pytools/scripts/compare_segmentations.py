@@ -50,20 +50,20 @@ params = {
     'segmentations' : [
         'huge_agglo_perfect_supervoxels.h5', 
         'huge_supervoxels.h5', 
-        'huge_flatagglo_lda_20f_35iter_test_supervoxels.h5',
-        #'huge_flatagglo_lda_14f_35iter_supervoxels.h5',
+        'huge_flatagglo_lda_23f_35iter_test_supervoxels.h5',
+        'huge_flatagglo_lda_24ft_35iter_test_supervoxels.h5',
         ],
     'seglbls' : [
         'perfect',
         'watershed',
-        'lda_35iters',
-        #'lda_14feat',
+        'lda_23f',
+        'lda_24ft',
         ],
     'subgroups' : [
         ['with_background',],
         ['with_background',],
         ['agglomeration',],
-        #['agglomeration',],
+        ['agglomeration',],
         ],
     'segparams' : [
         np.array([0.3]),
@@ -78,15 +78,15 @@ params = {
         #np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
         #    0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
         np.arange(1,35,dtype=np.double),
-        #np.arange(1,35,dtype=np.double),
+        np.arange(1,35,dtype=np.double),
         ],
     #
     'size' : [128, 128, 128], 'offset' : [0, 0, 0],
-    'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+    #'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
     #'chunks' : [[17,19,2], [17,23,1], [22,23,1]],
-    #'chunks' : [[17,19,2],],
+    'chunks' : [[17,23,1],],
     'figno' : 5000,
-    'plot_only':True,
+    'plot_only':False,
     'outpath' : '.',
     'save_file' : 'out.dill',
     'do_plots':True,
@@ -166,6 +166,9 @@ min_are_gala = are_gala.min(axis=2)
 amin_are_gala = are_gala.argmin(axis=2)
 min_vi_gala = vi_gala.min(axis=2)
 amin_vi_gala = vi_gala.argmin(axis=2)
+
+print('min are across param')
+print(min_are_gala)
 
 def scatter_err_plots(errs, strs, ylims, plsize, dostats, groups_vals_rep_loc=None, jitter=0, doLines=True):
     if groups_vals_rep_loc is None: groups_vals_rep_loc = groups_vals_rep

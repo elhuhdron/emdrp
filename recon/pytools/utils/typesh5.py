@@ -189,6 +189,12 @@ class emLabels(dpWriteh5):
         maxlbls = lbls.max(); sizes,edges = np.histogram(lbls, bins=range(0,maxlbls+2), range=(0,maxlbls+1))
         return sizes
 
+    @staticmethod
+    def getSizesMax(lbls,maxlbls):
+        assert( lbls.dtype.kind in 'ui' )
+        sizes,edges = np.histogram(lbls, bins=range(0,maxlbls+2), range=(0,maxlbls+1))
+        return sizes
+
     # get type of each supervoxel by majority vote by summing votes per supervoxel
     @staticmethod
     def type_components(labels, voxel_type, nlabels, ntypes):
