@@ -607,8 +607,11 @@ class dpSupervoxelClassifier():
                 bnd = nd.measurements.find_objects(sel); 
                 #xlim = (bins[x][bnd[0][0].start]+binw[x]/10, bins[x][bnd[0][0].stop]-binw[x]/10)
                 #ylim = (bins[y][bnd[0][1].start]+binw[y]/10, bins[y][bnd[0][1].stop]-binw[y]/10)
-                xlim = (cbins[x][bnd[0][0].start], cbins[x][bnd[0][0].stop-1])
-                ylim = (cbins[y][bnd[0][1].start], cbins[y][bnd[0][1].stop-1])
+                if len(bnd) == 0:
+                    xlim = [0,1]; ylim = [0,1]
+                else:
+                    xlim = (cbins[x][bnd[0][0].start], cbins[x][bnd[0][0].stop-1])
+                    ylim = (cbins[y][bnd[0][1].start], cbins[y][bnd[0][1].stop-1])
                 
                 # imshow uses f-order so x/y are flipped
                 pl.imshow(img,interpolation='nearest',extent=(cbins[y][0],cbins[y][-1],cbins[x][0],

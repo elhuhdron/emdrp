@@ -42,55 +42,59 @@ from dpLoadh5 import dpLoadh5
 from typesh5 import emLabels, emProbabilities, emVoxelType
 
 params = {
-    'gth5' : '/home/watkinspv/Data/M0007_33/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
+    'gth5' : '/Data/datasets/labels/gt/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
     'gt_ECS_label' : 1,
     #
-    #'segpath' : '/Data/pwatkins/full_datasets/newestECSall/20151001',
-    'segpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out/20151006',
+    'segpaths' : [
+        '/Data/datasets/labels/supervoxels/sixfold_threed_20151006',
+        '/home/watkinspv/Data/agglo', 
+        '/home/watkinspv/Data/agglo', 
+        '/home/watkinspv/Data/agglo', 
+        ],
     'segmentations' : [
-        'huge_agglo_perfect_supervoxels.h5', 
-        #'huge_supervoxels.h5', 
+        #'huge_agglo_perfect_supervoxels.h5', 
+        'huge_supervoxels.h5', 
         'huge_flatagglo_lda_23f_35iter_test_supervoxels.h5',
-        'huge_flatagglo_lda_24ft_35iter_test_supervoxels.h5',
         'huge_flatagglo_lda_25f_50iter_test_supervoxels.h5',
+        'huge_flatagglo_lda_24f_50iter_test_supervoxels.h5',
         ],
     'seglbls' : [
-        'perfect',
-        #'watershed',
+        #'perfect',
+        'watershed',
         'lda_23f',
-        'lda_24f',
         'lda_25f',
+        'lda_24f',
         ],
     'subgroups' : [
-        ['with_background',],
         #['with_background',],
+        ['with_background',],
         ['agglomeration',],
         ['agglomeration',],
         ['agglomeration',],
         ],
     'segparams' : [
-        np.array([0.3]),
-        #np.array([0.3, 0.4, 0.5, 0.6, 0.61, 0.62, 0.63, 0.64,
-        #    0.65, 0.66, 0.67, 0.68, 0.69, 0.7, 0.71, 0.72,
-        #    0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79, 0.8,
-        #    0.81, 0.82, 0.83, 0.84, 0.85, 0.86, 0.87, 0.88,
-        #    0.89, 0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96,
-        #    0.97, 0.98, 0.99, 0.995, 0.999, 0.9995, 0.9999,
-        #    0.99995, 0.99999, 0.999995, 0.999999,
-        #    ]),
+        #np.array([0.3]),
+        np.array([0.3, 0.4, 0.5, 0.6, 0.61, 0.62, 0.63, 0.64,
+            0.65, 0.66, 0.67, 0.68, 0.69, 0.7, 0.71, 0.72,
+            0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79, 0.8,
+            0.81, 0.82, 0.83, 0.84, 0.85, 0.86, 0.87, 0.88,
+            0.89, 0.9, 0.91, 0.92, 0.93, 0.94, 0.95, 0.96,
+            0.97, 0.98, 0.99, 0.995, 0.999, 0.9995, 0.9999,
+            0.99995, 0.99999, 0.999995, 0.999999,
+            ]),
         #np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
         #    0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
         np.arange(1,35,dtype=np.double),
-        np.arange(1,35,dtype=np.double),
+        np.arange(1,50,dtype=np.double),
         np.arange(1,50,dtype=np.double),
         ],
     #
     'size' : [128, 128, 128], 'offset' : [0, 0, 0],
-    #'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+    'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
     #'chunks' : [[17,19,2], [17,23,1], [22,23,1]],
-    'chunks' : [[17,23,1],],
+    #'chunks' : [[17,23,1],],
     'figno' : 5000,
-    'plot_only':True,
+    'plot_only':False,
     'outpath' : '.',
     'save_file' : 'out.dill',
     'do_plots':True,
@@ -126,8 +130,8 @@ if not plot_only:
         gtComps = loadh5.data_cube; gtIsECS = (gtComps == gt_ECS_label);
         gtComps[gtIsECS] = 0; n = gtComps.max(); gtComps[gtComps == n] = gt_ECS_label; gtnlabels = n-1
     
-        for i,seg in zip(range(nsegs),segmentations):
-            fps = os.path.join(segpath, seg)
+        for i,seg,segp in zip(range(nsegs), segmentations, segpaths):
+            fps = os.path.join(segp, seg)
             print('calculating metrics for ' + seg + (' chunk %d %d %d' % tuple(chunk))); t = time.time()
         
             for k,prm in zip(range(nparams[i]),segparams[i]):

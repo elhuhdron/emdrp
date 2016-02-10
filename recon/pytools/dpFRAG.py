@@ -67,11 +67,11 @@ class dpFRAG(emLabels):
     FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
         'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
         'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
-        'size_ovlp_small':9, 'size_ovlp_large':10, 'labeled_ovlp':11, 'other_ovlp':12,
-        'conv_overlap':13, 'rad_std_ovlp':14, 'ang_std_ovlp':15, 
-        'pca_angle0':16, 'pca_angle_small0':17, 'pca_angle_large0':18,
-        'pca_angle1':19, 'pca_angle_small1':20, 'pca_angle_large1':21,
-        'pca_angle2':22, 'pca_angle_small2':23, 'pca_angle_large2':24,
+        'size_ovlp_small':9, 'size_ovlp_large':10, 'labeled_ovlp':11,
+        'conv_overlap':12, 'rad_std_ovlp':13, 'ang_std_ovlp':14, 
+        'pca_angle0':15, 'pca_angle_small0':16, 'pca_angle_large0':17,
+        'pca_angle1':18, 'pca_angle_small1':19, 'pca_angle_large1':20,
+        'pca_angle2':21, 'pca_angle_small2':22, 'pca_angle_large2':23,
         }
         
     #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
@@ -98,9 +98,7 @@ class dpFRAG(emLabels):
     #   preserved, but some of the overlap calculations can still be preserved.
     svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out']
     sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
-    ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_cur_dilate',
-        'ovlp_labeled']
-    #ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
+    ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -117,6 +115,7 @@ class dpFRAG(emLabels):
         # external perimeter used to pad all volumes
         self.eperim = self.operim + self.bperim
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
+        self.outRAG = None
 
         assert( not self.trainout or self.gtfile )  # need ground truth to generate training data
 
@@ -186,11 +185,17 @@ class dpFRAG(emLabels):
         self.svox_bnd = nd.measurements.find_objects(self.supervoxels)
 
         # use update to only calculate features for nodes and neighbors in FRAG updated by agglomerate()
+        make_outRAG = False
         if update and hasattr(self,'FRAG') and self.FRAG is not None:
             assert( self.nsupervox == self.FRAG.number_of_nodes() )
         else:
             # create emtpy FRAG, using networkx for now for graph
-            self.FRAG = nx.Graph(); self.FRAG.add_nodes_from(range(1,self.nsupervox+1)); update = False
+            self.FRAG = nx.Graph(); self.FRAG.add_nodes_from(range(1,self.nsupervox+1))
+
+            if update:
+                # keep another graph that contains the outlbls neighbors
+                self.outRAG = nx.Graph(); self.outRAG.add_nodes_from(range(1,self.nsupervox+1))
+                make_outRAG = True; update = False  # this is first pass, so acting like not update mode
 
         # other inits for the supervoxel iteration loop
         mean_probs = [None]*self.ntypes
@@ -249,7 +254,7 @@ class dpFRAG(emLabels):
             nbrlbls = np.unique(svox_cur[n['svox_sel_out']])
             # do not add edges to background or to the same supervoxel
             nbrlbls = nbrlbls[np.logical_and(nbrlbls != i, nbrlbls != 0)]
-            
+
             # udpate the progress bar based on the current supervoxel size divided by its number of neighbors.
             # add all remainders to last update for this supervoxel.
             #if self.dpFRAG_verbose and useProgressBar:
@@ -307,17 +312,22 @@ class dpFRAG(emLabels):
                         ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
                         ovlp_cur[tuple([slice(x,-x) for x in self.operim])] = svox_ovlp[obnd]
                         
-                        # IMPORTANT: consistently did not find benefit of including neighbors that are not directly
-                        #   adjacent. Avoid these from "polluting" the overlap, which means that the overlap can be
-                        #   conserved between agglomerations (i.e., the small non-neighbor issue). Do this by only
-                        #   counting the area that is also contained within the supervoxels as overlap.
-                        ovlp_cur = np.logical_and(ovlp_cur, np.logical_or(ovlp_svox_cur==i, ovlp_svox_cur==j))
-                        assert( ovlp_cur.sum(dtype=np.int64) > 0 )
+                        # xxx - this is an alternative method that does not work as well. 
+                        #   replace this to use old method along with outRAG so that overlap is recomputed if the
+                        #   overlap is polluted by a non-adjacent neighbor. keeping other method here for reference:
+                        ## IMPORTANT: consistently did not find benefit of including neighbors that are not directly
+                        ##   adjacent. Avoid these from "polluting" the overlap, which means that the overlap can be
+                        ##   conserved between agglomerations (i.e., the small non-neighbor issue). Do this by only
+                        ##   counting the area that is also contained within the supervoxels as overlap.
+                        ##ovlp_cur = np.logical_and(ovlp_cur, np.logical_or(ovlp_svox_cur==i, ovlp_svox_cur==j))
+                        ##assert( ovlp_cur.sum(dtype=np.int64) > 0 ) # commented for speed, will error below anyways
 
                         # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
 
                         # optionally further dilate the overlap in order to increase averaging area for boundaries.
                         if self.perim > 0:
+                            #ovlp_cur = nd.morphology.binary_dilation(ovlp_cur, structure=self.bwconn, 
+                            #    iterations=self.perim)
                             ovlp_cur_dilate = nd.morphology.binary_dilation(ovlp_cur, structure=self.bwconn, 
                                 iterations=self.perim)
                         else:
@@ -331,8 +341,7 @@ class dpFRAG(emLabels):
                         mo = self.getOvlpAttrs(ovlp_cur, sampling, return_Cpts=True)
 
                         # percentage of voxels in the overlap area that are labeled (not background).
-                        # base this also on the dilated overlap.
-                        ovlp_labeled = (ovlp_svox_cur[ovlp_cur_dilate] > 0).sum(dtype=np.double)/mo['sel_size']
+                        ovlp_labeled = (ovlp_svox_cur[ovlp_cur] > 0).sum(dtype=np.double)/mo['sel_size']
 
                         # radial standard deviation of the overlap from the centroid
                         ovlp_rmom = np.std(nla.norm(mo['Cpts'], axis=1))
@@ -342,7 +351,7 @@ class dpFRAG(emLabels):
 
                         # simple "convexity" measure, compare size of overlap with that of overlap bounding box
                         ovlp_conv = mo['sel_size']/np.array([x.stop-x.start for x in obnd]).prod(dtype=np.double)
-                        #assert(ovlp_conv <= 1)     # silly sanity check
+                        #assert(ovlp_conv <= 1)     # silly sanity check, HIASSERT
 
                         # save the variables in ovlp_attrs to edge attributes
                         d = locals(); m = { k:d[k] for k in dpFRAG.ovlp_attrs }
@@ -384,10 +393,11 @@ class dpFRAG(emLabels):
                     oanglec = np.arctan2(nla.norm(np.cross(Vi,Vj)), np.dot(Vi,Vj))
                     odistci = nla.norm(Vi); odistcj = nla.norm(Vj)
 
-                    # total number of other labels in the overlap area
-                    otherlbls = np.unique(ovlp_svox_cur[m['ovlp_cur_dilate']])
-                    # do not count background or the labels currently involved in this edge
-                    otherlbls = otherlbls[np.logical_and(np.logical_and(otherlbls != i, otherlbls != j),otherlbls != 0)]
+                    # xxx - this feature is expensive and seemed marginally useful at best.
+                    ### total number of other labels in the overlap area
+                    ##otherlbls = np.unique(ovlp_svox_cur[m['ovlp_cur']])
+                    ### do not count background or the labels currently involved in this edge
+                    ##otherlbls = otherlbls[np.logical_and(np.logical_and(otherlbls != i, otherlbls != j),otherlbls != 0)]
 
                     # set all the features except the size of the neighbor label for current object
                     F = self.FEATURES
@@ -399,7 +409,7 @@ class dpFRAG(emLabels):
                         F['ang_std_ovlp']:m['ovlp_amom'],
                         F['conv_overlap']:m['ovlp_conv'],
                         F['labeled_ovlp']:m['ovlp_labeled'],
-                        F['other_ovlp']:otherlbls.size,
+                        #F['other_ovlp']:otherlbls.size,
                         # these features might need to be swapped depending on which object is larger
                         F['size_small']:n['lsvox_size'],
                         F['dist_cntr_small']:odistci, 
@@ -455,6 +465,23 @@ class dpFRAG(emLabels):
                 #if self.dpFRAG_verbose and useProgressBar:
                 #    running_size += (bar_update if j != nbrlbls[-1] else bar_final); pbar.update(running_size)
 
+            if make_outRAG:
+                # dilate out to the area that would overlap when the other supervoxel is dilated.
+                # supervoxels in this area that are not adjacent neighbors these will not be included in the 
+                #   FRAG but need to be taken into account in optimization to not recompute overlap (ovlp_attrs).
+                svox_sel_outer = nd.morphology.binary_dilation(svox_sel_out, structure=self.bwconn, 
+                    iterations=dpFRAG.neighbor_perim)
+            
+                # get all supervoxels that would overlap with this one with symmetric dilations (includes neighbors).
+                outlbls = np.unique(svox_cur[svox_sel_outer])
+                # again do not include background or current supervoxel
+                outlbls = outlbls[np.logical_and(outlbls != i, outlbls != 0)]
+
+                # add any other labels that are not neighbors but are in symmetric overlap region into a separate graph.
+                # this is maintained because these need to be counted as neighbors (ovlp_attrs)
+                for j in outlbls:
+                    if not self.FRAG.has_edge(i,j): self.outRAG.add_edge(i,j)
+            
             if self.dpFRAG_verbose and useProgressBar:
                 running_size += 1; pbar.update(running_size)
                 
@@ -561,10 +588,13 @@ class dpFRAG(emLabels):
             npnodes = np.array(tuple(nodes),dtype=np.int64); svox_sizes[ncomps] = self.svox_sizes[npnodes-1].sum()
             ncomps += 1; supervox_map[npnodes] = ncomps
             
-            # update the FRAG by creating a new agglomerated node and moving neighboring edges to this node
+            # update the FRAG by creating a new agglomerated node and moving neighboring edges to this node.
+            # make a new singleton node for if this node is not containing any agglomerations.
             newnode = ncomps+self.nsupervox; self.FRAG.add_node(newnode)
+            if self.outRAG is not None: self.outRAG.add_node(newnode)
+
             if len(nodes) == 1:
-                # singleton nodes do not contain any mergers.
+                # SINGLETON COMPONENT NODE: single supervoxel that is not being merged with anything.
                 # this is the only time that features may be copied over from old FRAG.
                 # i.e., this supervoxel did not change.
                 node = next(iter(nodes))    # the singleton node in old FRAG
@@ -576,33 +606,10 @@ class dpFRAG(emLabels):
                 #   So no need to save the supervoxel attributes in the node.
                 if len(self.FRAG[node]) > 0: self.FRAG.node[newnode]['svox_attrs'] = self.FRAG.node[node]['svox_attrs']
 
-                # for each neighbor of this node (edge in FRAG)
-                for neighbor,f in self.FRAG[node].items():
-                    assert( not self.FRAG.has_edge(neighbor, newnode) )     # sanity check for singleton node
-                    self.FRAG.add_edge(neighbor, newnode)   # move this edge to newnode
-                    # both new nodes must be singleton components to not require any feature updates.
-                    # edges not requiring feature updates are marked by having features copied over from previous FRAG.
-                    # only copy the features if the other node was already visited and was also singleton (has features)
-                    #   or if the other node was not visited yet (neighbor node <= previous nsupervox).
-                    if neighbor <= self.nsupervox or 'features' in f:
-                        features_copied = True
-                        self.FRAG[neighbor][newnode]['features'] = f['features']
-                        self.FRAG[neighbor][newnode]['first_pass'] = False
-                    else:
-                        features_copied = False
-
-                    # copy over overlap attributes but only if features are not copied over to final new edge.
-                    if neighbor <= self.nsupervox or not features_copied:
-                        # if the overlap attributes are present, then copy them over to the new edge.
-                        if 'ovlp_attrs' in f: 
-                            self.FRAG[neighbor][newnode]['ovlp_attrs'] = f['ovlp_attrs']
-                        # copy the supervoxel overlap attributes over for this singleton node
-                        if 'sovlp_attrs' in f and node in f['sovlp_attrs']:
-                            self.FRAG[neighbor][newnode]['sovlp_attrs'] = {newnode: f['sovlp_attrs'][node]}
-                            assert( 'ovlp_attrs' in f )     # should not have sovlp_attrs without ovlp_attrs
-                
-                # remove the old singleton node
-                self.FRAG.remove_node(node)
+                self._noagglo_iterate_neighbors(self.FRAG, node, newnode, copy_attrs=True)
+                if self.outRAG is not None:
+                    self._noagglo_iterate_neighbors(self.outRAG, node, newnode)
+                    
             else:
                 # MUTIPLE COMPONENT NODE: group of supervoxels being merged (agglomerated)
             
@@ -612,19 +619,9 @@ class dpFRAG(emLabels):
             
                 # each node in connected component (that compose the agglomerated newnode)
                 for node in nodes:
-                    # for each neighbor of this node (edge in FRAG)
-                    for neighbor in self.FRAG[node].keys():
-                        # skip neighbors that are other nodes of this component.
-                        if neighbor not in nodes:
-                            # if the edge is missing, then log this new neighbor and add edge.
-                            if not self.FRAG.has_edge(neighbor, newnode):
-                                self.FRAG.add_edge(neighbor, newnode)   # move this edge to newnode
-                                assert( neighbor not in neighbors )
-                                neighbors[neighbor] = 1
-                            else:
-                                # neighbor must have already been present for another node of the agglomerate.
-                                # increment the count for this neighbor.
-                                neighbors[neighbor] += 1
+                    self._agglo_iterate_neighbors(self.FRAG, node, nodes, neighbors, newnode)
+                    if self.outRAG is not None: 
+                        self._agglo_iterate_neighbors(self.outRAG, node, nodes, neighbors, newnode, remove=True)
 
                 for node in nodes:
                     # for each neighbor of this node (edge in FRAG)
@@ -637,16 +634,21 @@ class dpFRAG(emLabels):
                             # they might be preservable in this case if the neighbor is a singleton node.
                             if 'sovlp_attrs' in f and neighbor in f['sovlp_attrs']:
                                 self.FRAG[neighbor][newnode]['sovlp_attrs'] = {neighbor: f['sovlp_attrs'][neighbor]}
-                                assert( 'ovlp_attrs' in f )     # should not have sovlp_attrs without ovlp_attrs
+                                #assert( 'ovlp_attrs' in f ) # should not have sovlp_attrs without ovlp_attrs, HIASSERT
                     # after visiting, remove this old node that makes up part of the agglomerated node.
                     self.FRAG.remove_node(node)
                 
         # sanity checks
         assert( ncomps == self.FRAG.number_of_nodes() )
-        assert( self.nsupervox+ncomps == max(self.FRAG.nodes()) )  # commented for speed
-
+        #assert( self.nsupervox+ncomps == max(self.FRAG.nodes()) )  # commented for speed, HIASSERT
         # relabel the FRAG starting at supervoxel 1
         self.FRAG = nx.relabel_nodes(self.FRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
+        
+        # same steps for outRAG as for FRAG
+        if self.outRAG is not None: 
+            assert( ncomps == self.outRAG.number_of_nodes() )
+            #assert( self.nsupervox+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
+            self.outRAG = nx.relabel_nodes(self.outRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
                     
         # create/write the new supervoxels from the supervoxel_map containing mapping from old nodes to agglo nodes.
         self.data_cube = supervox_map[self.supervoxels_noperim]
@@ -664,6 +666,54 @@ class dpFRAG(emLabels):
         if self.dpFRAG_verbose:
             print('\tnsupervox',ncomps)
             print('\tdone in %.4f s' % (time.time() - t, ))
+
+    # "macro" for iterating neighbors for singleton nodes (not being agglomerated) in FRAG and outRAG
+    def _noagglo_iterate_neighbors(self, cRAG, node, newnode, copy_attrs=False):
+        # for each neighbor of this node (edge in FRAG)
+        for neighbor,f in cRAG[node].items():
+            #assert( not cRAG.has_edge(neighbor, newnode) )     # sanity check for singleton node, HIASSERT
+            cRAG.add_edge(neighbor, newnode)   # move this edge to newnode
+            
+            # copying features and attributes only happens for FRAG
+            if copy_attrs:
+                # both new nodes must be singleton components to not require any feature updates.
+                # edges not requiring feature updates are marked by having features copied over from previous FRAG.
+                # only copy the features if the other node was already visited and was also singleton (has features)
+                #   or if the other node was not visited yet (neighbor node <= previous nsupervox).
+                if neighbor <= self.nsupervox or 'features' in f:
+                    features_copied = True
+                    cRAG[neighbor][newnode]['features'] = f['features']
+                    cRAG[neighbor][newnode]['first_pass'] = False
+                else:
+                    features_copied = False
+
+                # copy over overlap attributes but only if features are not copied over to final new edge.
+                if neighbor <= self.nsupervox or not features_copied:
+                    # if the overlap attributes are present, then copy them over to the new edge.
+                    if 'ovlp_attrs' in f: 
+                        cRAG[neighbor][newnode]['ovlp_attrs'] = f['ovlp_attrs']
+                    # copy the supervoxel overlap attributes over for this singleton node
+                    if 'sovlp_attrs' in f and node in f['sovlp_attrs']:
+                        cRAG[neighbor][newnode]['sovlp_attrs'] = {newnode: f['sovlp_attrs'][node]}
+                        #assert( 'ovlp_attrs' in f )     # should not have sovlp_attrs without ovlp_attrs, HIASSERT
+
+        # remove the old singleton node
+        cRAG.remove_node(node)
+
+    # "macro" for iterating neighbors for compound nodes (those being agglomerated) in FRAG and outRAG
+    def _agglo_iterate_neighbors(self, cRAG, node, nodes, neighbors, newnode, remove=False):
+        # for each neighbor of this node (edge in cRAG)
+        for neighbor in cRAG[node].keys():
+            # skip neighbors that are other nodes of this component.
+            if neighbor not in nodes:
+                # move this edge to newnode
+                if not cRAG.has_edge(neighbor, newnode): cRAG.add_edge(neighbor, newnode)   
+                # add or increment neighbor count
+                if neighbor not in neighbors:
+                    neighbors[neighbor] = 1
+                else:
+                    neighbors[neighbor] += 1
+        if remove: cRAG.remove_node(node)
 
     # multiple probability thresholded agglomerate.
     # this method does NOT update the FRAG based on the target agglomeration.
@@ -918,7 +968,7 @@ class dpFRAG(emLabels):
             help='Path/name of ground truth (GT) labels (create training data)')
         p.add_argument('--trainout', nargs=1, type=str, default='', help='Output file for dumping training data (dill)')
         p.add_argument('--testin', nargs=1, type=str, default='', help='Input file for loading testing data (dill)')
-        p.add_argument('--perim', nargs=1, type=int, default=[1], choices=range(0,20),
+        p.add_argument('--perim', nargs=1, type=int, default=[0], choices=range(0,20),
             help='Size of perimeter around supervoxel overlap for calculating boundary features')
         p.add_argument('--operim', nargs=3, type=int, default=[16,16,8], choices=range(1,20),
             help='Size of bounding box around overlap for object features')
