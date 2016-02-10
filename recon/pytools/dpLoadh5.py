@@ -270,7 +270,7 @@ class dpLoadh5(object):
                 print('\tafter relabeling: min ' + str(data.min()) + ' max ' + str(data.max()))
         if self.sigmaLOG > 0:
             from scipy import ndimage as nd
-            data = nd.filters.gaussian_laplace(data, 0.5*sampling_ratio)
+            data = nd.filters.gaussian_laplace(data, 0.5*self.sampling_ratio)
 
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
         shape = data.shape
@@ -290,7 +290,7 @@ class dpLoadh5(object):
                 'space: left-posterior-superior\r\n' + \
                 'endian: little\r\n' + \
                 'sizes: %d %d %d\r\n' % shape + \
-                'space directions: (%.8f,0,0) (0,%.8f,0) (0,0,%.8f)\r\n' % tuple(self.data_attrs['scale']) + \
+                'space directions: (%.8f,0,0) (0,%.8f,0) (0,0,%.8f)\r\n' % tuple(self.sampling) + \
                 'kinds: domain domain domain\r\n' + \
                 'space origin: (0,0,0)\r\n' \
                 'encoding: raw\r\n\n'
@@ -298,7 +298,7 @@ class dpLoadh5(object):
             fh = open(self.outraw, 'w'); fh.write(hdr); fh.close()
             fh = open(self.outraw, 'ab'); data.tofile(fh); fh.close()
         elif ext == 'gipl':
-            dpLoadh5.gipl_write_volume(data, self.outraw, tuple(self.data_attrs['scale']))
+            dpLoadh5.gipl_write_volume(data, self.outraw, tuple(self.sampling))
         else:
             fh = open(self.outraw, 'wb'); data.tofile(fh); fh.close()
             
