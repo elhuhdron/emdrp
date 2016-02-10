@@ -102,10 +102,19 @@ class dpLoadh5(object):
                 if dset_found is not None:
                     for name,value in hdf[dset_found].attrs.items():
                         if name not in self.data_attrs: self.data_attrs[name] = value
+                #else:  # xxx - dangerous to add default here?
                     
             hdf.close()
         elif not self.data_type:
             self.data_type = self.default_data_type
+
+        # scale / voxel sampling is need is so many places, decided to add it here
+        if self.isFile and 'scale' in self.data_attrs:
+            self.sampling = self.data_attrs['scale']
+            self.sampling_ratio = self.sampling / self.sampling[0]
+        else:
+            self.sampling = np.ones((dpLoadh5.ND,), dtype=np.single)
+            self.sampling_ratio = np.ones((dpLoadh5.ND,), dtype=np.single)
 
         # optionally use chunk size from attributes to get actual read size
         if self.size_in_chunks: self.size *= self.data_attrs['chunks']
@@ -259,6 +268,9 @@ class dpLoadh5(object):
             data, fw, inv = relabel_sequential(data); data = data.astype(self.data_type)
             if self.dpLoadh5_verbose:
                 print('\tafter relabeling: min ' + str(data.min()) + ' max ' + str(data.max()))
+        if self.sigmaLOG > 0:
+            from scipy import ndimage as nd
+            data = nd.filters.gaussian_laplace(data, 0.5*sampling_ratio)
 
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
         shape = data.shape
@@ -425,6 +437,8 @@ class dpLoadh5(object):
             help='Specify non-zero number of colors for uint data (apply modulo, raw output)')
         p.add_argument('--dtypeGray', nargs=1, type=str, default=[0], metavar=('DTYPE'),
             help='Specify data type for converting to grayscale (raw output)')
+        p.add_argument('--sigmaLOG', nargs=1, type=float, default=[0], metavar=('DTYPE'),
+            help='Specify sigma for applying gaussian laplacian filter')
         p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0], 
             metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'), help='Size in voxels to zero pad (b=before, a=after)')
         p.add_argument('--relabel-seq', dest='relabel_seq', action='store_true', 
