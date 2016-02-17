@@ -56,6 +56,7 @@ try:
 except: pass 
 
 
+'''
 # for easy parallelization of raw em standard processing (upsample, median filter, downsample)
 class EMStandardFilterThread(Thread):
     def __init__(self, dp, data, reScale):
@@ -66,6 +67,7 @@ class EMStandardFilterThread(Thread):
         
     def run(self):
         EMDataParser.emStandardFilterProc(self.dp, self.data, self.reScale)
+'''
 
 
 class EMDataParser():
@@ -97,7 +99,8 @@ class EMDataParser():
     NAUGS = 16              # total number of simple augmentations (including reflections in z, 8 for xy augs only)
     HDF5_CLVL = 5           # compression level in hdf5
     
-    def __init__(self, cfg_file, write_outputs=False, init_load_path='', save_name=None, append_features=False):
+    def __init__(self, cfg_file, write_outputs=False, init_load_path='', save_name=None, append_features=False,
+            chunk_skip_list=[], dim_ordering=''):
         self.cfg_file = cfg_file
         self.write_outputs = write_outputs; self.save_name = save_name; self.append_features = append_features
 
@@ -105,7 +108,7 @@ class EMDataParser():
         # retrieve / save options from ini files, see definitions parseEMdataspec.ini
         opts = EMDataParser.get_options(cfg_file)
         for k, v in opts.items(): 
-            if type(v) is list: 
+            if type(v) is list and k not in ['chunk_skip_list','aug_datasets']: 
                 if len(v)==1:
                     setattr(self,k,v[0])  # save single element lists as first element
                 elif len(v)>0 and type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
@@ -127,12 +130,15 @@ class EMDataParser():
         # the manner in which the zreslice is defined, define sort from data -> re-order and from re-order -> data.
         # only 3 options because data can be automatically augmented to transpose the first two dims (in each "z-slice")
         # these orders were chosen because the "unsort" is the same as the "sort" indexing, so re-order->data not needed
+        if dim_ordering: self.dim_ordering = dim_ordering   # allow command line override
         if self.dim_ordering=='xyz':
             self.zreslice_dim_ordering = [0,1,2]
         elif self.dim_ordering=='xzy':
             self.zreslice_dim_ordering = [0,2,1]
         elif self.dim_ordering=='zyx':
             self.zreslice_dim_ordering = [2,1,0]
+        else:
+            assert(False)   # bad dim_ordering parameter given
 
         # immediately re-order any arguments that need it because of reslice. this prevents from having to do this on 
         #   command line, which ended up being annoying.
@@ -162,12 +168,15 @@ class EMDataParser():
                 self.chunk_range_cumsize = np.concatenate((np.zeros((1,),dtype=self.chunk_range_size.dtype), 
                     self.chunk_range_size.cumsum()))
                 self.chunk_range_nchunks = self.chunk_range_cumsize[-1]
-                if self.chunk_range_rand < 0: self.chunk_range_rand = self.chunk_range_nchunks
-                assert( self.chunk_range_rand <= self.chunk_range_nchunks )
+                self.nchunks = self.chunk_range_nchunks
             else:
                 # regular chunklist mode, chunk_range_beg just contains the list of the chunks to use
-                if self.chunk_range_rand < 0: self.chunk_range_rand = self.nchunk_list
-                assert( self.chunk_range_rand <= self.nchunk_list )
+                self.nchunks = self.nchunk_list
+
+            # this code is shared by defining max number of chunks depending on chunk list or chunk range mode.
+            # default for the chunk_range_rand is the max number of chunks.
+            if self.chunk_range_rand < 0: self.chunk_range_rand = self.nchunks
+            assert( self.chunk_range_rand <= self.nchunks )
 
             # offsets are either per chunk or per range, depending on above mode (whether chunk_range_end empty or not)
             if len(self.offset_list) > 0:
@@ -175,6 +184,24 @@ class EMDataParser():
                 assert( self.offset_list.shape[0] == self.nchunk_list )
             else:
                 self.offset_list = np.zeros_like(self.chunk_range_beg)
+                
+            # create a list for random chunks in chunk_range_rand based on the chunk_skip_list, if provided.
+            # let command line override definition in ini file.
+            if len(chunk_skip_list) > 0: self.chunk_skip_list = chunk_skip_list
+            if len(self.chunk_skip_list) > 0:
+                mask = np.zeros((self.nchunks,), dtype=np.bool)
+                mask[:self.chunk_range_rand] = 1
+                mask[np.array(self.chunk_skip_list, dtype=np.int64)] = 0
+                self.chunk_rand_list = np.nonzero(mask)[0].tolist()
+                self.chunk_range_rand = len(self.chunk_rand_list)
+                self.chunk_tiled_list = np.nonzero(np.logical_not(mask))[0].tolist()
+            else:
+                self.chunk_rand_list = range(self.chunk_range_rand)
+                self.chunk_tiled_list = range(self.chunk_range_rand,self.nchunks)
+
+            # the tiled chunks default to all the chunks. 
+            # the chunk_skip_is_test parameter makes the tiled chunks all the ones that are not rand chunks.
+            if not self.chunk_skip_is_test: self.chunk_tiled_list = range(self.nchunks)
 
             # xxx - not an easy way not to call initBatches in the beginning without breaking everything,
             #   so just load the first chunk, if first batch is an incremental chunk rand batch, it should not reload
@@ -197,6 +224,7 @@ class EMDataParser():
                     delimiter='', newline='\n', header='', footer='', comments='')            
             cstr = fh.getvalue(); fh.close(); print cstr
             print '\tchunk_list_rand %d, chunk_range_rand %d' % (self.chunk_list_rand, self.chunk_range_rand)
+            print '\tchunk_skip_list: ' + str(self.chunk_skip_list)
 
         # need these for appending features in chunklist mode, otherwise they do nothing
         #self.last_chunk_rand = self.chunk_rand; self.last_offset_rand = self.offset_rand
@@ -210,7 +238,7 @@ class EMDataParser():
         # to be certain things don't get off with augmentations, in and out size need to both be even or odd
         assert( (self.image_size % 2) == (self.image_out_size % 2) )
         assert( self.independent_labels or self.image_out_size == 1 ) # need independent labels for multiple pixels out
-        assert( not self.no_labels or self.no_label_lookup )
+        assert( not self.no_labels or self.no_label_lookup )    # must have no_label_lookup in no_labels mode
 
         # number of cases per batch should be kept lower than number of rand streams in convnet (128*128 = 16384)
         self.num_cases_per_batch = self.tile_size.prod()
@@ -291,6 +319,7 @@ class EMDataParser():
         self.output_size = list(self.labels_slice_size)
         self.output_size[0] /= self.image_out_size; self.output_size[1] /= self.image_out_size
 
+        '''
         # inits for preprocessing
         
         # check for file to load whitening matrix from
@@ -307,6 +336,15 @@ class EMDataParser():
         # optimization for integer multiple interpolations
         self.em_standard_interpn = [int(round(1/d)) for d in self.em_standard_idelta];
         self.em_standard_iinterp = all([np.equal(np.mod(1/d, 1), 0) for d in self.em_standard_idelta])
+        '''
+        
+        # augmented data cubes can be presented in parallel with raw EM data
+        self.naug_data = len(self.aug_datasets)
+        self.aug_data = [None]*self.naug_data
+        self.aug_actual_mean = np.zeros((self.naug_data,),dtype=np.double)
+        self.aug_actual_std = np.zeros((self.naug_data,),dtype=np.double)
+        assert( len(self.aug_mean) >= self.naug_data )
+        assert( len(self.aug_std) >= self.naug_data )
         
         # print out all initialized variables in verbose mode
         if self.verbose: 
@@ -342,7 +380,7 @@ class EMDataParser():
         if not hasattr(self, 'inds_tiled'): self.makeTiledIndices()
         if self.write_outputs: self.writeH5Cubes()
         self.makeBatchMeta()
-        self.initPreprocessData()   # this needs to be done last, init for per batch preprocessing
+        #self.initPreprocessData()   # this needs to be done last, init for per batch preprocessing
         
         self.silent = False
 
@@ -521,30 +559,49 @@ class EMDataParser():
     # in normal mode this fetches batches that have been loaded to memory already (see initBatches).
     # in chunklist mode, this can initiate loading a new chunk from a separate location in the hdf5 file.
     # the total processing time here needs to be kept under the network batch time, as the load happens in parallel.
-    def getBatch(self, batchnum, plot_outputs=False, tiledAug=0, do_preprocess=True):
+    #def getBatch(self, batchnum, plot_outputs=False, tiledAug=0, do_preprocess=True):
+    def getBatch(self, batchnum, plot_outputs=False, tiledAug=0):
         t = time.time()
+        
+        # allocate batch
         data = np.zeros((self.pixels_per_image, self.num_cases_per_batch), dtype=np.single, order='C')
+        aug_data = [None] * self.naug_data
+        for i in range(self.naug_data):
+            aug_data[i] = np.zeros((self.pixels_per_image, self.num_cases_per_batch), dtype=np.single, order='C')
         if self.no_labels or self.zero_labels:
             labels = np.zeros((0, self.num_cases_per_batch), dtype=np.single, order='C')
             seglabels = np.zeros((0, self.num_cases_per_batch), dtype=self.cubeLblType, order='C')
         else:
             labels = np.zeros((self.noutputs, self.num_cases_per_batch), dtype=np.single, order='C')
             seglabels = np.zeros((self.pixels_per_seg_out, self.num_cases_per_batch), dtype=self.cubeLblType, order='C')
+
+        # get data, augmented data and labels depending on batch type
         if batchnum >= self.FIRST_TILED_BATCH:
-            self.getTiledBatch(data,labels,seglabels,batchnum,tiledAug)
+            self.getTiledBatch(data,aug_data,labels,seglabels,batchnum,tiledAug)
         elif batchnum >= self.FIRST_RAND_NOLOOKUP_BATCH:
-            self.generateRandNoLookupBatch(data,labels,seglabels)
+            self.generateRandNoLookupBatch(data,aug_data,labels,seglabels)
         else:
-            self.generateRandBatch(data,labels,seglabels)
+            self.generateRandBatch(data,aug_data,labels,seglabels)
         
         # option to return zero labels, need this when convnet is expecting labels but not using them.
         # this is useful for dumping features over a large area that does not contain labels.
         if self.zero_labels:
             labels = np.zeros((self.noutputs, self.num_cases_per_batch), dtype=np.single, order='C')
         
+        '''
         if do_preprocess: 
             if plot_outputs: dataProc = self.preprocessData(data, reScale=False)
             else: data = self.preprocessData(data)
+        '''
+        
+        # replaced preprocessing with scalar mean subtraction and scalar std division.
+        if not plot_outputs:
+            data -= self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
+            data /= self.EM_std if self.EM_std > 0 else self.EM_actual_std
+            for i in range(self.naug_data):
+                aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else self.aug_actual_mean[i]
+                aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else self.aug_actual_std[i]
+        
         if self.verbose and not self.silent: 
             print 'EMDataParser: Got batch ', batchnum, ' (%.3f s)' % (time.time()-t,)
 
@@ -553,9 +610,10 @@ class EMDataParser():
         #if plot_outputs: self.plotData(data,dataProc,batchnum < self.FIRST_TILED_BATCH)
 
         #time.sleep(5) # useful for "brute force" memory leak debug
-        return data, labels
+        #return data, labels
+        return [data, labels] + aug_data
         
-    def generateRandBatch(self,data,labels,seglabels):
+    def generateRandBatch(self,data,aug_data,labels,seglabels):
         assert( not self.no_label_lookup )      # do not use rand batches without label lookup
         if self.use_chunk_list: self.randChunkList()    # load a new cube in chunklist or chunkrange modes
         
@@ -582,11 +640,12 @@ class EMDataParser():
 
         for imgi in range(self.num_cases_per_batch):
             inds = self.inds_label_lookup[lbls[imgi]][inds_lbls[lbls[imgi], imgi],:] + offset[imgi,:]
-            self.getImgDataAtPoint(inds,data[:,imgi],augs[imgi])
+            #self.getImgDataAtPoint(inds,data[:,imgi],augs[imgi])
+            self.getAllDataAtPoint(inds,data,aug_data,imgi,augs[imgi])
             self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],augs[imgi])
         self.tallyTrainingPrior(labels)
 
-    def generateRandNoLookupBatch(self,data,labels,seglabels):
+    def generateRandNoLookupBatch(self,data,aug_data,labels,seglabels):
         if self.use_chunk_list: self.randChunkList()    # load a new cube in chunklist or chunkrange modes
         
         # generate random indices from anywhere in the rand cube
@@ -603,7 +662,8 @@ class EMDataParser():
         augs = np.bitwise_and(nr.choice(self.NAUGS, self.num_cases_per_batch), self.augs_mask)
         
         for imgi in range(self.num_cases_per_batch):
-            self.getImgDataAtPoint(inds[imgi,:],data[:,imgi],augs[imgi])
+            #self.getImgDataAtPoint(inds[imgi,:],data[:,imgi],augs[imgi])
+            self.getAllDataAtPoint(inds[imgi,:],data,aug_data,imgi,augs[imgi])
             if not self.no_labels:
                 self.getLblDataAtPoint(inds[imgi,:],labels[:,imgi],seglabels[:,imgi],augs[imgi])
         if not self.no_labels: self.tallyTrainingPrior(labels)
@@ -619,22 +679,34 @@ class EMDataParser():
         else:
             cnts,edges = np.histogram(labels.astype(np.int32), bins=range(0,self.nlabels+1), range=(0,self.nlabels))
             self.batch_meta['prior_train_count'] += cnts
+
+    def getTiledBatchOffset(self, batchnum, setChunkList=False):
+        assert( batchnum >= self.FIRST_TILED_BATCH )    # this is only for tiled batches
         
-    def getTiledBatch(self, data,labels,seglabels, batchnum, aug=0):
         # these conversions used to be in data.cu for GPU data provider
         batchOffset = batchnum - self.FIRST_TILED_BATCH
 
         # for chunklist mode, the batch also determines which chunk we are in. need to reload if moving to new chunk
         if self.use_chunk_list:
             chunk = batchOffset / self.batches_per_rand_cube; batchOffset %= self.batches_per_rand_cube
+
             # xxx - moved this here so don't need this requirement for rand, doesn't matter b/c randomly selected.
             #   it is possible to fix this for tiled, but doesn't seem necessary.
             #   if it's fixed need to decide what are the chunks... still easier to have them as actual Knossos-sized
             #     chunks and not as defined by size_rand, then have to change how chunk_range_index is incremented
             assert( not self.use_chunk_range or (self.size_rand == self.chunksize).all() )
-            self.setChunkList(chunk)
+
+            # draw from the list of tiled chunks only, set in init depending on parameters.
+            if setChunkList: self.setChunkList(chunk, self.chunk_tiled_list)
+        else:
+            chunk = None
+            
+        return batchOffset, chunk
         
-        # get index and zslice the same way for both modes    
+    def getTiledBatch(self, data,aug_data,labels,seglabels, batchnum, aug=0):
+        batchOffset, chunk = self.getTiledBatchOffset(batchnum, setChunkList=True)
+        
+        # get index and zslice. same method for regular or use_chunk_list modes.   
         ind0 = (batchOffset % self.batches_per_zslice)*self.num_cases_per_batch
         zslc = batchOffset / self.batches_per_zslice * self.zslices_per_batch + self.nzslices/2;
         assert( zslc < self.ntotal_zslice ) # usually fails then specified tiled batch is out of range of cube
@@ -642,22 +714,22 @@ class EMDataParser():
         inds = np.zeros((3,),dtype=self.cubeSubType)
         for imgi in range(self.num_cases_per_batch):
             inds[:] = self.inds_tiled[:,ind0 + imgi]; inds[2] += zslc
-            self.getImgDataAtPoint(inds,data[:,imgi],aug)
+            #self.getImgDataAtPoint(inds,data[:,imgi],aug)
+            self.getAllDataAtPoint(inds,data,aug_data,imgi,aug)
             self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],aug)
 
     # set to a specific chunk, re-initBatches if the new chunk is different from the current one
-    def setChunkList(self, chunk):
+    def setChunkList(self, chunk, chunk_list):
         # should only be called from chunklist or chunkrange modes
-        assert(chunk >= 0)   # very bad things
+        assert(chunk >= 0 and chunk < len(chunk_list))   # usually fails when tiled batch is out of range of chunks
+        chunk = chunk_list[chunk]   # chunk looks up in appropriate list (for rand or tiled chunks), set by ini
         if self.use_chunk_range:
-            assert( chunk < self.chunk_range_nchunks )  # usually fails when tiled batch is out of range of chunks
             self.chunk_list_index = np.nonzero(chunk >= self.chunk_range_cumsize)[0][-1]
             self.chunk_range_index = chunk - self.chunk_range_cumsize[self.chunk_list_index]
             chunk_rand = np.unravel_index(self.chunk_range_index, self.chunk_range_rng[self.chunk_list_index,:]) \
                 + self.chunk_range_beg[self.chunk_list_index,:]
             offset_rand = self.offset_list[self.chunk_list_index,:]
         else:
-            assert( chunk < self.nchunk_list )  # usually fails when specified tiled batch is out of range of chunks
             self.chunk_list_index = chunk
             chunk_rand = self.chunk_range_beg[chunk,:]; offset_rand = self.offset_list[chunk,:]
             
@@ -682,15 +754,21 @@ class EMDataParser():
         else:
             if self.use_chunk_range: nextchunk = (self.chunk_range_index+1) % self.chunk_range_rand
             else: nextchunk = (self.chunk_list_index+1) % self.chunk_range_rand
-        self.setChunkList(nextchunk)
+        # draw from the list of random chunks only, set in init depending on parameters.
+        self.setChunkList(nextchunk, self.chunk_rand_list)
+
+    def getAllDataAtPoint(self,inds,data,aug_data,imgi,aug=0):
+        self.getImgDataAtPoint(self.data_cube,inds,data[:,imgi],aug)
+        for i in range(self.naug_data):
+            self.getImgDataAtPoint(self.aug_data[i],inds,aug_data[i][:,imgi],aug)
         
-    def getImgDataAtPoint(self,inds,data,aug=0):
+    def getImgDataAtPoint(self,data_cube,inds,data,aug):
         # don't simplify this... it's integer math
         selx = slice(inds[0]-self.image_size/2,inds[0]-self.image_size/2+self.image_size)
         sely = slice(inds[1]-self.image_size/2,inds[1]-self.image_size/2+self.image_size)
         selz = slice(inds[2]-self.nzslices/2,inds[2]-self.nzslices/2+self.nzslices)
-        #print self.data_cube[selx,sely,selz].shape, inds
-        data[:] = EMDataParser.augmentData(self.data_cube[selx,sely,selz].astype(np.single),
+        #print data_cube[selx,sely,selz].shape, inds
+        data[:] = EMDataParser.augmentData(data_cube[selx,sely,selz].astype(np.single),
             aug).transpose(2,0,1).flatten('C')  # z last because channel data must be contiguous for convnet
 
     def getLblDataAtPoint(self,inds,labels,seglabels,aug=0):
@@ -760,75 +838,118 @@ class EMDataParser():
                 # affinities for MEM voxels
                 isMEM = (lblscntr == 0)
                 lblsout[np.logical_and(isMEM,diff0),4] = 1; lblsout[np.logical_and(isMEM,diff1),5] = 1;
-            
+    
+    # originally this was single function for loading em data and labels.
+    # split into reading of labels and reading of data so that extra data can be read, i.e., augmented data        
+    #
+    # Comments from original function regarding how data is loading to support reslices and C/F order:
+    # xxx - might think of a better way to "reslice" the dimensions later, for now, here's the method:
+    # read_direct requires the same size for the numpy array as in the hdf5 file. so if we're re-ordering the dims:
+    #   (1) re-order the sizes to allocate here as if in original xyz order. 
+    #   (2) re-order the dims and sizes used in the *slices_from_indices functions into original xyz order. 
+    #       chunk indices are not changed.
+    #   (3) at the end of this function re-order the data and labels into the specified dim ordering
+    #   (4) the rest of the packager is then blind to the reslice dimension ordering
+    # NOTE ORIGINAL: chunk indices should be given in original hdf5 ordering.
+    #   all other command line arguments should be given in the re-ordered ordering.
+    #   the C/F order re-ordering needs to be done nested inside the reslice re-ordering
+    # NEW NOTE: had the re-ordering of command line inputs for reslice done automatically, meaning all inputs on 
+    #   command line should be given in original ordering, but they are re-ordered in re-slice order in init, so
+    #   un-re-order here to go back to original ordering again (minimal overhead, done to reduce debug time).
+    #
+    # ulimately everything is accessed as C-order, but support loading from F-order hdf5 inputs.
+    # h5py requires that for read_direct data must be C order and contiguous. this means F-order must be dealt with 
+    #   "manually". for F-order the cube will be in C-order, but shaped like F-order, and then the view 
+    #   transposed back to C-order so that it's transparent in the rest of the code.
     def readCubeToBuffers(self):
         if not self.silent: print 'EMDataParser: Buffering data and labels chunk %d,%d,%d offset %d,%d,%d' % \
             (self.chunk_rand[0], self.chunk_rand[1], self.chunk_rand[2], 
             self.offset_rand[0], self.offset_rand[1], self.offset_rand[2])
 
-        # xxx - might think of a better way to "reslice" the dimensions later, for now, here's the method:
-        # read_direct requires the same size for the numpy array as in the hdf5 file. so if we're re-ordering the dims:
-        #   (1) re-order the sizes to allocate here as if in original xyz order. 
-        #   (2) re-order the dims and sizes used in the *slices_from_indices functions into original xyz order. 
-        #       chunk indices are not changed.
-        #   (3) at the end of this function re-order the data and labels into the specified dim ordering
-        #   (4) the rest of the packager is then blind to the reslice dimension ordering
-        # NOTE ORIGINAL: chunk indices should be given in original hdf5 ordering.
-        #   all other command line arguments should be given in the re-ordered ordering.
-        #   the C/F order re-ordering needs to be done nested inside the reslice re-ordering
-        # NEW NOTE: had the re-ordering of command line inputs for reslice done automatically, meaning all inputs on 
-        #   command line should be given in original ordering, but they are re-ordered in re-slice order in init, so
-        #   un-re-order here to go back to original ordering again (minimal overhead, done to reduce debug time).
+        self.data_cube, self.data_attrs, self.chunksize, self.datasize, self.EM_actual_mean, self.EM_actual_std = \
+            self.loadData( self.data_cube if hasattr(self, 'data_cube') else None, self.imagesrc, self.dataset )
+        self.loadSegmentedLabels()
+
+        # load augmented data cubes
+        for i in range(self.naug_data):
+            self.aug_data[i], data_attrs, chunksize, datasize, self.aug_actual_mean[i], self.aug_actual_std[i] = \
+                self.loadData( self.aug_data[i], self.augsrc, self.aug_datasets[i] )
+            if not self.silent: print '\tbuffered aug data ' + self.aug_datasets[i]
+
+    def loadData(self, data_cube, fname, dataset):
         data_size = list(self.data_slice_size[i] for i in self.zreslice_dim_ordering)
+        size_rand = self.size_rand[self.zreslice_dim_ordering]; size_tiled = self.size_tiled[self.zreslice_dim_ordering]
+        if self.verbose and not self.silent: print 'data slice size ' + str(self.data_slice_size) + \
+            ' data size ' + str(data_size) + ' size rand ' + str(size_rand) + ' size tiled ' + str(size_tiled)
+
+        hdf = h5py.File(fname,'r')
+        if data_cube is None:
+            # for chunkrange / chunklist mode, this function is recalled, don't reallocate in this case
+            if self.hdf5_Corder: 
+                data_cube = np.zeros(data_size, dtype=hdf[dataset].dtype, order='C')
+            else: 
+                data_cube = np.zeros(data_size[::-1], dtype=hdf[dataset].dtype, order='C')
+        else:
+            # change back to the original view (same view changes as below, opposite order)
+
+            # zreslice un-re-ordering, so data is in original view in this function           
+            data_cube = data_cube.transpose(self.zreslice_dim_ordering)
+
+            # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
+            if not self.hdf5_Corder: 
+                data_cube = data_cube.transpose(2,1,0)
+
+        # slice out the data hdf
+        ind = self.get_hdf_index_from_chunk_index(hdf[dataset], self.chunk_rand, self.offset_rand)
+        slc,slcd = self.get_data_slices_from_indices(ind, size_rand, data_size, False)
+        hdf[dataset].read_direct(data_cube, slc, slcd)
+        if self.nz_tiled > 0:
+            ind = self.get_hdf_index_from_chunk_index(hdf[dataset], self.chunk_tiled, self.offset_tiled)
+            slc,slcd = self.get_data_slices_from_indices(ind, size_tiled, data_size, True)
+            hdf[dataset].read_direct(data_cube, slc, slcd)
+        data_attrs = {}
+        for name,value in hdf[dataset].attrs.items(): data_attrs[name] = value
+        # xxx - this is only used for chunkrange mode currently, likely item to rethink...
+        chunksize = np.array(hdf[dataset].chunks, dtype=np.int64)
+        datasize = np.array(hdf[dataset].shape, dtype=np.int64)  # not currently used
+        hdf.close()
+
+        # calculate mean and std over all of the data cube
+        mean = float(data_cube.mean(dtype=np.float64)); std = float(data_cube.std(dtype=np.float64))
+
+        # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
+        if not self.hdf5_Corder: 
+            data_cube = data_cube.transpose(2,1,0)
+
+        # zreslice re-ordering, so data is in re-sliced order view outside of this function           
+        data_cube = data_cube.transpose(self.zreslice_dim_ordering)
+        if self.verbose and not self.silent: 
+            print 'After re-ordering ' + fname + ' ' + dataset + ' data cube shape ' + str(data_cube.shape)
+            
+        return data_cube, data_attrs, chunksize, datasize, mean, std
+
+    def loadSegmentedLabels(self):
         if self.no_labels: seglabels_size = [0, 0, 0]
         else: seglabels_size = list(self.segmented_labels_slice_size[i] for i in self.zreslice_dim_ordering)
         size_rand = self.size_rand[self.zreslice_dim_ordering]; size_tiled = self.size_tiled[self.zreslice_dim_ordering]
-        if self.verbose and not self.silent: print 'data slice size ' + str(self.data_slice_size) + ' data size ' + \
-            str(data_size) + ' seglabels size ' + str(seglabels_size) + ' size rand ' + str(size_rand) + \
-            ' size tiled ' + str(size_tiled)
+        if self.verbose and not self.silent: print 'seglabels size ' + str(seglabels_size) + \
+            ' size rand ' + str(size_rand) + ' size tiled ' + str(size_tiled)
             
-        # ulimately everything is accessed as C-order, but support loading from F-order hdf5 inputs.
-        # h5py requires that for read_direct data must be C order and contiguous. this means F-order must be dealt with 
-        #   "manually" here. for F-order the cube will be in C-order, but shaped like F-order, and then the view 
-        #   transposed back to C-order so that it's transparent in the rest of the code.
-        if not hasattr(self, 'data_cube'):
+        if not hasattr(self, 'segmented_labels_cube'):
             # for chunkrange / chunklist mode, this function is recalled, don't reallocate in this case
             if self.hdf5_Corder: 
-                self.data_cube = np.zeros(data_size, dtype=np.uint8, order='C')
                 self.segmented_labels_cube = np.zeros(seglabels_size, dtype=self.cubeLblType, order='C')
             else: 
-                self.data_cube = np.zeros(data_size[::-1], dtype=np.uint8, order='C')
                 self.segmented_labels_cube = np.zeros(seglabels_size[::-1], dtype=self.cubeLblType, order='C')
         else:
             # change back to the original view (same view changes as below, opposite order)
 
             # zreslice un-re-ordering, so data is in original view in this function           
-            self.data_cube = self.data_cube.transpose(self.zreslice_dim_ordering)
             self.segmented_labels_cube = self.segmented_labels_cube.transpose(self.zreslice_dim_ordering)
 
             # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
             if not self.hdf5_Corder: 
-                self.data_cube = self.data_cube.transpose(2,1,0)
                 self.segmented_labels_cube = self.segmented_labels_cube.transpose(2,1,0)
-
-        # slice out the data hdf
-        hdf = h5py.File(self.imagesrc,'r');
-        ind = self.get_hdf_index_from_chunk_index(hdf[self.dataset], self.chunk_rand, self.offset_rand)
-        slc,slcd = self.get_data_slices_from_indices(ind, size_rand, data_size, False)
-        hdf[self.dataset].read_direct(self.data_cube, slc, slcd)
-        if self.nz_tiled > 0:
-            ind = self.get_hdf_index_from_chunk_index(hdf[self.dataset], self.chunk_tiled, self.offset_tiled)
-            slc,slcd = self.get_data_slices_from_indices(ind, size_tiled, data_size, True)
-            hdf[self.dataset].read_direct(self.data_cube, slc, slcd)
-        self.data_attrs = {}
-        for name,value in hdf[self.dataset].attrs.items(): self.data_attrs[name] = value
-        # xxx - this is only used for chunkrange mode currently, likely item to rethink...
-        self.chunksize = np.array(hdf[self.dataset].chunks, dtype=np.int64)
-        #self.datasize = np.array(hdf[self.dataset].shape, dtype=np.int64)  # not currently used
-        hdf.close()
-
-        self.EM_actual_mean = float(self.data_cube.mean(dtype=np.float64)) # mean grayscale over all of data cube
-        self.EM_actual_std = float(self.data_cube.std(dtype=np.float64))
 
         # slice out the labels hdf except for no_labels mode (save memory)
         hdf = h5py.File(self.labelsrc,'r');
@@ -847,14 +968,12 @@ class EMDataParser():
         
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
         if not self.hdf5_Corder: 
-            self.data_cube = self.data_cube.transpose(2,1,0)
             self.segmented_labels_cube = self.segmented_labels_cube.transpose(2,1,0)
 
         # zreslice re-ordering, so data is in re-sliced order view outside of this function           
-        self.data_cube = self.data_cube.transpose(self.zreslice_dim_ordering)
         self.segmented_labels_cube = self.segmented_labels_cube.transpose(self.zreslice_dim_ordering)
-        if self.verbose and not self.silent: print 'After re-ordering data cube shape ' + str(self.data_cube.shape) + \
-            ' segmented labels cube shape ' + str(self.segmented_labels_cube.shape)
+        if self.verbose and not self.silent: print 'After re-ordering segmented labels cube shape ' + \
+            str(self.segmented_labels_cube.shape)
 
     def get_hdf_index_from_chunk_index(self, hdf_dataset, chunk_index, offset):
         datasize = np.array(hdf_dataset.shape, dtype=np.int64)
@@ -906,13 +1025,14 @@ class EMDataParser():
         else:
             noutputs = self.noutputs
             label_names = self.indep_label_names_out if self.independent_labels else self.label_names
-        data_mean = self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
-        data_std = self.EM_std if self.EM_std > 0 else self.EM_actual_std
+        #data_mean = self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
+        #data_std = self.EM_std if self.EM_std > 0 else self.EM_actual_std
         # do not re-assign meta dict so this works with chunklist mode (which reloads each time)
         if not hasattr(self, 'batch_meta'): self.batch_meta = {}
         b = self.batch_meta; b['num_cases_per_batch']=self.num_cases_per_batch; b['label_names']=label_names; 
-        b['nlabels']=len(label_names); b['pixels_per_image']=self.pixels_per_image; b['scalar_data_mean']=data_mean; 
-        b['scalar_data_std']=data_std; b['noutputs']=noutputs; b['num_pixels_per_case']=self.pixels_per_image;
+        b['nlabels']=len(label_names); b['pixels_per_image']=self.pixels_per_image; 
+        #b['scalar_data_mean']=data_mean; b['scalar_data_std']=data_std; 
+        b['noutputs']=noutputs; b['num_pixels_per_case']=self.pixels_per_image;
         if self.verbose and not self.silent: print self.batch_meta
         
         # for debug only (standalone harness), DO NOT UNcomment these when running network, then count won't be saved
@@ -1168,6 +1288,7 @@ class EMDataParser():
                 pl.title('preproc imgno %d, min %.2f, max %.2f, naninf %d' % (imgno, mn, mx, numpix - fc))
             pl.show()
 
+    '''
     # moved preprocessing into convnet for the most part, so these methods are maybe obsolete?
     #   keeping this here incase, at least scalar mean and std are potentially useful.
     def preprocessData(self, d, doSetup=False, reScale=False):
@@ -1223,7 +1344,8 @@ class EMDataParser():
         t = time.time()
         preproc_data = np.zeros((self.pixels_per_image,0), dtype=np.single, order='C')
         start_batch = self.FIRST_RAND_NOLOOKUP_BATCH if self.no_labels else 1
-        if not self.silent: print '\tpre-processing based on %d rand batches starting at %d' % (self.preproc_nbatches, start_batch)
+        if not self.silent: 
+            print '\tpre-processing based on %d rand batches starting at %d' % (self.preproc_nbatches, start_batch)
         for i in range(start_batch,start_batch+self.preproc_nbatches): 
             data, labels = self.getBatch(i, do_preprocess=False)
             preproc_data = np.concatenate((preproc_data,data),1)
@@ -1371,6 +1493,7 @@ class EMDataParser():
     def normalizePerCase(X):
         Xmean = X.mean(0,keepdims=True, dtype=self.PDTYPE); Xstd = X.std(0,keepdims=True, dtype=self.PDTYPE)
         X -= Xmean; X /= Xstd;
+    '''
 
     @staticmethod
     def augmentData(d,augment):
@@ -1419,10 +1542,7 @@ class EMDataParser():
     def chunklistOutputCubes(self, feature_path, batchnum, isLastbatch):
         assert( self.use_chunk_list )   # do not call me unless chunklist mode
 
-        # xxx - same code as in getTiledBatch, modularize?
-        assert( batchnum >= self.FIRST_TILED_BATCH )    # exporting rand batches not supported
-        batchOffset = batchnum - self.FIRST_TILED_BATCH
-        chunk = batchOffset / self.batches_per_rand_cube; batchOffset %= self.batches_per_rand_cube
+        batchOffset, chunk = self.getTiledBatchOffset(batchnum, setChunkList=False)
 
         # write the output cubes if this is the last batch in current chunk or if this is the last overall batch
         if isLastbatch or (batchOffset == (self.batches_per_rand_cube - 1)):

@@ -31,6 +31,7 @@ class EMDataProvider(LabeledDataProvider):
     # this really should be an enumerated type indicating which feature writing mode, available options:
     #   prob    writes out the convnet output probabilities
     #   data    for initializing data pre-processing based on some pre-processing stages in convnet
+    #     xxx - most likely moving the pre-processing stuff out of parseEMdata.py, so clean this up in that case
     write_features_type = ''
     first_batch = 0
     
@@ -59,7 +60,8 @@ class EMDataProvider(LabeledDataProvider):
                 
             # instantiate the parser, override some attributes and then initialize 
             EMDataProvider.data_parser = EMDataParser(data_dir, write_outputs, dp_params['init_load_path'], 
-                dp_params['save_name'], append_features)
+                dp_params['save_name'], append_features, dp_params['convnet'].op.get_value('chunk_skip_list'),
+                dp_params['convnet'].op.get_value('dim_ordering'))
             # if writing any features, override the outpath and force no label lookup
             if EMDataProvider.write_features: 
                 EMDataProvider.data_parser.outpath = dp_params['em_feature_path']
@@ -71,13 +73,16 @@ class EMDataProvider(LabeledDataProvider):
     def get_next_batch(self):
         epoch, batchnum = self.curr_epoch, self.curr_batchnum
         self.advance_batch()
-        data, labels = EMDataProvider.data_parser.getBatch(batchnum)
+        #data, labels = EMDataProvider.data_parser.getBatch(batchnum)
+        alldata = EMDataProvider.data_parser.getBatch(batchnum)
         self.batches_generated += 1     # xxx - not currently using this
-        return epoch, batchnum, [data, labels]
+        return epoch, batchnum, alldata
 
     # Returns the dimensionality of the two data matrices returned by get_next_batch
     def get_data_dims(self, idx=0):
-        return self.batch_meta['num_pixels_per_case'] if idx == 0 else self.batch_meta['noutputs']
+        #return self.batch_meta['num_pixels_per_case'] if idx == 0 else self.batch_meta['noutputs']
+        # size is noutputs for labels, otherwise it's the pixel size of each input image
+        return self.batch_meta['noutputs'] if idx==1 else self.batch_meta['num_pixels_per_case']
 
     def on_finish_featurebatch(self, feature_path, batchnum, isLastbatch):
         # do nothing if EM provider is not in feature writing mode
