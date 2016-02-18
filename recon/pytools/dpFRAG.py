@@ -60,7 +60,7 @@ except:
 
 class dpFRAG(emLabels):
 
-    TARGETS = {'no_merge':0, 'yes_merge':1}     # hard coded as true and false below
+    TARGETS = {'no_merge':0, 'yes_merge':1}     # hard coded as false/true throughout code
     
     # different features setups / options... xxx - work on this
     log_size = True
@@ -72,6 +72,7 @@ class dpFRAG(emLabels):
         'pca_angle0':15, 'pca_angle_small0':16, 'pca_angle_large0':17,
         'pca_angle1':18, 'pca_angle_small1':19, 'pca_angle_large1':20,
         'pca_angle2':21, 'pca_angle_small2':22, 'pca_angle_large2':23,
+        'mean_gscale_log':24, 'mean_plog_MEM':25, 'mean_plog_ICS':26, 
         }
         
     #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
@@ -85,9 +86,18 @@ class dpFRAG(emLabels):
     types = ['MEM','ICS']
     #types = ['MEM']
 
+    # constants to pad the probabilities
+    types_pad = [1.0,0.0]
+
     # how much to dilate supervoxels in order to find neighbors.
     # xxx - never found it useful to include neighbors that are further out than adjacent voxels.
     neighbor_perim = 1
+
+    # xxx - consistently found max connectivity the best for finding neighbors
+    connectivity = 3
+
+    # xxx - usefulness of this parameter is unclear
+    ovlp_dilate = 0
 
     # for optimizations that prevent some feature variables from being recalculated
     #   if they did not change during an agglomeration.
@@ -98,7 +108,8 @@ class dpFRAG(emLabels):
     #   preserved, but some of the overlap calculations can still be preserved.
     svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out']
     sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
-    ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
+    ovlp_attrs = ['mean_probs','mean_probs_log','mean_grayscale','mean_grayscale_log','aobnd','ovlp_rmom','ovlp_amom',
+        'ovlp_conv','ovlp_labeled']
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -111,9 +122,9 @@ class dpFRAG(emLabels):
 
         self.ntypes = len(self.types)
         self.nfeatures = len(self.FEATURES)
-        self.bperim = 2*max([self.perim, dpFRAG.neighbor_perim])
+        self.bperim = 2*max([self.ovlp_dilate, dpFRAG.neighbor_perim])
         # external perimeter used to pad all volumes
-        self.eperim = self.operim + self.bperim
+        self.eperim = self.perim + self.bperim
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
         self.outRAG = None
 
@@ -148,18 +159,32 @@ class dpFRAG(emLabels):
     
         # load the probability data
         if self.probfile:
-            self.probs = [None]*self.ntypes
+            self.probs = [None]*self.ntypes; self.probs_log = [None]*self.ntypes
             for i in range(self.ntypes):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.types[i], chunk=self.chunk.tolist(), 
                     offset=self.offset.tolist(), size=self.size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE, 
                     verbose=self.dpLoadh5_verbose)
-                self.probs[i] = np.lib.pad(loadh5.data_cube, spad, 'constant',constant_values=0); del loadh5
+                data = loadh5.data_cube
+                    
+                # use laplacian of gaussian to get 3d gradient of probability data
+                data_log = nd.filters.gaussian_laplace(data.astype(np.double), self.sigma_prob_LOG/self.sampling_ratio)
+                    
+                # pad data, make borders appear like membrane
+                self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=self.types_pad[i])
+                self.probs_log[i] = np.lib.pad(data_log, spad, 'constant',constant_values=0)
 
         # load the raw em data
         if self.rawfile:
             loadh5 = dpLoadh5.readData(srcfile=self.rawfile, dataset=self.raw_dataset, chunk=self.chunk.tolist(), 
                 offset=self.offset.tolist(), size=self.size.tolist(), verbose=self.dpLoadh5_verbose)
-            self.raw = np.lib.pad(loadh5.data_cube, spad, 'constant',constant_values=0); del loadh5
+            data = loadh5.data_cube
+            
+            # use laplacian of gaussian to get 3d gradient of raw em data
+            data_log = nd.filters.gaussian_laplace(data.astype(np.double), self.sigma_raw_LOG/self.sampling_ratio)
+            
+            # pad data, make borders appear like membrane
+            self.raw = np.lib.pad(data, spad, 'constant',constant_values=0)
+            self.raw_log = np.lib.pad(data_log, spad, 'constant',constant_values=0)
 
         # load the ground truth data
         if self.gtfile:
@@ -173,7 +198,7 @@ class dpFRAG(emLabels):
                 else:
                     loadh5.data_cube[loadh5.data_cube == loadh5.data_cube.max()] = 0
             relabel, fw, inv = relabel_sequential(loadh5.data_cube); self.ngtlbl = inv.size - 1
-            self.gt = np.lib.pad(relabel, spad, 'constant',constant_values=0); del loadh5
+            self.gt = np.lib.pad(relabel, spad, 'constant',constant_values=0)
         else:
             self.gt = None; self.ngtlbl = -1
 
@@ -198,8 +223,7 @@ class dpFRAG(emLabels):
                 make_outRAG = True; update = False  # this is first pass, so acting like not update mode
 
         # other inits for the supervoxel iteration loop
-        mean_probs = [None]*self.ntypes
-        sampling = self.data_attrs['scale'] if 'scale' in self.data_attrs else [1,1,1]
+        mean_probs = [None]*self.ntypes; mean_probs_log = [None]*self.ntypes
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
@@ -302,15 +326,15 @@ class dpFRAG(emLabels):
                         #   more completex features of the objects and the overlap in the local overlap volume.
                         obnd = nd.measurements.find_objects(svox_ovlp)[0]
                         # convert bounding box back to entire volume space.
-                        aobnd = tuple([slice(x.start+y.start-self.operim[k],
-                            x.stop+y.start+self.operim[k]) for x,y,k in zip(obnd,n['pbnd'],range(dpLoadh5.ND))])
+                        aobnd = tuple([slice(x.start+y.start-self.perim[k],
+                            x.stop+y.start+self.perim[k]) for x,y,k in zip(obnd,n['pbnd'],range(dpLoadh5.ND))])
 
                         # get the supervoxels within the overlap bounding box.                            
                         ovlp_svox_cur = self.supervoxels[aobnd]
                         
                         # convert the overlap to within the same bounding box.
                         ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
-                        ovlp_cur[tuple([slice(x,-x) for x in self.operim])] = svox_ovlp[obnd]
+                        ovlp_cur[tuple([slice(x,-x) for x in self.perim])] = svox_ovlp[obnd]
                         
                         # xxx - this is an alternative method that does not work as well. 
                         #   replace this to use old method along with outRAG so that overlap is recomputed if the
@@ -325,20 +349,20 @@ class dpFRAG(emLabels):
                         # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
 
                         # optionally further dilate the overlap in order to increase averaging area for boundaries.
-                        if self.perim > 0:
-                            #ovlp_cur = nd.morphology.binary_dilation(ovlp_cur, structure=self.bwconn, 
-                            #    iterations=self.perim)
+                        if self.ovlp_dilate > 0:
                             ovlp_cur_dilate = nd.morphology.binary_dilation(ovlp_cur, structure=self.bwconn, 
-                                iterations=self.perim)
+                                iterations=self.ovlp_dilate)
                         else:
                             ovlp_cur_dilate = ovlp_cur
                         
                         for k in range(self.ntypes):
                             mean_probs[k] = self.probs[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+                            mean_probs_log[k] = self.probs_log[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
                         mean_grayscale = self.raw[aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+                        mean_grayscale_log = self.raw_log[aobnd][ovlp_cur_dilate].mean(dtype=np.double)
 
                         # MORE COMPLEX FEATURES: object attributes within the overlap bounding box.
-                        mo = self.getOvlpAttrs(ovlp_cur, sampling, return_Cpts=True)
+                        mo = self.getOvlpAttrs(ovlp_cur, self.sampling, return_Cpts=True)
 
                         # percentage of voxels in the overlap area that are labeled (not background).
                         ovlp_labeled = (ovlp_svox_cur[ovlp_cur] > 0).sum(dtype=np.double)/mo['sel_size']
@@ -348,6 +372,7 @@ class dpFRAG(emLabels):
                         # angular standard deviation of the overlap from the first principle component
                         ovlp_amom = np.std(np.arctan2(nla.norm(np.cross(mo['Cpts'],mo['V'][0,:]),axis=1), 
                             np.dot(mo['Cpts'],mo['V'][0,:])))
+                        mo['Cpts'] = None  # no need for this potentially large item to persist
 
                         # simple "convexity" measure, compare size of overlap with that of overlap bounding box
                         ovlp_conv = mo['sel_size']/np.array([x.stop-x.start for x in obnd]).prod(dtype=np.double)
@@ -372,13 +397,13 @@ class dpFRAG(emLabels):
                         mi = self.FRAG[i][j]['sovlp_attrs'][previ]
                         self.FRAG[i][j]['sovlp_attrs'] = {i:mi}     # move to current supervoxel value
                     else:
-                        mi = self.getOvlpAttrs(ovlp_svox_cur == i, sampling, Vother=mo['V'])
+                        mi = self.getOvlpAttrs(ovlp_svox_cur == i, self.sampling, Vother=mo['V'])
                         self.FRAG[i][j]['sovlp_attrs'][i] = mi
                     if loadj:
                         mj = self.FRAG[i][j]['sovlp_attrs'][prevj]
                         self.FRAG[i][j]['sovlp_attrs'] = {j:mj}     # move to current supervoxel value
                     else:
-                        mj = self.getOvlpAttrs(ovlp_svox_cur == j, sampling, Vother=mo['V'])
+                        mj = self.getOvlpAttrs(ovlp_svox_cur == j, self.sampling, Vother=mo['V'])
                         self.FRAG[i][j]['sovlp_attrs'][j] = mj
                     
                     # calculate angles between corresponding supervoxel eigenvectors within overlap box
@@ -404,6 +429,7 @@ class dpFRAG(emLabels):
                     f = {
                         F['size_overlap']:mo['lsel_size'],
                         F['mean_grayscale']:m['mean_grayscale'],
+                        F['mean_gscale_log']:m['mean_grayscale_log'],
                         F['ang_cntr']:oanglec, 
                         F['rad_std_ovlp']:m['ovlp_rmom'],
                         F['ang_std_ovlp']:m['ovlp_amom'],
@@ -424,6 +450,7 @@ class dpFRAG(emLabels):
                         f[F['pca_angle_large' + str(k)]] = mj['angles'][k]
                     for k in range(self.ntypes):
                         f[F['mean_prob_' + self.types[k]]] = m['mean_probs'][k]
+                        f[F['mean_plog_' + self.types[k]]] = m['mean_probs_log'][k]
                     self.FRAG[i][j]['features'] = f; self.FRAG[i][j]['first_pass'] = True
                 else: # if edge already in graph
                     # if this is update mode and the edge is there and not marked as first pass, 
@@ -968,17 +995,21 @@ class dpFRAG(emLabels):
             help='Path/name of ground truth (GT) labels (create training data)')
         p.add_argument('--trainout', nargs=1, type=str, default='', help='Output file for dumping training data (dill)')
         p.add_argument('--testin', nargs=1, type=str, default='', help='Input file for loading testing data (dill)')
-        p.add_argument('--perim', nargs=1, type=int, default=[0], choices=range(0,20),
-            help='Size of perimeter around supervoxel overlap for calculating boundary features')
-        p.add_argument('--operim', nargs=3, type=int, default=[16,16,8], choices=range(1,20),
+        p.add_argument('--perim', nargs=3, type=int, default=[16,16,8], choices=range(1,20),
             help='Size of bounding box around overlap for object features')
         p.add_argument('--remove-ECS', dest='remove_ECS', action='store_true', 
             help='Set to remove ECS supervoxels (set to 0)')
         p.add_argument('--gt-ECS-label', nargs=1, type=int, default=[1], 
             help='Which label is ECS in GT for remove-ECS (-1 is last label, 0 is none)')
         p.add_argument('--mapout', nargs=1, type=str, default='', help='Optional text dump of supervox to GT mapping')
-        p.add_argument('--connectivity', nargs=1, type=int, default=[3], choices=[1,2,3],
-            help='Connectivity for binary morphology operations')
+        p.add_argument('--sigma-raw-LOG', nargs=1, type=float, default=[3], metavar=('DTYPE'),
+            help='Specify sigma for gaussian laplacian of raw EM data')
+        p.add_argument('--sigma-prob-LOG', nargs=1, type=float, default=[1], metavar=('DTYPE'),
+            help='Specify sigma for gaussian laplacian of prob data')
+        #p.add_argument('--ovlp-dilate', nargs=1, type=int, default=[1], choices=range(0,20),
+        #    help='Amount to dilate overlap for calculating boundary features')
+        #p.add_argument('--connectivity', nargs=1, type=int, default=[3], choices=[1,2,3],
+        #    help='Connectivity for binary morphology operations')
         p.add_argument('--keep-subgroups', action='store_true', 
             help='Keep subgroups for labels in path for subgroups-out')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')

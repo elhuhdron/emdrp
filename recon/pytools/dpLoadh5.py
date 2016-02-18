@@ -270,7 +270,7 @@ class dpLoadh5(object):
                 print('\tafter relabeling: min ' + str(data.min()) + ' max ' + str(data.max()))
         if self.sigmaLOG > 0:
             from scipy import ndimage as nd
-            data = nd.filters.gaussian_laplace(data, 0.5*self.sampling_ratio)
+            data = nd.filters.gaussian_laplace(data, self.sigmaLOG/self.sampling_ratio)
 
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
         shape = data.shape
