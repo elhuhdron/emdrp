@@ -132,7 +132,11 @@ class dpWriteh5(dpLoadh5):
         self.writeCube()
         
     def loadFromRaw(self):
-        # xxx - this always assumes raw file is in F-order, add something here for C-order if we need it
+        # xxx - this is duplicated in writeCube(), couldn't move it to init because of types.h5
+        #   code needs some refactoring that allows for a single base class and input and output types.
+        if not self.data_type_out: self.data_type_out = self.data_type
+        if isinstance(self.data_type_out, str): self.data_type_out = eval('np.' + self.data_type_out)
+        
         ext = os.path.splitext(self.inraw)[1][1:]
         if ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
@@ -147,15 +151,15 @@ class dpWriteh5(dpLoadh5):
                     # Single blank line separates the header from the data
                     if line == '': break
                 nrrdfile.seek(headerSize)
-                # for uint16 here because currently this is just for itksnap and that's the only way it writes (?)
                 # xxx - get this from the header? what if not consistent with data-size instantiated for this object?
-                data = np.fromfile(nrrdfile,dtype=np.uint16).reshape(self.size[::-1]).transpose((2,1,0)).\
-                    astype(self.data_type)
+                data = np.fromfile(nrrdfile,dtype=self.data_type_out)
         elif ext == 'gipl':
             data = dpWriteh5.gipl_read_volume(self.inraw)
         else:
-            data = np.fromfile(self.inraw,dtype=self.data_type).reshape(self.size[::-1]).transpose((2,1,0))
-        self.data_cube = data
+            data = np.fromfile(self.inraw,dtype=self.data_type_out)
+
+        # xxx - this always assumes raw file is in F-order, add something here for C-order if we need it
+        self.data_cube = data.astype(self.data_type_out).reshape(self.size[::-1]).transpose((2,1,0))
 
     # xxx - move this as a utility or a GIPL class?
     # translated from matlab toolbox http://www.mathworks.com/matlabcentral/fileexchange/16407-gipl-toolbox
@@ -248,7 +252,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     
     writeh5 = dpWriteh5(args)
-    if writeh5.outfile:
+    if writeh5.outfile and not writeh5.inraw:
         writeh5.readCubeToBuffers()
         writeh5.writeCube()
     else:

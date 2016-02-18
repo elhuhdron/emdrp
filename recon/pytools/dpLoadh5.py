@@ -96,7 +96,7 @@ class dpLoadh5(object):
             # purpose is that if loading from some subgroup, the attributes like scale for the global dataset are used.
             if 'scale' not in self.data_attrs:
                 dset_found = None
-                dsets = ['data', 'data_mag1', 'labels', 'voxel_type', 'probabilities', 'ICS']
+                dsets = ['data', 'data_mag1', 'labels', 'voxel_type', 'probabilities', 'ICS', 'warpx']
                 for dset in dsets: 
                     if dset in hdf: dset_found = dset; break
                 if dset_found is not None:
