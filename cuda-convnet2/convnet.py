@@ -291,9 +291,13 @@ class ConvNet(IGPUModel):
         
         op.add_option("write-features", "write_features", StringOptionParser, "Write test data features from given layer", default="", requires=['feature-path'])
         op.add_option("feature-path", "feature_path", StringOptionParser, "Write test data features to this path (to be used with --write-features)", default="")
+        
+        # options added just for EM data parser, some override value from EM .ini file
         op.add_option("em-feature-path", "em_feature_path", StringOptionParser, "Write EM recon cubes to this path (to be used with --write-features)", default="")
         op.add_option("init-load-path", "init_load_path", StringOptionParser, "Path where saved weights or other saved matrix values are stored", default="")
         op.add_option("use-numpy-dump", "numpy_dump", BooleanOptionParser, "Save features in numpy format (to be used with --write-features)", default=0)
+        op.add_option("chunk-skip-list", "chunk_skip_list", ListOptionParser(IntegerOptionParser), "Skip these random EM chunks, usually for test, override .ini", default=[])
+        op.add_option("dim-ordering", "dim_ordering", StringOptionParser, "Which reslice ordering for EM provider, override .ini", default="")
 
         op.delete_option('max_test_err')
         op.options["testing_freq"].default = 57
