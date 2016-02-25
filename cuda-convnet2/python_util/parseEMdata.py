@@ -194,14 +194,20 @@ class EMDataParser():
                 mask[np.array(self.chunk_skip_list, dtype=np.int64)] = 0
                 self.chunk_rand_list = np.nonzero(mask)[0].tolist()
                 self.chunk_range_rand = len(self.chunk_rand_list)
-                self.chunk_tiled_list = np.nonzero(np.logical_not(mask))[0].tolist()
-            else:
-                self.chunk_rand_list = range(self.chunk_range_rand)
-                self.chunk_tiled_list = range(self.chunk_range_rand,self.nchunks)
 
-            # the tiled chunks default to all the chunks. 
-            # the chunk_skip_is_test parameter makes the tiled chunks all the ones that are not rand chunks.
-            if not self.chunk_skip_is_test: self.chunk_tiled_list = range(self.nchunks)
+                # the tiled chunks default to all the chunks. 
+                # if the chunk_skip_list is specified, then the chunk_skip_is_test parameter makes the tiled chunks 
+                #   only the chunks that are not rand chunks.
+                if self.chunk_skip_is_test: 
+                    self.chunk_tiled_list = np.nonzero(np.logical_not(mask))[0].tolist()
+                else:
+                    self.chunk_tiled_list = range(self.nchunks)
+            else:
+                # in the old mode, typically the test chunks are put at the end of the chunk list,
+                #   and all chunks are in the tiled chunk list.
+                # this was annoying because a seperate ini file had to be made for each cross-validation.
+                self.chunk_rand_list = range(self.chunk_range_rand)
+                self.chunk_tiled_list = range(self.nchunks)
 
             # xxx - not an easy way not to call initBatches in the beginning without breaking everything,
             #   so just load the first chunk, if first batch is an incremental chunk rand batch, it should not reload
