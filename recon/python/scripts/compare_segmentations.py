@@ -100,9 +100,10 @@ params = {
     #'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
     #'chunks' : [[17,19,2], [17,23,1], [22,23,1]],
     #'chunks' : [[17,23,1],],
-    'chunks' : [[16,17,4], [13,20,3], [13,15,3], [18,15,3], [18,20,3], [18,20,4]],
+    #'chunks' : [[16,17,4], [13,20,3], [13,15,3], [18,15,3], [18,20,3], [18,20,4]],
+    'chunks' : [[16,17,4],],
     'figno' : 5000,
-    'plot_only':False,
+    'plot_only':True,
     'outpath' : '.',
     'save_file' : 'out.dill',
     'do_plots':True,
@@ -126,7 +127,9 @@ if not plot_only:
         'are_gala' : ma.array(np.zeros((nsegs,nchunks,mparams),dtype=np.double),mask=True),
         'are_precrec_gala' : ma.array(np.zeros((nsegs,nchunks,mparams,2),dtype=np.double),mask=True),
         'split_vi_gala' : ma.array(np.zeros((nsegs,nchunks,mparams,2),dtype=np.double),mask=True),
-        #'nlabels_skel' : ma.array(np.zeros((nsegs,nchunks),dtype=np.int64),mask=True),
+        'nlabels' : ma.array(np.zeros((nsegs,nchunks,mparams),dtype=np.int64),mask=True),
+        # nsegparams repeated across chunks just for convenience
+        'nsegparams' : ma.array(np.zeros((nsegs,nchunks,mparams),dtype=np.double),mask=True),
         #'voxel_sizes_skel' : [[None]*nchunks]*nsegs,
         }                
     globals().update(metrics)
@@ -154,6 +157,15 @@ if not plot_only:
     
                 # calculate the split variation of information (gala) using full out components
                 split_vi_gala[i,j,k,:] = ev.split_vi(segComps, gtComps)
+
+                # total number of supervoxels
+                nlabels[i,j,k] = segComps.max()
+
+            # normalized segparams, repeat across chunks for convenience
+            if segparams[i].size == 1:
+                nsegparams[i,j,0] = 0
+            else:
+                tmp = segparams[i] - segparams[i].min(); nsegparams[i,j,:segparams[i].size] = tmp/tmp.max()
     
             print('\tdone in %.4f s' % (time.time() - t))
             
@@ -182,6 +194,8 @@ min_are_gala = are_gala.min(axis=2)
 amin_are_gala = are_gala.argmin(axis=2)
 min_vi_gala = vi_gala.min(axis=2)
 amin_vi_gala = vi_gala.argmin(axis=2)
+min_nlabels = nlabels.min(axis=2)
+amin_nlabels = nlabels.argmin(axis=2)
 
 print('min are across param')
 print(min_are_gala)
@@ -241,13 +255,16 @@ if do_plots:
 
     figno = figno+1; pl.figure(figno);
 
-    errs = [1-are_precrec_gala, split_vi_gala, ]
-    amins = [amin_are_gala, amin_vi_gala,  ]
-    xstrs = ['1-Recall', 'False Splits (bits)', ]
-    ystrs = ['1-Precision', 'False Merges (bits)', ]
+    errs = [1-are_precrec_gala, split_vi_gala, 
+        np.ma.concatenate((nlabels[:,:,:,None],nsegparams[:,:,:,None]),axis=3),
+        np.ma.concatenate((are_gala[:,:,:,None],nsegparams[:,:,:,None]),axis=3),
+        ]
+    amins = [amin_are_gala, amin_vi_gala,  amin_nlabels, amin_are_gala]
+    xstrs = ['1-Recall', 'False Splits (bits)', 'param', 'param']
+    ystrs = ['1-Precision', 'False Merges (bits)', 'nlabels', 'Rand 1-fscore']
     lims = [[[-0.05, 0.6], [-0.012, 0.12]], [[-0.5, 5], [-0.15, 1.5]] ]
-    titles = ['Adapted Rand', 'Split Variation of Information',  ]
-    plsize = [1,2]
+    titles = ['Adapted Rand', 'Split Variation of Information',  'Total SuperVoxels', 'Rand Error']
+    plsize = [2,2]
     plot_mean = True
     plot_setlims = False
         
