@@ -72,12 +72,20 @@ class dpFRAG(emLabels):
         'pca_angle0':15, 'pca_angle_small0':16, 'pca_angle_large0':17,
         'pca_angle1':18, 'pca_angle_small1':19, 'pca_angle_large1':20,
         'pca_angle2':21, 'pca_angle_small2':22, 'pca_angle_large2':23,
-        'mean_gscale_log':24, 'mean_plog_MEM':25, 'mean_plog_ICS':26, 
         }
         
     #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
     FEATURES = OrderedDict(sorted(FEATURES.items(), key=lambda t: t[1]))
     FEATURES_NAMES = list(FEATURES.keys())
+
+    # augmented inputs derived from probabilities and raw EM
+    # xxx - revisit this is some way of make features as options, might need to move to .ini based init?
+    augments = ['smooth', 'sharpen', 'edges', 
+        'blur15', 'blur20', 'blur3', 'blur4', 'blur5', 'blur6', 
+        'median', 'mean', 'min', 'max', 'var',
+        'grad_mag', 'grad_dir', 'laplacian', 'large_hess', 'small_hess', 'hess_ori',
+        'kuwahara', 'diff_blur',
+        ]
     
     # number of pca eigenvector angles to measure
     npcaang = 3 
@@ -85,9 +93,6 @@ class dpFRAG(emLabels):
     # the probability types to use for features
     types = ['MEM','ICS']
     #types = ['MEM']
-
-    # constants to pad the probabilities
-    types_pad = [1.0,0.0]
 
     # how much to dilate supervoxels in order to find neighbors.
     # xxx - never found it useful to include neighbors that are further out than adjacent voxels.
@@ -108,8 +113,7 @@ class dpFRAG(emLabels):
     #   preserved, but some of the overlap calculations can still be preserved.
     svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out']
     sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
-    ovlp_attrs = ['mean_probs','mean_probs_log','mean_grayscale','mean_grayscale_log','aobnd','ovlp_rmom','ovlp_amom',
-        'ovlp_conv','ovlp_labeled']
+    ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -127,14 +131,21 @@ class dpFRAG(emLabels):
         self.eperim = self.perim + self.bperim
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
         self.outRAG = None
+        self.naugments = len(self.augments)
+        self._augments = ['_' + x for x in self.augments]
 
         assert( not self.trainout or self.gtfile )  # need ground truth to generate training data
 
         # print out all initialized variables in verbose mode
         #if self.dpFRAG_verbose: print('dpFRAG, verbose mode:\n'); print(vars(self))
 
-    # xxx - remove this again, outdated not that FRAG is being updated on-the-fly with agglomeration
-    def loadSupervoxels(self):
+    def loadData(self):
+        if self.dpFRAG_verbose:
+            print('Loading data'); t = time.time()
+            
+        # amount for padding around edges
+        spad = tuple((np.ones((3,2),dtype=np.int32)*self.eperim[:,None]).tolist()); self.spad = spad
+
         # load the supervoxel label data
         self.readCubeToBuffers()
         if self.remove_ECS:
@@ -144,54 +155,73 @@ class dpFRAG(emLabels):
         self.supervoxels_noperim = relabel
         self.supervoxels = np.lib.pad(relabel, self.spad, 'constant',
             constant_values=0).astype(self.data_type_out, copy=False)
-            
         # supervoxel sizes are needed in advance for createFRAG (ignore background size).
         self.svox_sizes = emLabels.getSizesMax(self.supervoxels_noperim, self.nsupervox)[1:]
-
-    def loadData(self):
-        if self.dpFRAG_verbose:
-            print('Loading data'); t = time.time()
-            
-        # amount for zero padding around edges
-        spad = tuple((np.ones((3,2),dtype=np.int32)*self.eperim[:,None]).tolist()); self.spad = spad
-
-        self.loadSupervoxels()
     
         # load the probability data
         if self.probfile:
-            self.probs = [None]*self.ntypes; self.probs_log = [None]*self.ntypes
+            if not self.load_prob_perim: offset = self.offset; size = self.size
+            else: offset = self.offset - self.eperim; size = self.size + 2*self.eperim
+            
+            self.probs = [None]*self.ntypes
+            self.probs_aug = [[None]*self.ntypes for x in range(self.naugments)]
             for i in range(self.ntypes):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.types[i], chunk=self.chunk.tolist(), 
-                    offset=self.offset.tolist(), size=self.size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE, 
-                    verbose=self.dpLoadh5_verbose)
-                data = loadh5.data_cube
+                    offset=offset.tolist(), size=size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE, 
+                    verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
                     
-                # use laplacian of gaussian to get 3d gradient of probability data
-                data_log = nd.filters.gaussian_laplace(data.astype(np.double), self.sigma_prob_LOG/self.sampling_ratio)
+                if not self.load_prob_perim:
+                    # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
+                    self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=0)
+                else:
+                    self.probs[i] = data
                     
-                # pad data, make borders appear like membrane
-                self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=self.types_pad[i])
-                self.probs_log[i] = np.lib.pad(data_log, spad, 'constant',constant_values=0)
+                '''
+                for j in range(self.naugments):
+                    loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.types[i]+self.augments[j], 
+                        chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(), 
+                        verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+
+                    if not self.load_prob_perim:
+                        # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
+                        self.probs_aug[j][i] = np.lib.pad(data, spad, 'constant',constant_values=0)
+                    else:
+                        self.probs_aug[j][i] = data
+                '''
 
         # load the raw em data
         if self.rawfile:
+            if self.pad_raw_perim: offset = self.offset; size = self.size
+            else: offset = self.offset - self.eperim; size = self.size + 2*self.eperim
+        
             loadh5 = dpLoadh5.readData(srcfile=self.rawfile, dataset=self.raw_dataset, chunk=self.chunk.tolist(), 
-                offset=self.offset.tolist(), size=self.size.tolist(), verbose=self.dpLoadh5_verbose)
-            data = loadh5.data_cube
+                offset=offset.tolist(), size=size.tolist(), verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
             
-            # use laplacian of gaussian to get 3d gradient of raw em data
-            data_log = nd.filters.gaussian_laplace(data.astype(np.double), self.sigma_raw_LOG/self.sampling_ratio)
-            
-            # pad data, make borders appear like membrane
-            self.raw = np.lib.pad(data, spad, 'constant',constant_values=0)
-            self.raw_log = np.lib.pad(data_log, spad, 'constant',constant_values=0)
+            if self.pad_raw_perim: 
+                # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
+                self.raw = np.lib.pad(data, spad, 'constant',constant_values=0)
+            else:
+                self.raw = data
+
+            print(self._augments, self.naugments)
+            '''
+            self.raw_aug = [None]*self.naugments)
+            for j in range(self.naugments):
+                loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile, dataset=self.raw_dataset+self.augments[j], 
+                    chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(), 
+                    verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+
+                if self.pad_raw_perim: 
+                    # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
+                    self.raw_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=0)
+                else:
+                    self.raw_aug[j] = data
+            '''
 
         # load the ground truth data
         if self.gtfile:
             loadh5 = emLabels.readLabels(srcfile=self.gtfile, chunk=self.chunk.tolist(), 
                 offset=self.offset.tolist(), size=self.size.tolist(), verbose=self.dpLoadh5_verbose)
-            #loadh5 = dpLoadh5.readData(srcfile=self.gtfile, dataset=self.gt_dataset, chunk=self.chunk.tolist(), 
-            #    offset=self.offset.tolist(), size=self.size.tolist(), verbose=self.dpLoadh5_verbose)
             if self.remove_ECS and self.gt_ECS_label != 0:
                 if self.gt_ECS_label > 0:
                     loadh5.data_cube[loadh5.data_cube == self.gt_ECS_label] = 0
@@ -223,7 +253,7 @@ class dpFRAG(emLabels):
                 make_outRAG = True; update = False  # this is first pass, so acting like not update mode
 
         # other inits for the supervoxel iteration loop
-        mean_probs = [None]*self.ntypes; mean_probs_log = [None]*self.ntypes
+        mean_probs = [None]*self.ntypes
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
@@ -357,9 +387,7 @@ class dpFRAG(emLabels):
                         
                         for k in range(self.ntypes):
                             mean_probs[k] = self.probs[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
-                            mean_probs_log[k] = self.probs_log[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
                         mean_grayscale = self.raw[aobnd][ovlp_cur_dilate].mean(dtype=np.double)
-                        mean_grayscale_log = self.raw_log[aobnd][ovlp_cur_dilate].mean(dtype=np.double)
 
                         # MORE COMPLEX FEATURES: object attributes within the overlap bounding box.
                         mo = self.getOvlpAttrs(ovlp_cur, self.sampling, return_Cpts=True)
@@ -429,7 +457,6 @@ class dpFRAG(emLabels):
                     f = {
                         F['size_overlap']:mo['lsel_size'],
                         F['mean_grayscale']:m['mean_grayscale'],
-                        F['mean_gscale_log']:m['mean_grayscale_log'],
                         F['ang_cntr']:oanglec, 
                         F['rad_std_ovlp']:m['ovlp_rmom'],
                         F['ang_std_ovlp']:m['ovlp_amom'],
@@ -450,7 +477,6 @@ class dpFRAG(emLabels):
                         f[F['pca_angle_large' + str(k)]] = mj['angles'][k]
                     for k in range(self.ntypes):
                         f[F['mean_prob_' + self.types[k]]] = m['mean_probs'][k]
-                        f[F['mean_plog_' + self.types[k]]] = m['mean_probs_log'][k]
                     self.FRAG[i][j]['features'] = f; self.FRAG[i][j]['first_pass'] = True
                 else: # if edge already in graph
                     # if this is update mode and the edge is there and not marked as first pass, 
@@ -987,9 +1013,12 @@ class dpFRAG(emLabels):
     def addArgs(p):
         dpWriteh5.addArgs(p)
         p.add_argument('--probfile', nargs=1, type=str, default='', help='Path/name of hdf5 probability (input) file')
+        p.add_argument('--probaugfile', nargs=1, type=str, default='', 
+            help='Path/name of hdf5 augmented probability (input) file')
         #p.add_argument('--types', nargs='+', type=str, default=['MEM','ICS','ECS'], 
         #    metavar='TYPE', help='Dataset names of the voxel types to use from the probabilities')
         p.add_argument('--rawfile', nargs=1, type=str, default='', help='Path/name of hdf5 raw EM (input) file')
+        p.add_argument('--rawaugfile', nargs=1, type=str, default='', help='Path/name of hdf5 augmented raw EM file')
         p.add_argument('--raw-dataset', nargs=1, type=str, default='data', help='Name of the raw EM dataset to read')
         p.add_argument('--gtfile', nargs=1, type=str, default='', 
             help='Path/name of ground truth (GT) labels (create training data)')
@@ -1002,10 +1031,6 @@ class dpFRAG(emLabels):
         p.add_argument('--gt-ECS-label', nargs=1, type=int, default=[1], 
             help='Which label is ECS in GT for remove-ECS (-1 is last label, 0 is none)')
         p.add_argument('--mapout', nargs=1, type=str, default='', help='Optional text dump of supervox to GT mapping')
-        p.add_argument('--sigma-raw-LOG', nargs=1, type=float, default=[3], metavar=('DTYPE'),
-            help='Specify sigma for gaussian laplacian of raw EM data')
-        p.add_argument('--sigma-prob-LOG', nargs=1, type=float, default=[1], metavar=('DTYPE'),
-            help='Specify sigma for gaussian laplacian of prob data')
         #p.add_argument('--ovlp-dilate', nargs=1, type=int, default=[1], choices=range(0,20),
         #    help='Amount to dilate overlap for calculating boundary features')
         #p.add_argument('--connectivity', nargs=1, type=int, default=[3], choices=[1,2,3],
@@ -1013,6 +1038,8 @@ class dpFRAG(emLabels):
         p.add_argument('--keep-subgroups', action='store_true', 
             help='Keep subgroups for labels in path for subgroups-out')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
+        p.add_argument('--pad-raw-perim', action='store_true', help='Pad perimeter of raw EM instead of loading')
+        p.add_argument('--load-prob-perim', action='store_true', help='Load perimeter of probs instead of padding')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
 
 if __name__ == '__main__':

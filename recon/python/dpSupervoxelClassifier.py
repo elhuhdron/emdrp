@@ -124,7 +124,7 @@ class dpSupervoxelClassifier():
         
         # keep the list of merge percentages, use original to store current iteration value
         self.iterate_merge_perc_list = self.iterate_merge_perc
-
+        
         # initialize for "chunkrange" or "chunklist" mode if these parameters are not empty.
         # this code was modified from that in the em data parser for cuda-convnets2.
         self.chunk_range_beg = self.chunk_range_beg.reshape(-1,3); self.use_chunk_range = False
@@ -184,6 +184,13 @@ class dpSupervoxelClassifier():
         self.iterative_frag = [None] * self.nchunks
         self.iterative_mode_count = 0
 
+        if self.iterative_mode:
+            # expand the list out to the number of iterations by repeating the last merge percentage
+            tmp = np.zeros((self.iterate_count,), dtype=np.double)
+            tmp[:len(self.iterate_merge_perc_list)] = self.iterate_merge_perc_list
+            tmp[len(self.iterate_merge_perc_list):] = self.iterate_merge_perc_list[-1]
+            self.iterate_merge_perc_list = tmp
+
         # xxx - clean this up at some point, basically hack for legacy metric comparison scripts
         if len(self.threshold_subgroups) == 0:
             if self.iterative_mode:
@@ -200,8 +207,7 @@ class dpSupervoxelClassifier():
 
     def train(self):
 
-        if self.dpSupervoxelClassifier_verbose: 
-            print('\nTRAIN')
+        if self.dpSupervoxelClassifier_verbose: print('\nTRAIN')
 
         if self.trainin and (not self.classifierin or self.doplots):
             if self.dpSupervoxelClassifier_verbose: 
@@ -234,7 +240,7 @@ class dpSupervoxelClassifier():
                             progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
-                        frag = self.iterative_frag[chunk]; #frag.loadSupervoxels()
+                        frag = self.iterative_frag[chunk]
                 else:
                     frag = dpFRAG.makeTrainingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
                         self.raw_dataset, self.gtfile, self.label_subgroups, 
@@ -332,82 +338,88 @@ class dpSupervoxelClassifier():
                 '_iter_' + str(self.iterative_mode_count), thr=thr, plot_features=self.plot_features)
 
     def test(self):
-        if self.dpSupervoxelClassifier_verbose: 
-            print('\nTEST')
+        if self.dpSupervoxelClassifier_verbose: print('\nTEST')
 
         for chunk in range(self.nchunks):
             cchunk, chunk_list_index, chunk_range_index = self.get_chunk_inds(chunk)
-            offset = self.offset_list[chunk_list_index,:]; size = self.size_list[chunk_list_index,:]
 
             if chunk_list_index not in self.test_chunks: continue
-            print('Exporting testing data for chunk %d,%d,%d' % tuple(cchunk.tolist()))
+            data,sdata,thr = self._test(chunk, cchunk, chunk_list_index, chunk_range_index)
 
-            FRAG = None
-            if len(self.test_chunks) == 1 and self.testin:
-                if self.dpSupervoxelClassifier_verbose: 
-                    print('Loading testing data')
-                with open(self.testin, 'rb') as f: data = dill.load(f)
-                FRAG = data['FRAG']; data = data['data']
-
-            frag = None; subgroups_out= list(self.label_subgroups_out)
-            if self.iterative_mode:
-                if self.iterative_frag[chunk] is None: subgroups_out += ['thr']
-                else: frag = self.iterative_frag[chunk]; #frag.loadSupervoxels()
-
-            if frag is None:
-                if self.doplots:
-                    frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
-                        self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out, 
-                        G=FRAG, progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
-                else:
-                    frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
-                        self.raw_dataset, self.outfile, self.label_subgroups, subgroups_out, G=FRAG,
-                        progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
-
-            if self.iterative_mode and self.iterative_frag[chunk] is None:
-                frag.isTraining = False; self.iterative_frag[chunk] = frag
+        # xxx - this only plots the LAST test chunk (currently this is only used for leave-one-out cross-validations)
+        if self.doplots: 
+            assert(len(self.test_chunks) == 1)  # exporting plots/test data only works for one test chunk
+            return dpSupervoxelClassifier.createPlots(data['target'],sdata,self.clf,self.export_plots,
+                name=self.classifier + '_test_' + '_'.join([str(x) for x in self.test_chunks]) + \
+                '_iter_' + str(self.iterative_mode_count), thr=thr, plot_features=self.plot_features)
             
-            if not (len(self.test_chunks) == 1 and self.testin):
-                frag.createFRAG(update = self.iterative_mode)
-                #frag.createFRAG(update = False)
-                data = frag.createDataset(train=self.doplots)
+    def _test(self, ichunk, cchunk, chunk_list_index, chunk_range_index):
+        print('Exporting testing data for chunk %d,%d,%d' % tuple(cchunk.tolist()))
+        offset = self.offset_list[chunk_list_index,:]; size = self.size_list[chunk_list_index,:]
 
-                if self.testout:
-                    if self.dpSupervoxelClassifier_verbose: 
-                        print('Dumping testing data')
-                    descr = 'Testing data from dpFRAG.py with command line:\n' + self.arg_str
-                    descr = ('With ini file "%s":\n' % (self.cfgfile,)) + self.ini_str
-                    data['DESCR'] = descr
-                    with open(self.testout, 'wb') as f: dill.dump({'data':data,'FRAG':frag.FRAG}, f)
+        FRAG = None
+        if len(self.test_chunks) == 1 and self.testin:
+            if self.dpSupervoxelClassifier_verbose: 
+                print('Loading testing data')
+            with open(self.testin, 'rb') as f: data = dill.load(f)
+            FRAG = data['FRAG']; data = data['data']
 
-            sdata = scale(data['data'])     # normalize for the classifiers
+        frag = None; subgroups_out= list(self.label_subgroups_out)
+        if self.iterative_mode:
+            if self.iterative_frag[ichunk] is None: subgroups_out += ['thr']
+            else: frag = self.iterative_frag[ichunk]
 
-            thr = -1
-            if self.iterative_mode:
-                # merge based on current classifier
-                frag.subgroups_out[-1] = '%.8f' % self.threshold_subgroups[self.iterative_mode_count]
-                clf_predict, thr = self.get_merge_predict_thr(sdata)
-                frag.agglomerate(clf_predict)
-            
-                # make the next training iteration load from the current agglomerated supervoxels
-                self.iterative_frag[chunk].srcfile = self.iterative_frag[chunk].outfile
-                self.iterative_frag[chunk].subgroups = self.iterative_frag[chunk].subgroups_out
+        if frag is None:
+            if self.doplots:
+                frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
+                    self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out, 
+                    G=FRAG, progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
             else:
-                try:
-                    # predict merge or not on testing cube and write outputs at specified probability thresholds
-                    frag.threshold_agglomerate(self.clf.predict_proba(sdata), self.thresholds, self.threshold_subgroups)
-                    # there's an issue here if there are no mergers left, would be better to just copy the current
-                    #   agglomeration, xxx - deal with this later. handled this explicitly in other locations.
-                    #except AttributeError:
-                except:
-                    # if the classifier doesn't do probabilities just export single prediction
-                    frag.subgroups_out += ['single_' + self.classifier]
-                    frag.agglomerate(self.clf.predict(sdata))
+                frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
+                    self.raw_dataset, self.outfile, self.label_subgroups, subgroups_out, G=FRAG,
+                    progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
 
-            if self.doplots: 
-                return dpSupervoxelClassifier.createPlots(data['target'],sdata,self.clf,self.export_plots,
-                    name=self.classifier + '_test_' + '_'.join([str(x) for x in self.test_chunks]) + \
-                    '_iter_' + str(self.iterative_mode_count), thr=thr, plot_features=self.plot_features)
+        if self.iterative_mode and self.iterative_frag[ichunk] is None:
+            frag.isTraining = False; self.iterative_frag[ichunk] = frag
+            
+        if not (len(self.test_chunks) == 1 and self.testin):
+            frag.createFRAG(update = self.iterative_mode)
+            #frag.createFRAG(update = False)
+            data = frag.createDataset(train=self.doplots)
+
+            if self.testout:
+                if self.dpSupervoxelClassifier_verbose: 
+                    print('Dumping testing data')
+                descr = 'Testing data from dpFRAG.py with command line:\n' + self.arg_str
+                descr = ('With ini file "%s":\n' % (self.cfgfile,)) + self.ini_str
+                data['DESCR'] = descr
+                with open(self.testout, 'wb') as f: dill.dump({'data':data,'FRAG':frag.FRAG}, f)
+
+        sdata = scale(data['data'])     # normalize for the classifiers
+
+        thr = -1
+        if self.iterative_mode:
+            # merge based on current classifier
+            frag.subgroups_out[-1] = '%.8f' % self.threshold_subgroups[self.iterative_mode_count]
+            clf_predict, thr = self.get_merge_predict_thr(sdata)
+            frag.agglomerate(clf_predict)
+            
+            # make the next training iteration load from the current agglomerated supervoxels
+            self.iterative_frag[ichunk].srcfile = self.iterative_frag[ichunk].outfile
+            self.iterative_frag[ichunk].subgroups = self.iterative_frag[ichunk].subgroups_out
+        else:
+            try:
+                # predict merge or not on testing cube and write outputs at specified probability thresholds
+                frag.threshold_agglomerate(self.clf.predict_proba(sdata), self.thresholds, self.threshold_subgroups)
+                # there's an issue here if there are no mergers left, would be better to just copy the current
+                #   agglomeration, xxx - deal with this later. handled this explicitly in other locations.
+                #except AttributeError:
+            except:
+                # if the classifier doesn't do probabilities just export single prediction
+                frag.subgroups_out += ['single_' + self.classifier]
+                frag.agglomerate(self.clf.predict(sdata))
+            
+        return data,sdata,thr
 
     def iterative_classify(self):
         assert(self.iterative_mode)
@@ -427,21 +439,37 @@ class dpSupervoxelClassifier():
         # each iteration loop trains on the current supervoxels and 
         #   then performs a merge (test) based with a normal sklearn predict based on a small merge prior.
         self.classifierin = ''; self.trainin = ''; self.trainout = ''; self.testin = ''; self.testout = ''
-        print('Iterative mode with merge prior %.4f' % (self.merge_prior,))
-        for i in range(self.iterate_count):
-            self.iterate_merge_perc = self.iterate_merge_perc_list[i] if i < len(self.iterate_merge_perc_list) \
-                else self.iterate_merge_perc_list[-1]
-            self.iterative_mode_count = i; print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,
-                self.iterate_merge_perc))
-            if self.clfs[i] is None: 
-                train_metrics[i] = self.train(); self.clfs[i] = self.clf
-            else: 
-                self.clf = self.clfs[i]
-            test_metrics[i] = self.test()
+        if self.test_only:
+            print('Test-only iterative mode with merge prior %.4f' % (self.merge_prior,))
+            for chunk in range(self.nchunks):
+                cchunk, chunk_list_index, chunk_range_index = self.get_chunk_inds(chunk)
+                #if chunk_list_index not in self.test_chunks: continue
+            
+                for i in range(self.iterate_count):
+                    self.iterate_merge_perc = self.iterate_merge_perc_list[i]; self.iterative_mode_count = i
+                    print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,self.iterate_merge_perc))
+                
+                    assert( self.clfs[i] is not None)
+                    self._test(chunk, cchunk, chunk_list_index, chunk_range_index)
+                    
+                # let the previous chunk get garbage collected to save memory.
+                # that is essentially the purpose of this special mode (iteration loop as inner loop).
+                self.iterative_frag[chunk] = None
+        else:
+            print('Normal iterative mode with merge prior %.4f' % (self.merge_prior,))
+            for i in range(self.iterate_count):
+                self.iterate_merge_perc = self.iterate_merge_perc_list[i]; self.iterative_mode_count = i
+                print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,self.iterate_merge_perc))
+                
+                if self.clfs[i] is None: 
+                    train_metrics[i] = self.train(); self.clfs[i] = self.clf
+                else: 
+                    self.clf = self.clfs[i]
+                test_metrics[i] = self.test()
 
-            if self.classifierout:
-                with open(self.classifierout, 'wb') as f: 
-                    dill.dump({'classifiers':self.clfs,'train_metrics':train_metrics,'test_metrics':test_metrics}, f)
+                if self.classifierout:
+                    with open(self.classifierout, 'wb') as f: 
+                        dill.dump({'classifiers':self.clfs,'train_metrics':train_metrics,'test_metrics':test_metrics},f)
 
     def get_merge_predict_thr(self,data):
         thr = -1; ntargets = data.shape[0]
