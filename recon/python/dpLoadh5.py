@@ -297,6 +297,9 @@ class dpLoadh5(object):
             if self.dpLoadh5_verbose: print(hdr)
             fh = open(self.outraw, 'w'); fh.write(hdr); fh.close()
             fh = open(self.outraw, 'ab'); data.tofile(fh); fh.close()
+            # pynrrd is super slow and does some kind of view changing for some reason
+            #import nrrd
+            #nrrd.write(self.outraw, data)
         elif ext == 'gipl':
             dpLoadh5.gipl_write_volume(data, self.outraw, tuple(self.sampling))
         else:

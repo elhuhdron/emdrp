@@ -308,7 +308,7 @@ class dpWatershedTypes(object):
             help='Offset in chunk to read')
         p.add_argument('--size', nargs=3, type=int, default=[256,256,128], metavar=('X', 'Y', 'Z'),
             help='Size in voxels to read')
-        p.add_argument('--ThrRng', nargs=3, type=float, default=[0.95,1.0,0.01], metavar=('BEG', 'END', 'STP'),
+        p.add_argument('--ThrRng', nargs=3, type=float, default=[0.95,0.999,0.01], metavar=('BEG', 'END', 'STP'),
             help='Python range (start, stop] by linear step for probability thresholds')
         p.add_argument('--ThrHi', nargs='*', type=float, default=[0.995, 0.999, 0.9995, 0.9999], 
             help='Extra thresholds for probs on high end')

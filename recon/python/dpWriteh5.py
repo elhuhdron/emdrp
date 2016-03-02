@@ -151,8 +151,12 @@ class dpWriteh5(dpLoadh5):
                     # Single blank line separates the header from the data
                     if line == '': break
                 nrrdfile.seek(headerSize)
-                # xxx - get this from the header? what if not consistent with data-size instantiated for this object?
+                # xxx - fix this to get data type and endianess from the header, pynrrd still sucks too much
                 data = np.fromfile(nrrdfile,dtype=self.data_type_out)
+                #data = np.fromfile(nrrdfile,dtype=self.data_type_out).byteswap(True)    # meh, imagej
+            # pynrrd is super slow and does some kind of view changing for some reason
+            #import nrrd
+            #data, hdr = nrrd.read(self.inraw)
         elif ext == 'gipl':
             data = dpWriteh5.gipl_read_volume(self.inraw)
         else:
