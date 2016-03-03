@@ -20,10 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Top level script for generating supervoxels / running metrics.
-# Adapted from top level script for revision of ECS paper. 
-# 
-# Ideally this top-level script eventually morphs into some top-level control for EMDRP...
+# Script for comparing different segmentations of the different datasets.
 
 
 import os, sys

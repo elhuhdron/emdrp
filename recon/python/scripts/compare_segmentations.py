@@ -20,11 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Top level script for generating supervoxels / running metrics.
-# Adapted from top level script for revision of ECS paper. 
-# 
-# Ideally this top-level script eventually morphs into some top-level control for EMDRP...
-
+# Script for comparing different segmentations of the same dataset.
 
 import os, sys
 import argparse
@@ -42,44 +38,42 @@ from dpLoadh5 import dpLoadh5
 from typesh5 import emLabels, emProbabilities, emVoxelType
 
 params = {
-    #'gth5' : '/Data/datasets/labels/gt/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
-    'gth5' : '/Data/datasets/labels/gt/M0027_11_labels_briggmankl_watkinspv_33x37x7chunks_Forder.h5',
+    'gth5' : '/Data/datasets/labels/gt/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
+    #'gth5' : '/Data/datasets/labels/gt/M0027_11_labels_briggmankl_watkinspv_33x37x7chunks_Forder.h5',
     'gt_ECS_label' : 1,
     #
     'segpaths' : [
         '/home/watkinspv/Data/agglo', 
         '/Data/datasets/labels/supervoxels/sixfold_threed_20151006',
         '/home/watkinspv/Data/agglo', 
-        #'/home/watkinspv/Data/agglo', 
+        '/home/watkinspv/Data/agglo', 
         ],
     'segmentations' : [
-        'none_agglo_perfect_supervoxels.h5', 
-        'none_supervoxels.h5', 
+        #'none_agglo_perfect_supervoxels.h5', 
+        #'none_supervoxels.h5', 
+        'huge_agglo_perfect_supervoxels.h5', 
+        'huge_supervoxels.h5', 
         #'huge_flatagglo_lda_23f_35iter_test_supervoxels.h5',
-        #'huge_flatagglo_lda_25f_50iter_test_supervoxels.h5',
-        #'huge_flatagglo_lda_24f_50iter_test_supervoxels.h5',
-        #'huge_flatagglo_lda_27f_50iter_test_supervoxels.h5',
-        #'huge_flatagglo_lda_27fn_50iter_test_supervoxels.h5',
-        'none_flatagglo_lda_27f_50iter_test_supervoxels.h5',
+        'huge_flatagglo_lda_24f_50iter_test_supervoxels.h5',
+        'huge_flatagglo_rf_81f_50iter_test_supervoxels.h5',
         ],
     'seglbls' : [
         'perfect',
         'watershed',
         #'lda_23f',
-        #'lda_25f',
-        #'lda_24f',
-        'lda_27f',
-        #'lda_27fn',
+        'lda_24f',
+        'rf_81f',
         ],
     'subgroups' : [
         ['with_background',],
         ['with_background',],
         ['agglomeration',],
-        #['agglomeration',],
+        ['agglomeration',],
         #['agglomeration',],
         ],
     'segparams' : [
-        np.array([0.9999]),
+        #np.array([0.9999]),
+        np.array([0.9995]),
         np.array([0.3, 0.4, 0.5, 0.6, 0.61, 0.62, 0.63, 0.64,
             0.65, 0.66, 0.67, 0.68, 0.69, 0.7, 0.71, 0.72,
             0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79, 0.8,
@@ -92,18 +86,17 @@ params = {
         #    0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
         #np.arange(1,35,dtype=np.double),
         np.arange(1,50,dtype=np.double),
-        #np.arange(1,50,dtype=np.double),
-        #np.arange(1,50,dtype=np.double),
+        np.arange(1,50,dtype=np.double),
         ],
     #
     'size' : [128, 128, 128], 'offset' : [0, 0, 0],
-    #'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+    'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
     #'chunks' : [[17,19,2], [17,23,1], [22,23,1]],
     #'chunks' : [[17,23,1],],
     #'chunks' : [[16,17,4], [13,20,3], [13,15,3], [18,15,3], [18,20,3], [18,20,4]],
-    'chunks' : [[16,17,4],],
+    #'chunks' : [[16,17,4],],
     'figno' : 5000,
-    'plot_only':True,
+    'plot_only':False,
     'outpath' : '.',
     'save_file' : 'out.dill',
     'do_plots':True,

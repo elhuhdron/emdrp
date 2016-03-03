@@ -183,7 +183,10 @@ class dpLoadh5(object):
 
         # slice out the data hdf
         hdf = h5py.File(self.srcfile,'r'); self.dset, self.group, self.dsetpath = self.getDataset(hdf)
-        assert( self.dset )     # fail here if dataset does not exist in subgroups path
+        if not self.dset: 
+            print('Missing',self.subgroups,self.dataset)
+            assert( False )     # fail here if dataset does not exist in subgroups path
+        #assert( self.dset )     # fail here if dataset does not exist in subgroups path
         ind = self.get_hdf_index_from_chunk_index(self.dset, self.chunk, self.offset)
         #print(ind, self.dset.shape)
         slc,slcd = self.get_data_slices_from_indices(ind, size, data_size)
