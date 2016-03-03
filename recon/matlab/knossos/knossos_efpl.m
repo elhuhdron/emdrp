@@ -47,23 +47,26 @@ o.chunksize = inf.Datasets(ind).ChunkSize;
 o.datasize = inf.Datasets(ind).Dataspace(1).Size;
 o.scale = h5readatt(pdata.datah5,['/' p.dataset_data],'scale')';
 
-% get the parameter space from the labels h5 file
-o.thresholds = h5readatt(pdata.lblsh5,['/' 'voxel_type'],'thresholds')';
-o.Tmins = h5readatt(pdata.lblsh5,['/' 'voxel_type'],'Tmins')';
+% either load the parameter space from the attributes of voxel_type, or they are passed in as parameters.
+if ~isempty(pdata.segparam_attr)
+  % get the parameter space from the labels h5 file
+  o.thresholds = h5readatt(pdata.lblsh5,['/' 'voxel_type'],pdata.segparam_attr)';
+else
+  o.thresholds = pdata.segparams;
+end
 
-% to select only a subset of available parameters to analyze
-use_Tmins = isfield(p, 'use_Tmins');
-if use_Tmins, o.Tmins = o.Tmins(ismember(o.Tmins,p.use_Tmins)); end
-use_thresholds = isfield(p, 'use_thresholds');
-% mmmm, floating point
-if use_thresholds, o.thresholds = o.thresholds(ismember(round(1e6*o.thresholds),round(1e6*p.use_thresholds))); end
+% % to select only a subset of available parameters to analyze
+% use_Tmins = isfield(p, 'use_Tmins');
+% if use_Tmins, o.Tmins = o.Tmins(ismember(o.Tmins,p.use_Tmins)); end
+% use_thresholds = isfield(p, 'use_thresholds');
+% % mmmm, floating point
+% if use_thresholds, o.thresholds = o.thresholds(ismember(round(1e6*o.thresholds),round(1e6*p.use_thresholds))); end
 
 % other calculated values based on params
 o.loadsize = p.nchunks.*o.chunksize - p.offset;
 o.loadcorner = pdata.chunk.*o.chunksize + p.offset;
 o.nthresholds = length(o.thresholds);
-o.nTmins = length(o.Tmins);
-o.nparams = o.nthresholds * o.nTmins;
+o.nparams = o.nthresholds;
 assert( o.nparams > 1 );
 assert( p.m_ij_threshold > 0 );
 
@@ -121,13 +124,8 @@ o.minnodes = [minx miny minz]; o.maxnodes = [maxx maxy maxz];
 % read out labels at some threshold, this first step is just to get nodes/edges
 %   within labeled supervoxel area (within volume and not empty label) and path lengths.
 % the labeled supervoxel area and skeleton path lengths are not a function of threshold.
-if o.nTmins==1 && ~use_Tmins
-  fprintf(1,'reading labels at thr %.8f\n', o.thresholds(1)); t = now;
-  dset = sprintf('/with_background/%.8f/%s',o.thresholds(1),p.dataset_lbls);
-else
-  fprintf(1,'reading labels at Tmin %d, thr %.8f\n', o.Tmins(1), o.thresholds(1)); t = now;
-  dset = sprintf('/with_background/%d/%.8f/%s',o.Tmins(1),o.thresholds(1),p.dataset_lbls);
-end
+fprintf(1,'reading labels at thr %.8f\n', o.thresholds(1)); t = now;
+dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(1),p.dataset_lbls);
 Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
@@ -232,10 +230,8 @@ fprintf(1,'\t\tbest case count  = %d, worst case count = %d\n',length(efpl{1}),l
 
 
 
-% iterate over parameters controlling the supervoxel watershedding. currently these are:
-%   (1) top threshold (o.thresholds)
-%   (2) minimum component size to add to label seed mask (o.Tmins)
-%
+
+% iterate over single dimension of specified segmentation parameters, typically threshold.
 
 % allocate outputs
 o.nSMs = zeros(o.nparams,2); o.nSMs_segEM = zeros(o.nparams,2); 
@@ -253,23 +249,23 @@ o.ri_CI = zeros(o.nparams,2); o.ari_CI = zeros(o.nparams,2);
 o.error_rate_CI = zeros(o.nparams,p.npasses_edges,2); o.eftpl_CI = zeros(o.nparams,p.npasses_edges,2);
 
 for prm=1:o.nparams
-  % this is specific to how many parameter dimensions there are, currently just Tmin and threshold
-  [thr, tmn] = ind2sub([o.nthresholds o.nTmins],prm);
   
-  if o.nTmins==1 && ~use_Tmins
-    fprintf(1,'\nreading labels at thr %.8f\n', o.thresholds(thr)); t = now;
-    dset = sprintf('/with_background/%.8f/%s',o.thresholds(thr),p.dataset_lbls);
-  else
-    fprintf(1,'\nreading labels at Tmin %d, thr %.8f\n', o.Tmins(tmn),o.thresholds(thr)); t = now;
-    dset = sprintf('/with_background/%d/%.8f/%s',o.Tmins(tmn),o.thresholds(thr),p.dataset_lbls);
-  end
+  thr = prm;
+  fprintf(1,'\nreading labels at thr %.8f\n', o.thresholds(thr)); t = now;
+  dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(thr),p.dataset_lbls);
   Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
-  display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   
-  % get nlabels from attributes
-  o.types_nlabels(prm,:) = h5readatt(pdata.lblsh5,dset,'types_nlabels');
-  nlabels = double(sum(o.types_nlabels(prm,:))); % do not remove ECS components
-  %nlabels = double(nlabels(1)); Vlbls(Vlbls > nlabels) = 0;  % remove ECS components
+  if ~isempty(pdata.nlabels_attr)
+    % get nlabels from attributes
+    o.types_nlabels(prm,:) = h5readatt(pdata.lblsh5,dset,pdata.nlabels_attr);
+    nlabels = double(sum(o.types_nlabels(prm,:))); % do not remove ECS components
+    %nlabels = double(nlabels(1)); Vlbls(Vlbls > nlabels) = 0;  % remove ECS components
+  else
+    % get nlabels with max, no easy way to get num ICS/ECS individually
+    % xxx - currently this is only for comparing with agglomeration
+    nlabels = double(max(Vlbls(:))); o.types_nlabels(prm,:) = [nlabels 0];
+  end
+  display(sprintf('\t\tdone in %.3f s, nlabels = %d',(now-t)*86400,nlabels));
   
   % first pass over all edges for all skeletons to get confusion matrix
   % instead of pixels, each tally in the confusion matrix is a node count
@@ -419,7 +415,7 @@ for prm=1:o.nparams
     jnk.coutThings{nOutThings+1}.edges = all_ef_edges;
     jnk.coutThings{nOutThings+1}.thingid = nOutThings+1;
     
-    jnk.fn = fullfile(p.outpath, [o.skelname sprintf('_thr%.8f_tmin%d_use.nml',o.thresholds(thr),o.Tmins(tmn))]);
+    jnk.fn = fullfile(p.outpath, [o.skelname sprintf('_thr%.8f_use.nml',o.thresholds(thr))]);
     evalc('KnossosM_exportNML(jnk.fn,jnk.coutThings,meta,{});'); % suppress output
     display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   end
