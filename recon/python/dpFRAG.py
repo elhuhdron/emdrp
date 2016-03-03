@@ -61,31 +61,34 @@ except:
 class dpFRAG(emLabels):
 
     TARGETS = {'no_merge':0, 'yes_merge':1}     # hard coded as false/true throughout code
-    
-    # different features setups / options... xxx - work on this
-    log_size = True
-    FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
-        'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
-        'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
-        'size_ovlp_small':9, 'size_ovlp_large':10, 'labeled_ovlp':11,
-        'conv_overlap':12, 'rad_std_ovlp':13, 'ang_std_ovlp':14, 
-        'pca_angle0':15, 'pca_angle_small0':16, 'pca_angle_large0':17,
-        'pca_angle1':18, 'pca_angle_small1':19, 'pca_angle_large1':20,
-        'pca_angle2':21, 'pca_angle_small2':22, 'pca_angle_large2':23,
-        }
-        
-    #FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
-    FEATURES = OrderedDict(sorted(FEATURES.items(), key=lambda t: t[1]))
-    FEATURES_NAMES = list(FEATURES.keys())
 
+
+
+    # properties that determine the features... this whole thing needs to be revisited    
+        
     # augmented inputs derived from probabilities and raw EM
     # xxx - revisit this is some way of make features as options, might need to move to .ini based init?
-    augments = ['smooth', 'sharpen', 'edges', 
-        'blur15', 'blur20', 'blur3', 'blur4', 'blur5', 'blur6', 
+    #augments = []
+    # the original augments
+    ##augments = ['smooth', 'sharpen', 'edges', 
+    ##    'blur10', 'blur15', 'blur20', 'blur30', 'blur40', 'blur50', 'blur60', 
+    ##    'median', 'mean', 'min', 'max', 'var',
+    ##    'grad_mag', 'grad_dir', 'laplacian', 'large_hess', 'small_hess', 'hess_ori',
+    ##    'kuwahara', 'diff_blur'
+    ##    ]
+    # found the following to be colinear:
+    #   smooth == sharp, blurs == diff_blur, large_hess == small_hess
+    #   laplacian <==> grad_mag BUT only with some combination of blurs and smooth/edges/kuwahara?? 
+    augments = ['smooth', 'edges', 'kuwahara',
+        'blur10', 'blur15', 'blur20', 'blur30', 'blur40', 'blur50', 'blur60', 
         'median', 'mean', 'min', 'max', 'var',
-        'grad_mag', 'grad_dir', 'laplacian', 'large_hess', 'small_hess', 'hess_ori',
-        'kuwahara', 'diff_blur',
+        'grad_mag', 'grad_dir', 'large_hess', 'hess_ori',
         ]
+    naugments = len(augments)
+    _augments = ['_' + x for x in augments]
+
+    # wheter to use log for voxel sizes of objects
+    log_size = True
     
     # number of pca eigenvector angles to measure
     npcaang = 3 
@@ -93,6 +96,10 @@ class dpFRAG(emLabels):
     # the probability types to use for features
     types = ['MEM','ICS']
     #types = ['MEM']
+    ntypes = len(types)
+
+
+
 
     # how much to dilate supervoxels in order to find neighbors.
     # xxx - never found it useful to include neighbors that are further out than adjacent voxels.
@@ -113,7 +120,50 @@ class dpFRAG(emLabels):
     #   preserved, but some of the overlap calculations can still be preserved.
     svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out']
     sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
-    ovlp_attrs = ['mean_probs','mean_grayscale','aobnd','ovlp_rmom','ovlp_amom','ovlp_conv','ovlp_labeled']
+    ovlp_attrs = ['mean_probs','mean_probs_aug','mean_grayscale','mean_grayscale_aug','aobnd','ovlp_rmom','ovlp_amom',
+        'ovlp_conv','ovlp_labeled']
+
+    # xxx - this is some hybrid method for creating what the features are, still need to work on how this is configured.
+    @staticmethod
+    def make_FEATURES():
+        # old static class property:
+        # different features setups / options... xxx - work on this
+        #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2, 
+        #    'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5, 
+        #    'ang_cntr':6, 'dist_cntr_small':7, 'dist_cntr_large':8, 
+        #    'size_ovlp_small':9, 'size_ovlp_large':10, 'labeled_ovlp':11,
+        #    'conv_overlap':12, 'rad_std_ovlp':13, 'ang_std_ovlp':14, 
+        #    'pca_angle0':15, 'pca_angle_small0':16, 'pca_angle_large0':17,
+        #    'pca_angle1':18, 'pca_angle_small1':19, 'pca_angle_large1':20,
+        #    'pca_angle2':21, 'pca_angle_small2':22, 'pca_angle_large2':23,
+        #    }
+        ##FEATURES = {'size_overlap':0, 'mean_prob_MEM':1}
+        #FEATURES = OrderedDict(sorted(FEATURES.items(), key=lambda t: t[1]))
+        #FEATURES_NAMES = list(FEATURES.keys())
+    
+        # this independent of static options
+        names = ['size_small', 'size_large', 'size_overlap',
+            'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large', 
+            'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
+            'conv_overlap', 'rad_std_ovlp', 'ang_std_ovlp']
+
+        for k in range(dpFRAG.ntypes):
+            names += ['mean_prob_' + dpFRAG.types[k]]
+        
+        for k in range(dpFRAG.naugments):
+            names += ['mean_grayscale' + dpFRAG._augments[k]]
+            for j in range(dpFRAG.ntypes):
+                names += ['mean_prob_' + dpFRAG.types[j] + dpFRAG._augments[k]]
+
+        for k in range(dpFRAG.npcaang):
+            names += ['pca_angle' + str(k)]
+            names += ['pca_angle_small' + str(k)]
+            names += ['pca_angle_large' + str(k)]
+
+        nfeatures = len(names)
+        features = OrderedDict([(x,y) for x,y in zip(names,range(nfeatures))])
+
+        return features,names,nfeatures
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -124,15 +174,12 @@ class dpFRAG(emLabels):
 
         if not self.data_type_out: self.data_type_out = self.data_type
 
-        self.ntypes = len(self.types)
-        self.nfeatures = len(self.FEATURES)
+        self.FEATURES, self.FEATURES_NAMES, self.nfeatures = dpFRAG.make_FEATURES()
         self.bperim = 2*max([self.ovlp_dilate, dpFRAG.neighbor_perim])
         # external perimeter used to pad all volumes
         self.eperim = self.perim + self.bperim
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
         self.outRAG = None
-        self.naugments = len(self.augments)
-        self._augments = ['_' + x for x in self.augments]
 
         assert( not self.trainout or self.gtfile )  # need ground truth to generate training data
 
@@ -175,10 +222,11 @@ class dpFRAG(emLabels):
                     self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=0)
                 else:
                     self.probs[i] = data
+
+                self.probs[i][np.logical_not(np.isfinite(self.probs[i]))] = 0   # no NaNs/Infs
                     
-                '''
                 for j in range(self.naugments):
-                    loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.types[i]+self.augments[j], 
+                    loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.types[i]+self._augments[j], 
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(), 
                         verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
 
@@ -187,7 +235,8 @@ class dpFRAG(emLabels):
                         self.probs_aug[j][i] = np.lib.pad(data, spad, 'constant',constant_values=0)
                     else:
                         self.probs_aug[j][i] = data
-                '''
+                        
+                    self.probs_aug[j][i][np.logical_not(np.isfinite(self.probs_aug[j][i]))] = 0     # no NaNs/Infs
 
         # load the raw em data
         if self.rawfile:
@@ -203,11 +252,11 @@ class dpFRAG(emLabels):
             else:
                 self.raw = data
 
-            print(self._augments, self.naugments)
-            '''
-            self.raw_aug = [None]*self.naugments)
+            self.raw[np.logical_not(np.isfinite(self.raw))] = 0     # no NaNs/Infs
+
+            self.raw_aug = [None]*self.naugments
             for j in range(self.naugments):
-                loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile, dataset=self.raw_dataset+self.augments[j], 
+                loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile, dataset=self.raw_dataset+self._augments[j], 
                     chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(), 
                     verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
 
@@ -216,7 +265,8 @@ class dpFRAG(emLabels):
                     self.raw_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=0)
                 else:
                     self.raw_aug[j] = data
-            '''
+
+                self.raw_aug[j][np.logical_not(np.isfinite(self.raw_aug[j]))] = 0   # no NaNs/Infs
 
         # load the ground truth data
         if self.gtfile:
@@ -254,6 +304,8 @@ class dpFRAG(emLabels):
 
         # other inits for the supervoxel iteration loop
         mean_probs = [None]*self.ntypes
+        mean_probs_aug = [[None]*self.ntypes for x in range(self.naugments)]
+        mean_grayscale_aug = [None]*self.naugments
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
@@ -389,6 +441,13 @@ class dpFRAG(emLabels):
                             mean_probs[k] = self.probs[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
                         mean_grayscale = self.raw[aobnd][ovlp_cur_dilate].mean(dtype=np.double)
 
+                        # augmented raw data and probability mean boundary features
+                        for k in range(self.naugments):
+                            mean_grayscale_aug[k] = self.raw_aug[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+                            for x in range(self.ntypes):
+                                mean_probs_aug[k][x] = \
+                                    self.probs_aug[k][x][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+
                         # MORE COMPLEX FEATURES: object attributes within the overlap bounding box.
                         mo = self.getOvlpAttrs(ovlp_cur, self.sampling, return_Cpts=True)
 
@@ -477,6 +536,11 @@ class dpFRAG(emLabels):
                         f[F['pca_angle_large' + str(k)]] = mj['angles'][k]
                     for k in range(self.ntypes):
                         f[F['mean_prob_' + self.types[k]]] = m['mean_probs'][k]
+                    for k in range(self.naugments):
+                        f[F['mean_grayscale' + self._augments[k]]] = m['mean_grayscale_aug'][k]
+                        for x in range(self.ntypes):
+                            f[F['mean_prob_' + self.types[x] + self._augments[k]]] = m['mean_probs_aug'][k][x]
+                    
                     self.FRAG[i][j]['features'] = f; self.FRAG[i][j]['first_pass'] = True
                 else: # if edge already in graph
                     # if this is update mode and the edge is there and not marked as first pass, 
@@ -928,7 +992,7 @@ class dpFRAG(emLabels):
         return A
         
     @classmethod
-    def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, gtfile, 
+    def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, 
             subgroups=[], G=None, progressBar=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -939,8 +1003,8 @@ class dpFRAG(emLabels):
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
-        arg_str += ' --probfile ' + probfile
-        arg_str += ' --rawfile ' + rawfile
+        arg_str += ' --probfile ' + probfiles[0]; arg_str += ' --probaugfile ' + probfiles[1]
+        arg_str += ' --rawfile ' + rawfiles[0]; arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --gtfile ' + gtfile
         
@@ -954,7 +1018,7 @@ class dpFRAG(emLabels):
         return frag
 
     @classmethod
-    def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, outfile, subgroups=[], 
+    def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile, subgroups=[], 
             subgroups_out=[], G=None, progressBar=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -964,8 +1028,8 @@ class dpFRAG(emLabels):
         arg_str += ' --chunk %d %d %d ' % tuple(chunk)
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
-        arg_str += ' --probfile ' + probfile
-        arg_str += ' --rawfile ' + rawfile
+        arg_str += ' --probfile ' + probfiles[0]; arg_str += ' --probaugfile ' + probfiles[1]
+        arg_str += ' --rawfile ' + rawfiles[0]; arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --outfile ' + outfile
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
@@ -981,7 +1045,7 @@ class dpFRAG(emLabels):
         return frag
 
     @classmethod
-    def makeBothFRAG(cls, labelfile, chunk, size, offset, probfile, rawfile, raw_dataset, gtfile, outfile,
+    def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile,
             subgroups=[], subgroups_out=None, G=None, progressBar=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG', 
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -991,8 +1055,8 @@ class dpFRAG(emLabels):
         arg_str += ' --chunk %d %d %d ' % tuple(chunk)
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
-        arg_str += ' --probfile ' + probfile
-        arg_str += ' --rawfile ' + rawfile
+        arg_str += ' --probfile ' + probfiles[0]; arg_str += ' --probaugfile ' + probfiles[1]
+        arg_str += ' --rawfile ' + rawfiles[0]; arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --gtfile ' + gtfile
         arg_str += ' --outfile ' + outfile

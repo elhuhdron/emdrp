@@ -204,7 +204,9 @@ class dpSupervoxelClassifier():
             else:
                 assert( len(self.thresholds) == len(self.threshold_subgroups) )
 
-
+        # dpFRAG features are now "half-static"
+        self.FEATURES, self.FEATURES_NAMES, self.nfeatures = dpFRAG.make_FEATURES()
+        
     def train(self):
 
         if self.dpSupervoxelClassifier_verbose: print('\nTRAIN')
@@ -215,12 +217,12 @@ class dpSupervoxelClassifier():
             with open(self.trainin, 'rb') as f: data = dill.load(f)
             target = data['target']; fdata = data['data']
             ntargets = target.size; nfeatures = fdata.shape[1]
-            assert( nfeatures == len(dpFRAG.FEATURES) ) # xxx - FRAG features currently static
+            assert( nfeatures == self.nfeatures ) 
             
         elif not self.classifierin: 
             #dict_keys(['feature_names', 'DESCR', 'target_names', 'target', 'data'])
             nalloc = self.nchunks*self.nalloc_per_chunk
-            nfeatures = len(dpFRAG.FEATURES)
+            nfeatures = self.nfeatures
             target = np.zeros((nalloc,), dtype=np.int64)
             fdata = np.zeros((nalloc,nfeatures), dtype=np.double)
         
@@ -235,14 +237,16 @@ class dpSupervoxelClassifier():
                 
                 if self.iterative_mode:
                     if self.iterative_frag[chunk] is None:
-                        frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
+                        frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, 
+                            [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile], 
                             self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, ['training','thr'], 
                             progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
                         frag = self.iterative_frag[chunk]
                 else:
-                    frag = dpFRAG.makeTrainingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
+                    frag = dpFRAG.makeTrainingFRAG(self.labelfile, cchunk, size, offset, 
+                        [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile], 
                         self.raw_dataset, self.gtfile, self.label_subgroups, 
                         progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
                 frag.createFRAG(update = self.iterative_mode)
@@ -286,7 +290,8 @@ class dpSupervoxelClassifier():
                 # the gala parameters
                 #self.clf = RandomForestClassifier(n_estimators=100, criterion='entropy', max_depth=20,
                 #    bootstrap=False, random_state=None)
-                self.clf = RandomForestClassifier(n_estimators=5*nfeatures,n_jobs=self.n_jobs,max_depth=10)
+                #self.clf = RandomForestClassifier(n_estimators=5*nfeatures,n_jobs=self.n_jobs,max_depth=10)
+                self.clf = RandomForestClassifier(n_estimators=256,n_jobs=self.n_jobs,max_depth=16)
             elif self.classifier == 'svm':
                 self.clf = svm.SVC(kernel='rbf',probability=True,cache_size=2000)
             elif self.classifier == 'nb':
@@ -309,7 +314,7 @@ class dpSupervoxelClassifier():
                 with open(self.classifierout, 'wb') as f: dill.dump({'classifier':self.clf}, f)
 
         if self.dpSupervoxelClassifier_verbose: 
-            print('\n\tdone in %.4f s' % (time.time() - t))
+            print('\tdone in %.4f s' % (time.time() - t))
 
         # do the agglomeration to use as input to next iteration for iterative mode
         thr = -1
@@ -371,11 +376,13 @@ class dpSupervoxelClassifier():
 
         if frag is None:
             if self.doplots:
-                frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
+                frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset, 
+                    [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile], 
                     self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out, 
                     G=FRAG, progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
             else:
-                frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset, self.probfile, self.rawfile, 
+                frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset, 
+                    [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile], 
                     self.raw_dataset, self.outfile, self.label_subgroups, subgroups_out, G=FRAG,
                     progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
 
@@ -448,8 +455,9 @@ class dpSupervoxelClassifier():
                 for i in range(self.iterate_count):
                     self.iterate_merge_perc = self.iterate_merge_perc_list[i]; self.iterative_mode_count = i
                     print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,self.iterate_merge_perc))
-                
-                    assert( self.clfs[i] is not None)
+
+                    assert( self.clfs[i] is not None) # classifierin must be specified for test only
+                    self.clf = self.clfs[i]     
                     self._test(chunk, cchunk, chunk_list_index, chunk_range_index)
                     
                 # let the previous chunk get garbage collected to save memory.
@@ -587,7 +595,9 @@ class dpSupervoxelClassifier():
             
             # plot for LDA classifier only
             axes = pl.subplot(1,2,2)
-            plt.xticks(range(nfeatures),rotation=45); axes.set_xticklabels(dpFRAG.FEATURES_NAMES)
+            plt.xticks(range(nfeatures),rotation=45)
+            FEATURES, FEATURES_NAMES, nfeatures = dpFRAG.make_FEATURES()    # xxx - meh
+            axes.set_xticklabels(FEATURES_NAMES)
             pl.plot(clf.scalings_[:,0],'k')
             d = clf.decision_function(clf.means_)   # distance from means to the decision boundary
             pl.title('dist: not %.5f yes %.5f' % (d[0],d[1]))
@@ -647,8 +657,9 @@ class dpSupervoxelClassifier():
                 plt.xlim(ylim); plt.ylim(xlim)
                     
                 if y==x+1: 
-                    plt.xlabel(dpFRAG.FEATURES_NAMES[y])
-                    plt.ylabel(dpFRAG.FEATURES_NAMES[x])
+                    FEATURES, FEATURES_NAMES, nfeatures = dpFRAG.make_FEATURES()    # xxx - meh
+                    plt.xlabel(FEATURES_NAMES[y])
+                    plt.ylabel(FEATURES_NAMES[x])
                 else: 
                     plt.gca().axes.get_xaxis().set_visible(False)
                     plt.gca().axes.get_yaxis().set_visible(False)

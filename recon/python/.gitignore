@@ -1,0 +1,4 @@
+
+# used as output logs for classifier runs
+out*.txt
+
