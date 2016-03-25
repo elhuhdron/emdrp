@@ -24,33 +24,35 @@
 
 pdata = struct;  % input parameters depending on dataset
 
-% with almost no ECS, agglomeration
+% % with almost no ECS, agglomeration
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+% % corner chunk
+% pdata(i).chunk = [12 14 2];
+% pdata(i).skelin = '/home/watkinspv/Data/M0027_11/M0027_11_dense_skels.186.nml';
+% % supervoxels, all thresholds and watershed types
+% pdata(i).lblsh5 = '/Data/pwatkins/agglo/none_aggloall_supervoxels.h5';
+% pdata(i).name = 'none_agglo';
+% pdata(i).subgroup = 'agglomeration';
+% pdata(i).numsegs = 50;
+% pdata(i).nlabels_attr = 'types_nlabels';
+% pdata(i).outlbls = '/Data/pwatkins/agglo/none_aggloall_supervoxels_relabel.h5';
+% pdata(i).prm_start = 1;
+
+% with ~20% ECS, agglomeration
 i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
 % corner chunk
-pdata(i).chunk = [12 14 2];
-pdata(i).skelin = '/home/watkinspv/Data/M0027_11/M0027_11_dense_skels.186.nml';
+pdata(i).chunk = [16 17 0];
+pdata(i).skelin = '/home/watkinspv/Data/M0007_33/M0007_33_dense_skels.152.nml';
 % supervoxels, all thresholds and watershed types
-pdata(i).lblsh5 = '/Data/pwatkins/agglo/none_aggloall_supervoxels.h5';
-pdata(i).name = 'none_agglo';
+pdata(i).lblsh5 = '/Data/pwatkins/agglo/huge_aggloall_rf_supervoxels.h5';
+pdata(i).name = 'huge_agglo';
 pdata(i).subgroup = 'agglomeration';
 pdata(i).numsegs = 50;
-pdata(i).nlabels_attr = 'types_nlabels';
-pdata(i).outlbls = '/Data/pwatkins/agglo/none_aggloall_supervoxels_relabel.h5';
+pdata(i).nlabels_attr = '';
+pdata(i).outlbls = '/Data/pwatkins/agglo/huge_aggloall_rf_supervoxels_relabel.h5';
 pdata(i).prm_start = 1;
-
-% % with ~20% ECS, agglomeration
-% i = 2;
-% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-% % corner chunk
-% pdata(i).chunk = [16 17 0];
-% pdata(i).skelin = '/home/watkinspv/Data/M0007_33/M0007_33_dense_skels.152.nml';
-% % supervoxels, all thresholds and watershed types
-% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/M0007_33_20151001_newestECSall/huge_aggloall_supervoxels.h5';
-% pdata(i).name = 'huge_agglo';
-% pdata(i).subgroup = 'agglomeration';
-% pdata(i).numsegs = 18;
-% pdata(i).nlabels_from_attrs = false;
 
 
 
