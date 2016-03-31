@@ -1,5 +1,6 @@
 
-load('/home/watkinspv/Data/agglo/efpl_none.mat');
+%load('/home/watkinspv/Data/agglo/efpl_huge_rf60.mat');
+load('/Data/pwatkins/full_datasets/newestECSall/20151001/efpl.mat');
 
 pplot = struct;
 
@@ -19,6 +20,8 @@ pplot.dplxs = 0.0001; pplot.plxs = -1.9+pplot.dplxs/2:pplot.dplxs:2.2-pplot.dplx
 
 % for node histograms
 pplot.dndx = 1; pplot.ndx = 0+pplot.dndx/2:pplot.dndx:150-pplot.dndx/2; pplot.nndx = length(pplot.ndx);
+
+pplot.set_thresholds_axis = true;
 
 po = knossos_efpl_plot(pdata,o,pplot);
 
