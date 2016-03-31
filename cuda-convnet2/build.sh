@@ -30,22 +30,25 @@ export CUDA_INSTALL_PATH=/usr/local/cuda
 
 # Python include directory. This should contain the file Python.h, among others.
 #export PYTHON_INCLUDE_PATH=/usr/include/python2.7
-export PYTHON_INCLUDE_PATH=/usr/include/python2.6
+#export PYTHON_INCLUDE_PATH=/usr/include/python2.6
+export PYTHON_INCLUDE_PATH=$HOME/anaconda2/include/python2.7
 
 # Numpy include directory. This should contain the file arrayobject.h, among others.
 #export NUMPY_INCLUDE_PATH=/usr/lib/python2.7/dist-packages/numpy/core/include/numpy/
-export NUMPY_INCLUDE_PATH=/usr/lib64/python2.6/site-packages/numpy/core/include/numpy
+#export NUMPY_INCLUDE_PATH=/usr/lib64/python2.6/site-packages/numpy/core/include/numpy
+export NUMPY_INCLUDE_PATH=$HOME/anaconda2/lib/python2.7/site-packages/numpy/core/include/numpy
 
 # ATLAS library directory. This should contain the file libcblas.so, among others.
 #export ATLAS_LIB_PATH=/usr/lib/atlas-base
 export ATLAS_LIB_PATH=/usr/lib64/atlas
 
 # libjpeg (libjpeg-turbo) library directory installed in another location. This should contain the file jpeg.h....
-export LIBJPEG_PATH=/opt/libjpeg-turbo
+#export LIBJPEG_PATH=/opt/libjpeg-turbo
+export LIBJPEG_PATH=/usr/lib64
 
 # Optionally use a compiler different from base install. This should contain gcc,g++ etc
-#export COMPILER_BIN_PATH=/usr/bin
-export COMPILER_BIN_PATH=/opt/rh/devtoolset-1.1/root/usr/bin
+export COMPILER_BIN_PATH=/usr/bin
+#export COMPILER_BIN_PATH=/opt/rh/devtoolset-1.1/root/usr/bin
 
 # You don't have to change these:
 export LD_LIBRARY_PATH=$CUDA_INSTALL_PATH/lib64:$LD_LIBRARY_PATH
