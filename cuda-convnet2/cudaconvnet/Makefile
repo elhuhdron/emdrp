@@ -40,14 +40,14 @@ NVCC            = $(CUDA_BIN_PATH)/nvcc
 GCC=$(COMPILER_BIN_PATH)/g++
 #AR				= ar
 
-# CUDA code generation flags
-GENCODE_SM35    := -gencode arch=compute_35,code=sm_35
-GENCODE_FLAGS   := $(GENCODE_SM35)
+# CUDA code generation flags, moved to build.sh
+#GENCODE_SM35    := -gencode arch=compute_35,code=sm_35
+#GENCODE_FLAGS   := $(GENCODE_SM35)
 
 LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart
 CCFLAGS   := -m64
 NVCCFLAGS := -m64 --compiler-bindir=$(COMPILER_BIN_PATH)/g++
-LINK_LIBS := -L$(LIBJPEG_PATH)/lib64
+LINK_LIBS := 
 
 # Debug build flags
 ifeq ($(dbg),1)
@@ -69,10 +69,10 @@ TARGETDIR := ./bin/$(DBG)
 OBJDIR := ./obj/$(DBG)
 
 ########## USER STUFF ###########
-PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
+#PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
 MODELNAME := _ConvNet
-LDFLAGS   += -lpthread -ljpeg -lpython$(PYTHON_VERSION) -L../util -lutilpy -L../nvmatrix -lnvmatrix -L../cudaconv3 -lcudaconv -lcublas -Wl,-rpath=./util -Wl,-rpath=./nvmatrix -Wl,-rpath=./cudaconv3 
-INCLUDES      := -I$(CUDA_INC_PATH) -I $(CUDA_SDK_PATH)/common/inc -I./include -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH) -I$(LIBJPEG_PATH)/include
+LDFLAGS   += -lpthread -ljpeg -L$(PYTHON_LIBRARY_PATH) -lpython$(PYTHON_VERSION) -L../util -lutilpy -L../nvmatrix -lnvmatrix -L../cudaconv3 -lcudaconv -lcublas -Wl,-rpath=./util -Wl,-rpath=./nvmatrix -Wl,-rpath=./cudaconv3 
+INCLUDES      := -I$(CUDA_INC_PATH) -I $(CUDA_SDK_PATH)/common/inc -I./include -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH) 
 
 DEFINES := -DNUMPY_INTERFACE
 

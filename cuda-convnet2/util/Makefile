@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#LINK_LIBS := -L$(ATLAS_LIB_PATH) -latlas -lcblas
-LINK_LIBS := -L$(ATLAS_LIB_PATH) -ltatlas
+LINK_LIBS := -L$(ATLAS_LIB_PATH) -lcblas -latlas 
+#LINK_LIBS := -L$(ATLAS_LIB_PATH) -ltatlas 
 INCLUDES := -I./include
 COMMONFLAGS :=
 CC_ARGS := 
@@ -28,8 +28,8 @@ OUT_DIR=./bin/$(OUT_SUFFIX)
 OUT_FILE=libutil.so
 
 ifeq ($(numpy), 1)
-	PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
-	LINK_LIBS += -lpython$(PYTHON_VERSION)
+	#PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
+	LINK_LIBS += -L$(PYTHON_LIBRARY_PATH) -lpython$(PYTHON_VERSION)
 
 	INCLUDES += -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH)
 	COMMONFLAGS += -DNUMPY_INTERFACE

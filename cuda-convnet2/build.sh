@@ -33,6 +33,10 @@ export CUDA_INSTALL_PATH=/usr/local/cuda
 #export PYTHON_INCLUDE_PATH=/usr/include/python2.6
 export PYTHON_INCLUDE_PATH=$HOME/anaconda2/include/python2.7
 
+# Python library directory and link version. This should contain libpythonx.x, among others.
+export PYTHON_LIBRARY_PATH=$HOME/anaconda2/lib
+export PYTHON_VERSION=2.7
+
 # Numpy include directory. This should contain the file arrayobject.h, among others.
 #export NUMPY_INCLUDE_PATH=/usr/lib/python2.7/dist-packages/numpy/core/include/numpy/
 #export NUMPY_INCLUDE_PATH=/usr/lib64/python2.6/site-packages/numpy/core/include/numpy
@@ -40,15 +44,15 @@ export NUMPY_INCLUDE_PATH=$HOME/anaconda2/lib/python2.7/site-packages/numpy/core
 
 # ATLAS library directory. This should contain the file libcblas.so, among others.
 #export ATLAS_LIB_PATH=/usr/lib/atlas-base
-export ATLAS_LIB_PATH=/usr/lib64/atlas
-
-# libjpeg (libjpeg-turbo) library directory installed in another location. This should contain the file jpeg.h....
-#export LIBJPEG_PATH=/opt/libjpeg-turbo
-export LIBJPEG_PATH=/usr/lib64
+#export ATLAS_LIB_PATH=/usr/lib64/atlas
+export ATLAS_LIB_PATH=$HOME/anaconda2/pkgs/atlas-3.8.4-0/lib
 
 # Optionally use a compiler different from base install. This should contain gcc,g++ etc
 export COMPILER_BIN_PATH=/usr/bin
 #export COMPILER_BIN_PATH=/opt/rh/devtoolset-1.1/root/usr/bin
+
+# Set the cuda gencode option from top level
+export GENCODE_FLAGS='-gencode arch=compute_35,code=sm_35 -gencode arch=compute_52,code=sm_52'
 
 # You don't have to change these:
 export LD_LIBRARY_PATH=$CUDA_INSTALL_PATH/lib64:$LD_LIBRARY_PATH

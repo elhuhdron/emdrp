@@ -40,9 +40,9 @@ NVCC            = $(CUDA_BIN_PATH)/nvcc
 GCC=$(COMPILER_BIN_PATH)/g++
 #AR				= ar
 
-# CUDA code generation flags
-GENCODE_SM35    := -gencode arch=compute_35,code=sm_35
-GENCODE_FLAGS   := $(GENCODE_SM35)
+# CUDA code generation flags, moved to build.sh
+#GENCODE_SM35    := -gencode arch=compute_35,code=sm_35
+#GENCODE_FLAGS   := $(GENCODE_SM35)
 
 LDFLAGS   := -L$(CUDA_LIB_PATH) -lcudart
 CCFLAGS   := -m64

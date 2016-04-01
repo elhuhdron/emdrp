@@ -24,8 +24,8 @@ CC=$(COMPILER_BIN_PATH)/g++
 
 OUT_DIR=./bin/$(OUT_SUFFIX)
 
-PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
-LINK_LIBS := -L$(CUDA_INSTALL_PATH)/lib64 `pkg-config --libs opencv` -lpython$(PYTHON_VERSION) -lpthread
+#PYTHON_VERSION=$(shell python -V 2>&1 | cut -d ' ' -f 2 | cut -d '.' -f 1,2)
+LINK_LIBS := -L$(CUDA_INSTALL_PATH)/lib64 `pkg-config --libs opencv` -L$(PYTHON_LIBRARY_PATH) -lpython$(PYTHON_VERSION) -lpthread
 
 INCLUDES += -I$(PYTHON_INCLUDE_PATH) 
 OUT_FILE=_MakeDataPyExt.so
