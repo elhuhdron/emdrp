@@ -37,7 +37,7 @@ from utils import optimal_color
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-#from pyCext import type_components
+from pyCext import type_components
     
 class emVoxelType(dpWriteh5):
     VOXTYPE_DTYPE = np.uint8

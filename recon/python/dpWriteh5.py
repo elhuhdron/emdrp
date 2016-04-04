@@ -42,7 +42,7 @@ class dpWriteh5(dpLoadh5):
         if not self.fillvalue: self.fillvalue = '0'
         if isinstance(self.fillvalue, str): 
             self.fillvalue = np.asscalar(np.fromstring(self.fillvalue, dtype=self.data_type, sep=' '))
-
+        if not self.outfile: self.outfile = self.srcfile
 
     def writeCube(self, data=None, outfile=None):
         # do not move this to init, won't work with typesh5.py
