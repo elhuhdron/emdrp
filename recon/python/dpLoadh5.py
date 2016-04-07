@@ -304,7 +304,7 @@ class dpLoadh5(object):
             #import nrrd
             #nrrd.write(self.outraw, data)
         elif ext == 'gipl':
-            dpLoadh5.gipl_write_volume(data, self.outraw, tuple(self.sampling))
+            dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
         else:
             fh = open(self.outraw, 'wb'); data.tofile(fh); fh.close()
             
@@ -375,9 +375,9 @@ class dpLoadh5(object):
         return hdr, info
     
     @staticmethod
-    def gipl_write_volume(I,fname,scale):
+    def gipl_write_volume(I,shape,fname,scale):
         hdr, info = dpLoadh5.gipl_generate_header()
-        hdr['sizes'][:I.ndim] = I.shape
+        hdr['sizes'][:I.ndim] = shape
         hdr['scales'][:I.ndim] = scale
         hdr['image_type'][0] = info['image_types'][str(I.dtype)]
         hdr['voxmin'][0] = I.min()
