@@ -205,9 +205,11 @@ sumSM = split_er+merge_fracnodes;
 [m,mi] = min(sumSM,[],2);
 minSM = [[split_er(1,mi(1)); merge_fracnodes(1,mi(1))] ...
   [split_er(2,mi(2)); merge_fracnodes(2,mi(2))]];
-plot(split_er(1,:),merge_fracnodes(1,:),'--.');
-hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(split_er(2,:),merge_fracnodes(2,:),'--.');
+% plot(split_er(1,:),merge_fracnodes(1,:),'--.');
+% hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(split_er(2,:),merge_fracnodes(2,:),'--.');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(split_er', merge_fracnodes');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 plot(minSM(1,1),minSM(2,1),'x');
 hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end

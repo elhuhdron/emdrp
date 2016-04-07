@@ -125,7 +125,8 @@ o.minnodes = [minx miny minz]; o.maxnodes = [maxx maxy maxz];
 %   within labeled supervoxel area (within volume and not empty label) and path lengths.
 % the labeled supervoxel area and skeleton path lengths are not a function of threshold.
 fprintf(1,'reading labels at thr %.8f\n', o.thresholds(1)); t = now;
-dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(1),p.dataset_lbls);
+%dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(1),p.dataset_lbls);
+dset = sprintf('/%s/%.8f/%s',strrep(reshape(char(pdata.subgroups)',1,[]), ' ','/'),o.thresholds(1),p.dataset_lbls);
 Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
@@ -252,8 +253,9 @@ for prm=1:o.nparams
   
   thr = prm;
   fprintf(1,'\nreading labels at thr %.8f\n', o.thresholds(thr)); t = now;
-  dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(thr),p.dataset_lbls);
-  Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
+  %dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(thr),p.dataset_lbls);
+  dset = sprintf('/%s/%.8f/%s',strrep(reshape(char(pdata.subgroups)',1,[]), ' ','/'),o.thresholds(thr),p.dataset_lbls);
+  clear Vlbls; Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
   
   if ~isempty(pdata.nlabels_attr)
     % get nlabels from attributes

@@ -1,5 +1,6 @@
 
-load('/home/watkinspv/Data/agglo/efpl_huge_rf60.mat');
+load('/Users/pwatkins/Downloads/efpl_paper.mat');
+%load('/home/watkinspv/Data/agglo/efpl_huge_rf60.mat');
 %load('/Data/pwatkins/full_datasets/newestECSall/20151001/efpl.mat');
 
 pplot = struct;
