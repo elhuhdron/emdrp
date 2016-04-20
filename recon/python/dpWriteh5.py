@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -40,7 +40,7 @@ class dpWriteh5(dpLoadh5):
 
         # Options / Inits
         if not self.fillvalue: self.fillvalue = '0'
-        if isinstance(self.fillvalue, str): 
+        if isinstance(self.fillvalue, str):
             self.fillvalue = np.asscalar(np.fromstring(self.fillvalue, dtype=self.data_type, sep=' '))
         if not self.outfile: self.outfile = self.srcfile
 
@@ -49,8 +49,8 @@ class dpWriteh5(dpLoadh5):
         # xxx - this class hierarchy maybe should be revisited someday.... to die
         if not self.data_type_out: self.data_type_out = self.data_type
         if isinstance(self.data_type_out, str): self.data_type_out = eval('np.' + self.data_type_out)
-        
-        if data is None: 
+
+        if data is None:
             data = self.data_cube
         else:
             #assert(data.dtype == self.data_type)    # xxx - probably revisit this, this was original
@@ -68,9 +68,10 @@ class dpWriteh5(dpLoadh5):
         #   with this tool. make this more explicit in how classes are defined?
         if self.dataset_out: self.dataset = self.dataset_out
         if len(self.subgroups_out)==0 or self.subgroups_out[0] is not None: self.subgroups = self.subgroups_out
-            
+        self.offset = self.offset_out
+
         dset, group, h5file = self.createh5(outfile)
-        if self.dpWriteh5_verbose: 
+        if self.dpWriteh5_verbose:
             print('dpWriteh5: Writing hdf5')
             t = time.time()
         # always write outputs in F-order
@@ -80,13 +81,13 @@ class dpWriteh5(dpLoadh5):
         #print(ind, d.shape, dset.shape, d.max(), d.min(), dset.dtype, d.dtype)
         dset[ind[0]:ind[0]+d.shape[0],ind[1]:ind[1]+d.shape[1],ind[2]:ind[2]+d.shape[2]] = d
         if hasattr(self, 'data_attrs'):
-            for name,value in self.data_attrs.items(): 
+            for name,value in self.data_attrs.items():
                 if name in dset.attrs: del dset.attrs[name]
                 newname = self.dataset + '_' + name
                 if newname in group: del group[newname]
                 # xxx - this is arbitrary, but don't want to exceed 64k hdf5 header limit
                 if isinstance(value, np.ndarray) and value.size > 100:
-                    group.create_dataset(newname, data=value, compression='gzip', 
+                    group.create_dataset(newname, data=value, compression='gzip',
                         compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
                 else:
                     #http://stackoverflow.com/questions/23220513/storing-a-list-of-strings-to-a-hdf5-dataset-from-python
@@ -96,24 +97,24 @@ class dpWriteh5(dpLoadh5):
                         value = [n.encode("ascii", "ignore") for n in value]
                     dset.attrs.create(name,value)
         h5file.close()
-        if self.dpWriteh5_verbose: 
+        if self.dpWriteh5_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
 
     def createh5(self, outfile):
         h5file = h5py.File(outfile, 'r+' if os.path.isfile(outfile) else 'w')
         dset, group, dsetpath = self.getDataset(h5file)
-        if not dset: 
+        if not dset:
             self.createh5dataset(h5file, dsetpath)
             dset, group, dsetpath = self.getDataset(h5file)
             assert( dset )  # dataset not created? this is bad
         return dset, group, h5file
 
     def createh5dataset(self, h5file, dsetpath):
-        if self.dpWriteh5_verbose: 
+        if self.dpWriteh5_verbose:
             print('dpWriteh5: Creating hdf5 dataset')
             t = time.time()
         # create an output prob hdf5 file (likely for a larger dataset, this is how outputs are "chunked")
-        # get the shape and chunk size from the data hdf5. if this file is in F-order, re-order to C-order 
+        # get the shape and chunk size from the data hdf5. if this file is in F-order, re-order to C-order
         shape = self.datasize; chunks = self.chunksize
         # do not re-order for F-order here, should have already been re-ordered in dpLoadh5
         #if not self.hdf5_Corder:
@@ -121,22 +122,22 @@ class dpWriteh5(dpLoadh5):
         # now re-order the dims based on the specified re-ordering and then re-order back to F-order
         shape = shape[self.zreslice_dim_ordering]; chunks = chunks[self.zreslice_dim_ordering]
         shape = shape[::-1]; chunks = tuple(chunks[::-1])
-        h5file.create_dataset(dsetpath, shape=shape, dtype=self.data_type_out, compression='gzip', 
+        h5file.create_dataset(dsetpath, shape=shape, dtype=self.data_type_out, compression='gzip',
             compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True, fillvalue=self.fillvalue, chunks=chunks)
-        if self.dpWriteh5_verbose: 
+        if self.dpWriteh5_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
-        
+
     def writeFromRaw(self):
         self.loadFromRaw()
         if self.dpWriteh5_verbose: print(self.data_cube.min(), self.data_cube.max(), self.data_cube.shape)
         self.writeCube()
-        
+
     def loadFromRaw(self):
         # xxx - this is duplicated in writeCube(), couldn't move it to init because of types.h5
         #   code needs some refactoring that allows for a single base class and input and output types.
         if not self.data_type_out: self.data_type_out = self.data_type
         if isinstance(self.data_type_out, str): self.data_type_out = eval('np.' + self.data_type_out)
-        
+
         ext = os.path.splitext(self.inraw)[1][1:]
         if ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
@@ -177,7 +178,7 @@ class dpWriteh5(dpLoadh5):
         fh.seek(0, os.SEEK_END); info['filesize'] = fh.tell(); fh.seek(0); info['filename'] = fname
 
         # read binary header with correct order / data types, gipl format is big-endian!!!
-        for field in info['hdr_fields']: 
+        for field in info['hdr_fields']:
             hdr[field] = np.fromfile(fh, dtype=hdr[field].dtype, count=hdr[field].size).byteswap(True)
             #print('\t',field,'\tsize',hdr[field].size,'\ttell ',fh.tell())
         assert( fh.tell() == info['hdr_size_bytes'] )
@@ -189,22 +190,22 @@ class dpWriteh5(dpLoadh5):
     @staticmethod
     def gipl_read_volume(fname):
         hdr, info = dpWriteh5.gipl_read_header(fname)
-        
+
         dtype = info['numpy_types'][hdr['image_type'][0]]
         datasize = hdr['sizes'].prod(dtype=np.int64)
-        
+
         # read data, gipl format is big-endian!!!
         fh = open(fname, 'rb')
         fh.seek(info['hdr_size_bytes'])
         V = np.fromfile(fh, dtype=dtype, count=datasize).byteswap(True).reshape((hdr['sizes'][:3]))
-        
+
         return V
 
     @classmethod
-    def writeData(cls, outfile, dataset, chunk, offset, size, data_type, datasize, chunksize, fillvalue=None, data=None, 
+    def writeData(cls, outfile, dataset, chunk, offset, size, data_type, datasize, chunksize, fillvalue=None, data=None,
             inraw='', outraw='', attrs={}, verbose=False):
         assert( data is not None or inraw )
-        parser = argparse.ArgumentParser(description='class:dpWriteh5', 
+        parser = argparse.ArgumentParser(description='class:dpWriteh5',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + outfile
@@ -231,7 +232,7 @@ class dpWriteh5(dpLoadh5):
     def addArgs(p):
         # adds arguments required for this object to specified ArgumentParser object
         dpLoadh5.addArgs(p)
-        p.add_argument('--outfile', nargs=1, type=str, default='', 
+        p.add_argument('--outfile', nargs=1, type=str, default='',
             help='Output file (allows dataset copy), default: srcfile')
         p.add_argument('--chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
             help='Chunk size to use for new hdf5')
@@ -240,12 +241,14 @@ class dpWriteh5(dpLoadh5):
         p.add_argument('--fillvalue', nargs=1, type=str, default=[''], metavar=('FILL'),
             help='Fill value for empty (default 0)')
         p.add_argument('--inraw', nargs=1, type=str, default='', metavar='FILE', help='Raw input file')
-        p.add_argument('--dataset-out', nargs=1, type=str, default='', 
+        p.add_argument('--dataset-out', nargs=1, type=str, default='',
             help='Name of the dataset to write: default: dataset')
         p.add_argument('--subgroups-out', nargs='*', type=str, default=[None], metavar=('GRPS'),
             help='List of groups to identify subgroup for the output dataset (empty for top level), default:subgroups')
         p.add_argument('--data-type-out', nargs=1, type=str, default='', metavar='DTYPE',
             help='numpy type to write out as')
+        p.add_argument('--offset-out', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+            help='Hacky way to shift datasets over during "copy"')
         p.add_argument('--dpWriteh5-verbose', action='store_true', help='Debugging output for dpWriteh5')
 
 
@@ -254,11 +257,11 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     dpWriteh5.addArgs(parser)
     args = parser.parse_args()
-    
+
     writeh5 = dpWriteh5(args)
     if writeh5.outfile and not writeh5.inraw:
         writeh5.readCubeToBuffers()
         writeh5.writeCube()
     else:
         writeh5.writeFromRaw()
-    
+

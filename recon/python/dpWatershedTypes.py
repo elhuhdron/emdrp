@@ -78,12 +78,13 @@ class dpWatershedTypes(object):
         assert( len(self.warp_datasets) == self.nwarps )
         self.docrop = (self.cropborder > 0).any()
         self.size_crop = self.size - 2*self.cropborder; self.offset_crop = self.offset + self.cropborder
-        assert( not self.docrop or self.warpfile )  # currently cropping only support for warping method
+        assert( not self.docrop or self.method == 'overlap' )  # currently cropping only supported for overlap method
+        assert( not self.warpfile or self.method == 'overlap' ) # warps only used for overlap method
 
         # other input validations
         assert( (self.Ts > 0).all() and (self.Ts < 1).all() )
         assert( (self.Tmins > 1).all() )   # iterative cc's method needs a min threshold to "keep" small supervoxels
-        assert( self.skimWatershed or self.connectivity in [1,3] )  # warping does not support 18-conn (no LUT)
+        assert( self.method=='skim-ws' or self.connectivity in [1,3] )  # warping does not support 18-conn (no LUT)
 
         # xxx - intended skeletonizatino for GT objects, needs updating
         self.skeletonize = False
@@ -143,6 +144,7 @@ class dpWatershedTypes(object):
         self.bwconn2d = self.bwconn[:,:,1]; self.simpleLUT = None
 
         # load the warpings if warping mode is enabled
+        warps = None
         if self.warpfile:
             warps = [None]*self.nwarps
             for i in range(self.nwarps):
@@ -205,10 +207,10 @@ class dpWatershedTypes(object):
 
                     # this if/elif switch determines the main method for creating the labels.
                     # xxx - make cropping to be done in more efficient way, particular to avoid filling cropped areas
-                    if self.warpfile:
+                    if self.method == 'overlap':
                         # definite advantage to this method over other methods, but cost is about 2-3 times slower.
                         # labels are linked per zslice using precalculated slice to slice warpings based on the probs.
-                        labels, nlabels = self.warp_connect(bwlabels, voxTypeSel[j], warps)
+                        labels, nlabels = self.label_overlap(bwlabels, voxTypeSel[j], warps)
 
                         # xxx - add switches to only optionally export the unconnected labels
                         #uclabels = labels; ucnlabels = nlabels;
@@ -222,7 +224,7 @@ class dpWatershedTypes(object):
                         # NOTE: currently this only removes 6-connectivity, no matter what specified connecitity is
                         # xxx - some method of removing adjacencies with arbitrary connectivity?
                         uclabels, ucnlabels = emLabels.remove_adjacencies(labels)
-                    elif self.skimWatershed:
+                    elif self.method == 'skim-ws':
                         # xxx - still trying to evaluate if there is any advantage to this more traditional watershed.
                         #   it does not leave a non-adjacency boundary and is about 1.5 times slower than bwmorph
 
@@ -237,7 +239,7 @@ class dpWatershedTypes(object):
                         # xxx - some method of removing adjacencies with arbitrary connectivity?
                         uclabels, ucnlabels = emLabels.remove_adjacencies(labels)
                     else:
-                        if self.probWatershed and i>1:
+                        if self.method == 'comps-ws' and i>1:
                             # this is an alternative to the traditional watershed that warps out only based on stepping
                             #   back through the thresholds in reverse order. has advantages of non-connectivity.
                             # may help slightly for small supervoxels but did not show much improved metrics in
@@ -252,6 +254,7 @@ class dpWatershedTypes(object):
                                 connectivity=self.connectivity, gray=probs[j+1],
                                 grayThresholds=self.Ts[i-1::-1].astype(np.float32, order='C'))
                         else:
+                            assert( self.method == 'comps' )     # bad method
                             # make an unconnected version of bwlabels by warping out but with mask only for this type
                             bwlabels, diff, self.simpleLUT = binary_warping(bwlabels, np.ones(self.size,dtype=np.bool),
                                 mask=voxTypeSel[j], borderval=False, slow=True, simpleLUT=self.simpleLUT,
@@ -339,13 +342,16 @@ class dpWatershedTypes(object):
                         chunksize=self.chunksize.tolist(), data=sklabels, verbose=writeVerbose,
                         attrs=d, strbits=self.outlabelsbits, subgroups=['skeletonized']+subgroups )
 
-    def warp_connect(self, bwlabels, mask, warps):
+    # This labeling method connects zslices layer-by-layer. This can be done by simply overlapping the eroded labeled
+    #   regoins or by overlapping by using warped labels (with warps generated externally by some optic flow method).
+    def label_overlap(self, bwlabels, mask, warps=None):
         # this method operates slice by slice
         zlabels = np.zeros(self.size, dtype=np.int64)
         nzlabels = 0; prv_labels = None; connections = [None]*(self.size[2]-1)
         s = self.size; s2 = [s[0], s[1], 1]; c = self.cropborder
-        x = np.arange(s[0], dtype=warps[0].dtype); y = np.arange(s[1], dtype=warps[0].dtype)
-        X = np.meshgrid(x,y, indexing='ij')
+        if warps:
+            x = np.arange(s[0], dtype=warps[0].dtype); y = np.arange(s[1], dtype=warps[0].dtype)
+            X = np.meshgrid(x,y, indexing='ij')
         for z in range(self.size[2]):
             # get bwlabels and mask for the current zslice
             cur_bwlabels = bwlabels[:,:,z]; cur_mask = mask[:,:,z]
@@ -367,23 +373,25 @@ class dpWatershedTypes(object):
 
             # warp the previous slice to this slice and connect them
             if z > 0:
-                # apply warping from previous label slice to current slice using nearest neighbor interpolation.
-                cur_warpsx = warps[0][:,:,z-1]; cur_warpsy = warps[1][:,:,z-1]
-                xi = X[0] + cur_warpsx; yi = X[1] + cur_warpsy
-                # remove warps that are out of the size bounds
-                xi[xi < 0] = 0; xi[xi > s[0]-1] = s[0]-1; yi[yi < 0] = 0; yi[yi > s[1]-1] = s[1]-1
-                f = interpolate.RegularGridInterpolator((x,y), prv_labels, method='nearest')
-                prv_warped = f( np.vstack((xi.ravel(),yi.ravel())).T ).reshape(prv_labels.shape)
+                if warps:
+                    # apply warping from previous label slice to current slice using nearest neighbor interpolation.
+                    cur_warpsx = warps[0][:,:,z-1]; cur_warpsy = warps[1][:,:,z-1]
+                    xi = X[0] + cur_warpsx; yi = X[1] + cur_warpsy
+                    # remove warps that are out of the size bounds
+                    #xi[xi < 0] = 0; xi[xi > s[0]-1] = s[0]-1; yi[yi < 0] = 0; yi[yi > s[1]-1] = s[1]-1
+                    f = interpolate.RegularGridInterpolator((x,y), prv_labels, method='nearest',
+                        bounds_error=False, fill_value=0)
+                    prv_labels = f( np.vstack((xi.ravel(),yi.ravel())).T ).reshape(prv_labels.shape)
 
-                # map the previous warped labels to the current labels
+                # map the previous warped labels to the current labels based on pixel-by-pixel overlap of eroded labels.
                 # only used the xy cropped area to do the linkage.
-                prv_warped_crop = prv_warped; cur_labels_crop = cur_labels
+                prv_labels_crop = prv_labels; cur_labels_crop = cur_labels
                 if self.docrop:
-                    prv_warped_crop = prv_warped_crop[c[0]:s[0]-c[0],c[1]:s[1]-c[1]]
+                    prv_labels_crop = prv_labels_crop[c[0]:s[0]-c[0],c[1]:s[1]-c[1]]
                     cur_labels_crop = cur_labels_crop[c[0]:s[0]-c[0],c[1]:s[1]-c[1]]
                 tmp = dpWatershedTypes.unique_rows(\
-                    np.ascontiguousarray( np.vstack((prv_warped_crop.ravel(),cur_labels_crop.ravel())).T ))
-                # remove background connections (any zeros)
+                    np.ascontiguousarray( np.vstack((prv_labels_crop.ravel(),cur_labels_crop.ravel())).T ))
+                # remove background connections (any rows with zeros)
                 connections[z-1] = tmp[(tmp>0).all(axis=1),:]
 
             # loop updates for linking current slice to next
@@ -437,11 +445,9 @@ class dpWatershedTypes(object):
         p.add_argument('--outlabels', nargs=1, type=str, default='', metavar='FILE', help='Supervoxels h5 output file')
         p.add_argument('--outlabelsbits', nargs=1, type=str, default=['32'], metavar=('BITS'),
             help='Number of bits for labels (always uint type)')
+        p.add_argument('--method', nargs=1, type=str, default='comps', choices=['comps','comps-ws', 'skim-ws',
+            'overlap'], help='Method to use for generating supervoxels')
         #p.add_argument('--skeletonize', action='store_true', help='Create skeletonized version of labels')
-        p.add_argument('--probWatershed', action='store_true',
-            help='Run actual watershed on probabilities to fill out labels')
-        p.add_argument('--skimWatershed', action='store_true',
-            help='Run scikit-image watershed on probabilities to fill out labels')
         p.add_argument('--connectivity', nargs=1, type=int, default=[1], choices=[1,2,3],
             help='Connectivity for connected components (and watershed)')
         p.add_argument('--warpfile', nargs=1, type=str, default='',
