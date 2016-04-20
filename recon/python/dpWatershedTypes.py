@@ -99,7 +99,7 @@ class dpWatershedTypes(object):
         #readVerbose = self.dpWatershedTypes_verbose
 
         # load the probability data, allocate as array of volumes instead of 4D ndarray to maintain C-order volumes
-        probs = [None]*self.ntypes; bwseeds = [None]*self.ntypes;
+        probs = [None]*self.ntypes; bwseeds = [None]*self.ntypes; probs_contig = True
         if self.srclabels:
             # this code path is typically not used in favor of the label checker for fully labeled 3d gt components.
             # but, some ground truth (for example, 2d ECS cases) was only labeled with voxel type,
@@ -133,7 +133,8 @@ class dpWatershedTypes(object):
                     offset=self.offset.tolist(), size=self.size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
                     verbose=readVerbose)
                 self.datasize = loadh5.datasize; self.chunksize = loadh5.chunksize; self.attrs = loadh5.data_attrs
-                probs[i] = np.ascontiguousarray(loadh5.data_cube); del loadh5
+                probs[i] = loadh5.data_cube
+            probs_contig = False; del loadh5
 
         # save some of the parameters as attributes
         self.attrs['types'] = self.types; self.attrs['fg_types'] = self.fg_types
@@ -142,6 +143,20 @@ class dpWatershedTypes(object):
         # save connnetivity structure and warping LUT because used on each iteration (for speed)
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
         self.bwconn2d = self.bwconn[:,:,1]; self.simpleLUT = None
+
+        # optionally close background (membranes) and open foreground types.
+        # this helps fill in small background gaps and removes small foreground blobs.
+        # found best results using close_bg==2 which creates a 3d diamond structuring element of radius 2.
+        #    xxx - more systematically try different structuring elements and radii.
+        if self.close_bg > 0:
+            strel = np.zeros((5,5,5),dtype=np.bool); strel[2,2,2]=1;
+            strel = nd.binary_dilation(strel,iterations=self.close_bg)
+            probs[0] = nd.grey_closing( probs[0], structure=strel )
+            for i in range(self.nfg_types): probs[i+1] = nd.grey_opening( probs[i+1], structure=strel )
+
+        # if we know probabilities are not C-order contiguous, then copy, need C-contiguous for binary_warping.
+        if not probs_contig:
+            for i in range(self.ntypes): probs[i] = np.ascontiguousarray(probs[i])
 
         # load the warpings if warping mode is enabled
         warps = None
@@ -254,7 +269,7 @@ class dpWatershedTypes(object):
                                 connectivity=self.connectivity, gray=probs[j+1],
                                 grayThresholds=self.Ts[i-1::-1].astype(np.float32, order='C'))
                         else:
-                            assert( self.method == 'comps' )     # bad method
+                            assert( self.method == 'comps' )     # bad method option
                             # make an unconnected version of bwlabels by warping out but with mask only for this type
                             bwlabels, diff, self.simpleLUT = binary_warping(bwlabels, np.ones(self.size,dtype=np.bool),
                                 mask=voxTypeSel[j], borderval=False, slow=True, simpleLUT=self.simpleLUT,
@@ -456,6 +471,8 @@ class dpWatershedTypes(object):
             help='Datasets for x/y warpings')
         p.add_argument('--cropborder', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
            help='Optionally crop down outputs before writing')
+        p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(4),
+            help='Diamond radius to perform gray closing on background probs / opening on foreground probs')
         p.add_argument('--dpWatershedTypes-verbose', action='store_true',
             help='Debugging output for dpWatershedTypes')
 
