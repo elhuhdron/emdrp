@@ -99,7 +99,7 @@ class dpWatershedTypes(object):
         #readVerbose = self.dpWatershedTypes_verbose
 
         # load the probability data, allocate as array of volumes instead of 4D ndarray to maintain C-order volumes
-        probs = [None]*self.ntypes; bwseeds = [None]*self.ntypes; probs_contig = True
+        probs = [None]*self.ntypes; bwseeds = [None]*self.ntypes
         if self.srclabels:
             # this code path is typically not used in favor of the label checker for fully labeled 3d gt components.
             # but, some ground truth (for example, 2d ECS cases) was only labeled with voxel type,
@@ -133,8 +133,7 @@ class dpWatershedTypes(object):
                     offset=self.offset.tolist(), size=self.size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
                     verbose=readVerbose)
                 self.datasize = loadh5.datasize; self.chunksize = loadh5.chunksize; self.attrs = loadh5.data_attrs
-                probs[i] = loadh5.data_cube
-            probs_contig = False; del loadh5
+                probs[i] = loadh5.data_cube; del loadh5
 
         # save some of the parameters as attributes
         self.attrs['types'] = self.types; self.attrs['fg_types'] = self.fg_types
@@ -143,20 +142,6 @@ class dpWatershedTypes(object):
         # save connnetivity structure and warping LUT because used on each iteration (for speed)
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
         self.bwconn2d = self.bwconn[:,:,1]; self.simpleLUT = None
-
-        # optionally close background (membranes) and open foreground types.
-        # this helps fill in small background gaps and removes small foreground blobs.
-        # found best results using close_bg==2 which creates a 3d diamond structuring element of radius 2.
-        #    xxx - more systematically try different structuring elements and radii.
-        if self.close_bg > 0:
-            strel = np.zeros((5,5,5),dtype=np.bool); strel[2,2,2]=1;
-            strel = nd.binary_dilation(strel,iterations=self.close_bg)
-            probs[0] = nd.grey_closing( probs[0], structure=strel )
-            for i in range(self.nfg_types): probs[i+1] = nd.grey_opening( probs[i+1], structure=strel )
-
-        # if we know probabilities are not C-order contiguous, then copy, need C-contiguous for binary_warping.
-        if not probs_contig:
-            for i in range(self.ntypes): probs[i] = np.ascontiguousarray(probs[i])
 
         # load the warpings if warping mode is enabled
         warps = None
@@ -171,7 +156,22 @@ class dpWatershedTypes(object):
         # xxx - may need to revisit cropping, only intended to be used with warping method.
         if self.docrop: c = self.cropborder; s = self.size  # DO NOT use variables c or s below
 
-        # background type was put first, so voxType of zero is background
+        # optionally apply filters in attempt to fill small background (membrane) probability gaps.
+        if self.close_bg > 0:
+            # create structuring element
+            n = 2*self.close_bg + 1; h = self.close_bg; strel = np.zeros((n,n,n),dtype=np.bool); strel[h,h,h]=1;
+            strel = nd.binary_dilation(strel,iterations=self.close_bg)
+
+            # xxx - this was the only thing tried here that helped some but didn't work well against the skeletons
+            probs[0] = nd.grey_closing( probs[0], structure=strel )
+            for i in range(self.nfg_types): probs[i+1] = nd.grey_opening( probs[i+1], structure=strel )
+            # xxx - this gave worse results
+            #probs[0] = nd.maximum_filter( probs[0], footprint=strel )
+            # xxx - this had almost no effect
+            #probs[0] = nd.grey_closing( probs[0], structure=strel )
+
+        # argmax produces the winner-take-all assignment for each supervoxel.
+        # background type was put first, so voxType of zero is background (membrane).
         voxType = np.concatenate([x.reshape(x.shape + (1,)) for x in probs], axis=3).argmax(axis=3)
         # write out the winning type for each voxel
         # save some params from this watershed run in the attributes
@@ -191,9 +191,15 @@ class dpWatershedTypes(object):
         voxTypeSel = [None] * self.nfg_types; voxTypeNotSel =  [None] * self.nfg_types
         for i in range(self.nfg_types):
             voxTypeSel[i] = (voxType == i+1)
-            # create an inverted version, only used for complete fill so crop it if cropping enabled
+            # create an inverted version, only used for complete fill not for warping (which requires C-contiguous),
+            #   so apply crop here if cropping enabled
             voxTypeNotSel[i] = np.logical_not(voxTypeSel[i])
             if self.docrop: voxTypeNotSel[i] = voxTypeNotSel[i][c[0]:s[0]-c[0],c[1]:s[1]-c[1],c[2]:s[2]-c[2]]
+
+        # need C-contiguous probabilities for binary_warping.
+        for i in range(self.nfg_types):
+            if not probs[i+1].flags.contiguous or np.isfortran(probs[i+1]):
+                probs[i+1] = np.ascontiguousarray(probs[i+1])
 
         # iteratively apply thresholds, each time only keeping components that have fallen under size Tmin.
         # at last iteration keep all remaining components.
@@ -471,8 +477,8 @@ class dpWatershedTypes(object):
             help='Datasets for x/y warpings')
         p.add_argument('--cropborder', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
            help='Optionally crop down outputs before writing')
-        p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(4),
-            help='Diamond radius to perform gray closing on background probs / opening on foreground probs')
+        p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(5),
+            help='Diamond radius of structuring element to try to fill in background (membrane) gaps')
         p.add_argument('--dpWatershedTypes-verbose', action='store_true',
             help='Debugging output for dpWatershedTypes')
 
