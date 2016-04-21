@@ -88,7 +88,7 @@ x = uscalings.T; sl = uscalings.T-sscalings.T; sh = uscalings.T+sscalings.T
 
 # plot top 10, then second top 10
 tsel = np.argsort(x.mean(axis=0))
-subfeatures = [tsel[:-10:-1].tolist(), tsel[-10:-20:-1].tolist()]; bbox = [(1.1, -0.2), (1.5, 0.9)]
+subfeatures = [tsel[-40:-50:-1].tolist(), tsel[-50:-60:-1].tolist()]; bbox = [(1.1, -0.2), (1.5, 0.9)]
 
 for i,fsel in zip(range(len(subfeatures)),subfeatures):
     axes = pl.subplot(2,2,2+i)

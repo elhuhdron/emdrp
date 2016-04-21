@@ -79,11 +79,13 @@ class dpFRAG(emLabels):
     # found the following to be colinear:
     #   smooth == sharp, blurs == diff_blur, large_hess == small_hess
     #   laplacian <==> grad_mag BUT only with some combination of blurs and smooth/edges/kuwahara?? 
-    augments = ['smooth', 'edges', 'kuwahara',
-        'blur10', 'blur15', 'blur20', 'blur30', 'blur40', 'blur50', 'blur60', 
-        'median', 'mean', 'min', 'max', 'var',
-        'grad_mag', 'grad_dir', 'large_hess', 'hess_ori',
-        ]
+    #augments = ['smooth', 'edges', 'kuwahara',
+    #    'blur10', 'blur15', 'blur20', 'blur30', 'blur40', 'blur50', 'blur60', 
+    #    'median', 'mean', 'min', 'max', 'var',
+    #    'grad_mag', 'grad_dir', 'large_hess', 'hess_ori',
+    #    ]
+    # a small subset
+    augments = ['kuwahara', 'blur30', 'blur40', 'max']
     naugments = len(augments)
     _augments = ['_' + x for x in augments]
 
