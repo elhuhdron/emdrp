@@ -68,7 +68,7 @@ class dpWriteh5(dpLoadh5):
         #   with this tool. make this more explicit in how classes are defined?
         if self.dataset_out: self.dataset = self.dataset_out
         if len(self.subgroups_out)==0 or self.subgroups_out[0] is not None: self.subgroups = self.subgroups_out
-        self.offset = self.offset_out
+        if self.offset_out[0] is not None: self.offset = self.offset_out
 
         dset, group, h5file = self.createh5(outfile)
         if self.dpWriteh5_verbose:
@@ -247,7 +247,7 @@ class dpWriteh5(dpLoadh5):
             help='List of groups to identify subgroup for the output dataset (empty for top level), default:subgroups')
         p.add_argument('--data-type-out', nargs=1, type=str, default='', metavar='DTYPE',
             help='numpy type to write out as')
-        p.add_argument('--offset-out', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+        p.add_argument('--offset-out', nargs=3, type=int, default=[None,None,None], metavar=('X', 'Y', 'Z'),
             help='Hacky way to shift datasets over during "copy"')
         p.add_argument('--dpWriteh5-verbose', action='store_true', help='Debugging output for dpWriteh5')
 
