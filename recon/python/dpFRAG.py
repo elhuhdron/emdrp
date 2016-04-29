@@ -117,16 +117,18 @@ class dpFRAG(emLabels):
                 'conv_overlap', 'rad_std_ovlp', 'ang_std_ovlp']
             npcaang = 3
             prob_types = ['MEM','ICS']
-            # all of the original augments that were computed for raw EM and MEM/ICS probs
+            # all of the original augments that were computed for raw EM and MEM/ICS probs (23 augments)
             #            augments = ['smooth', 'sharpen', 'edges',
             #                'blur10', 'blur15', 'blur20', 'blur30', 'blur40', 'blur50', 'blur60',
             #                'median', 'mean', 'min', 'max', 'var',
             #                'grad_mag', 'grad_dir', 'laplacian', 'large_hess', 'small_hess', 'hess_ori',
             #                'kuwahara', 'diff_blur'
             #                ]
+            # if all were included, total features would be 93 features
             # notes on augments found to be colinear:
             #   smooth == sharp, blurs == diff_blur, large_hess == small_hess
             #   laplacian <==> grad_mag BUT only with some combination of blurs and smooth/edges/kuwahara??
+            # after removing colinears, 19 augments:
             augments = ['smooth', 'edges', 'kuwahara',
                 'blur10', 'blur15', 'blur20', 'blur30', 'blur40', 'blur50', 'blur60',
                 'median', 'mean', 'min', 'max', 'var',
