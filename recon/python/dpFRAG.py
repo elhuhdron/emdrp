@@ -110,6 +110,7 @@ class dpFRAG(emLabels):
         log_size = True
 
         if feature_set == 'all':
+            # 81 total features
             static_features = ['size_small', 'size_large', 'size_overlap',
                 'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large',
                 'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
@@ -131,7 +132,8 @@ class dpFRAG(emLabels):
                 'median', 'mean', 'min', 'max', 'var',
                 'grad_mag', 'grad_dir', 'large_hess', 'hess_ori',
                 ]
-        elif feature_set == 'reduced':
+        elif feature_set == 'standard':
+            # 36 total features
             static_features = ['size_small', 'size_large', 'size_overlap',
                 'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large',
                 'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
@@ -139,11 +141,30 @@ class dpFRAG(emLabels):
             npcaang = 3
             prob_types = ['MEM','ICS']
             augments = ['kuwahara', 'blur30', 'blur40', 'max']
+        elif feature_set == 'reduced':
+            # 21 total features
+            static_features = ['size_small', 'size_large', 'size_overlap',
+                'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large',
+                'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
+                'conv_overlap', 'rad_std_ovlp', 'ang_std_ovlp']
+            npcaang = 0
+            prob_types = ['MEM','ICS']
+            augments = ['blur30', 'max']
+        elif feature_set == 'small':
+            # 15 total features, no augments
+            static_features = ['size_small', 'size_large', 'size_overlap',
+                'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large',
+                'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
+                'conv_overlap', 'rad_std_ovlp', 'ang_std_ovlp']
+            npcaang = 0
+            prob_types = ['MEM','ICS']
+            augments = []
         elif feature_set == 'minimal':
+            # 6 total features
             static_features = ['size_small', 'size_large', 'size_overlap', 'mean_grayscale']
             npcaang = 0
-            prob_types = ['MEM']
-            augments = ['kuwahara', 'blur30', 'blur40', 'max']
+            prob_types = ['MEM', 'ICS']
+            augments = []
         else:
             assert(False)   # bad feature set
 
@@ -1122,7 +1143,8 @@ class dpFRAG(emLabels):
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
         p.add_argument('--pad-raw-perim', action='store_true', help='Pad perimeter of raw EM instead of loading')
         p.add_argument('--load-prob-perim', action='store_true', help='Load perimeter of probs instead of padding')
-        p.add_argument('--feature-set', nargs=1, type=str, default='reduced', choices=['all','reduced','minimal'],
+        p.add_argument('--feature-set', nargs=1, type=str, default='standard',
+            choices=['all','standard','reduced','small','minimal'],
             help='Option to control which features are calculated')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
 
