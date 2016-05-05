@@ -1,0 +1,57 @@
+
+import time
+import sys
+
+from neon.callbacks.callbacks import Callback
+
+class EMEpochCallback(Callback):
+    """
+    Callback for custom printout of EM information for each neon "epoch"
+      which is hijacked as an EM macrobatch.
+
+    """
+    def __init__(self, test_epoch_freq, nmacrobatches):
+        self.epoch_freq = 1
+        super(EMEpochCallback, self).__init__(epoch_freq=self.epoch_freq)
+        self.test_epoch_freq = test_epoch_freq
+        self.nmacrobatches = nmacrobatches
+        #self.cur_minibatch_index = 0
+        self.mini_batches_per_epoch = None
+
+    def on_minibatch_begin(self, callback_data, model, epoch, minibatch):
+        self.cur_minibatch_index = minibatch
+        
+    def on_epoch_begin(self, callback_data, model, epoch):
+        self.epoch_start = time.time()
+        macro_epoch = epoch//self.nmacrobatches
+        # print out epoch and batch as they were in cuda-convnets2, starting at 1
+        if epoch % self.nmacrobatches == 0:
+            sys.stdout.write('========= Begin epoch %d =========\n' % (macro_epoch+1,))
+        batch = epoch % self.nmacrobatches
+        if (epoch + 1) % self.epoch_freq == 0:
+            if (epoch + 1) % self.test_epoch_freq == 0:
+                sys.stdout.write('%d.%d (test)... ' % (macro_epoch+1,batch+1,))
+            else:
+                sys.stdout.write('%d.%d ... ' % (macro_epoch+1,batch+1,))
+        sys.stdout.flush()
+
+    def on_epoch_end(self, callback_data, model, epoch):
+        t = time.time() - self.epoch_start
+        if (epoch + 1) % self.epoch_freq == 0:
+            sys.stdout.write('done in %.2f s ' % t)
+
+            if self.mini_batches_per_epoch is None: 
+                self.mini_batches_per_epoch = self.cur_minibatch_index+1
+            loss = callback_data['cost']['train']\
+                [epoch*self.mini_batches_per_epoch:(epoch+1)*self.mini_batches_per_epoch].mean()
+            progress_string = " [%s %.2f]" % (model.cost.costfunc.__class__.__name__, loss)
+            sys.stdout.write(progress_string)
+
+            if (epoch + 1) % self.test_epoch_freq == 0:
+                assert( 'metrics' in callback_data )    # EM epoch callback requires metric callbacks
+                sys.stdout.write('\n\t')
+                for met in callback_data['metrics'].keys():
+                    sys.stdout.write(' [%s %.2f]' % (met, callback_data['metrics'][met][epoch//self.test_epoch_freq]))
+
+            sys.stdout.write('\n')
+            sys.stdout.flush()
