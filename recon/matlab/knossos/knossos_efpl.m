@@ -263,9 +263,11 @@ for prm=1:o.nparams
     nlabels = double(sum(o.types_nlabels(prm,:))); % do not remove ECS components
     %nlabels = double(nlabels(1)); Vlbls(Vlbls > nlabels) = 0;  % remove ECS components
   else
-    % get nlabels with max, no easy way to get num ICS/ECS individually
-    % xxx - currently this is only for comparing with agglomeration
+    % get nlabels with max, no easy way to get num ICS/ECS individually.
+    % use this pathway for comparing against agglomeration before it has
+    %   been resorted based on supervoxel_type (dpCleanLabels).
     nlabels = double(max(Vlbls(:))); o.types_nlabels(prm,:) = [nlabels 0];
+    assert( ~p.remove_MEM_ECS_nodes );  % need labels sorted by supervoxel type for this to work
   end
   display(sprintf('\t\tdone in %.3f s, nlabels = %d',(now-t)*86400,nlabels));
   
@@ -282,6 +284,12 @@ for prm=1:o.nparams
   o.nBGnodes(prm) = full(sum(m_ij(:,1)));
   % plus two because first supervoxel column is background in confusion matrix.
   o.nECSnodes(prm) = full(sum(sum(m_ij(:,o.types_nlabels(prm,1)+2:end),2),1));
+  
+  % optionally completely remove nodes falling into ECS and MEM supervoxels from
+  %   confusion matrix.
+  if p.remove_MEM_ECS_nodes
+    m_ij = m_ij(:,2:o.types_nlabels(prm,1)+2);
+  end
   
   fprintf(1,'\tcomputing rand error from confusion matrix\n');
   [are,prec,rec,ri,ari] = getRandErrors(m_ij, nnodes); 
