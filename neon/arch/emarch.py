@@ -1,3 +1,24 @@
+# The MIT License (MIT)
+# 
+# Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+# 
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+# 
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 from neon.initializers import Constant, Gaussian, Uniform
 from neon.layers import Conv, Dropout, Pooling, Affine, LRN
@@ -21,50 +42,22 @@ class fergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(fergus, self).__init__(noutputs, use_softmax)
 
-        #    @property
-        #    def layers(self):
-        #        # 5 conv layers, 2 local layers, logistic outputs
-        #        return [
-        #            Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0),
-        #                 activation=Rectlin(), padding=3, strides=1),
-        #            #LRN(31, alpha=0.001, beta=0.75),
-        #            Pooling(3, strides=2),
-        #            Conv((5, 5, 256), init=Gaussian(scale=0.01), bias=Constant(1),
-        #                 activation=Rectlin(), padding=2),
-        #            #LRN(31, alpha=0.001, beta=0.75),
-        #            Pooling(3, strides=2),
-        #            Conv((3, 3, 384), init=Gaussian(scale=0.03), bias=Constant(0),
-        #                 activation=Rectlin(), padding=1),
-        #            Conv((3, 3, 384), init=Gaussian(scale=0.03), bias=Constant(1),
-        #                 activation=Rectlin(), padding=1),
-        #            Conv((3, 3, 256), init=Gaussian(scale=0.03), bias=Constant(1),
-        #                 activation=Rectlin(), padding=1),
-        #            Pooling(3, strides=2),
-        #            Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(1), activation=Rectlin()),
-        #            Dropout(keep=0.5),
-        #            Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(1), activation=Rectlin()),
-        #            Dropout(keep=0.5),
-        #            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), bias=Constant(-7), 
-        #                   activation=Softmax() if self.use_softmax else Logistic())
-        #        ]
-
     @property
     def layers(self):
-        # 5 conv layers, 2 local layers, logistic outputs
         return [
-            Conv((7, 7, 96), init=Gaussian(scale=0.0001), bias=Constant(0), activation=Rectlin(), 
+            Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
                  padding=3, strides=1),
             LRN(31, ascale=0.001, bpower=0.75),
             Pooling(3, strides=2),
-            Conv((5, 5, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((5, 5, 256), init=Gaussian(scale=0.01), bias=Constant(1), activation=Rectlin(), 
                  padding=2, strides=1),
             LRN(31, ascale=0.001, bpower=0.75),
             Pooling(3, strides=2),
-            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), bias=Constant(0), activation=Rectlin(), 
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), bias=Constant(1), activation=Rectlin(), 
                  padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 256), init=Gaussian(scale=0.03), bias=Constant(1), activation=Rectlin(), 
                  padding=1, strides=1),
             Pooling(3, strides=2),
             Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Identity()),
@@ -83,13 +76,33 @@ class cifar10(EMModelArchitecture):
     def layers(self):
         init_uni = Uniform(low=-0.1, high=0.1)
         bn = False
-        # 2 conv layers, 2 local layers, logistic outputs
         return [
             Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic())
+            Affine(nout=self.noutputs, init=init_uni, activation=Softmax() if self.use_softmax else Logistic())
+        ]
+
+class conv11_7(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False):
+        super(conv11_7, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        #init_uni = Uniform(low=-0.1, high=0.1)
+        init_uni = Gaussian(scale=0.01)
+        bn = False
+        # 2 conv layers, 1 local layers
+        return [
+            Conv((11, 11, 96), init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Pooling((3,3), strides=2),
+            Conv((7, 7, 256), init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Pooling((3,3), strides=2),
+            Affine(nout=1024, init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=1024, init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=init_uni, activation=Softmax() if self.use_softmax else Logistic())
         ]
