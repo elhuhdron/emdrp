@@ -58,8 +58,8 @@ parser = NeonArgparser(__doc__)
 parser.add_argument('--model_arch', type=str, default='fergus', help='Specify convnet model architecture from arch/')
 parser.add_argument('--rate_decay', type=float, default=5.0, 
                     help='Learning schedule rate decay time constant (in epochs)')
-parser.add_argument('--rate_freq', type=int, default=40, 
-                    help='Batch frequency to update rate decay (<= 1 means per batch)')
+parser.add_argument('--rate_freq', type=int, default=0, 
+                    help='Batch frequency to update rate decay (< 1 means twice per EM epoch (training macrobatches))')
 parser.add_argument('--weight_decay', type=float, default=0.02, help='Weight decay')
 parser.add_argument('--rate_init', nargs=2, type=float, default=[0.00005, 0.0001], 
                     help='Initial learning rates [weight, bias]')
@@ -71,12 +71,12 @@ parser.add_argument('--neon_progress', action="store_true",
 parser.add_argument('--data_config', type=str, default=None, help='Specify em data configuration ini file')
 parser.add_argument('--write_output', type=str, default='', help='File to to write outputs for test batches')
 parser.add_argument('--train_range', nargs=2, type=int, default=[1,200], help='emcc2-style training batch range')
-parser.add_argument('--test_range', nargs=2, type=int, default=[200001,200002], help='emcc2-style testing batch range')
+parser.add_argument('--test_range', nargs=2, type=int, default=[200001,200001], 
+                    help='emcc2-style testing batch range, concatenated into single "neon epoch" (macrobatch)')
 parser.add_argument('--chunk_skip_list', nargs='*', type=int, default=[], 
                     help='Skip these random EM chunks, usually for test, override .ini')
 parser.add_argument('--dim_ordering', type=str, default='xyz', 
                     help='Which reslice ordering for EM provider, override .ini')
-parser.add_argument('--test_one', action="store_true", help='Test with the first test batch only (default all)')
 parser.add_argument('--nbebuf', type=int, default=2, 
                     help='How many backend buffers to use, 1 for no double buffering (saves gpu memory, slower)')
 
@@ -95,15 +95,13 @@ if args.model_file:
 if not args.write_output:
     # training mode, can start from existing model file or start a new model based on specified architecture    
     
-    print( 1/2 )    
-    
     if args.data_config:
         # initialize the em data parser
         train = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
                                batch_range=args.train_range, name='train', NBUF=args.nbebuf)
         # test batches need to be concatenated into a single "neon epoch" for built-in neon eval_set to work correctly
         test = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
-                              batch_range=args.test_range, name='test', concatenate_batches=not args.test_one,
+                              batch_range=args.test_range, name='test', concatenate_batches=True,
                               NBUF=args.nbebuf)
     else:
         # make dummy random data just for testing model inits
@@ -129,6 +127,8 @@ if not args.write_output:
 
     # configure optimizers and weight update schedules
     num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
+    # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
+    if args.rate_freq < 1: args.rate_freq = train.nmacrobatches//2
     if args.rate_freq > 1:
         weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
     else:
@@ -149,6 +149,8 @@ if not args.write_output:
     callbacks = Callbacks(model, eval_set=test, metric=metric, **args.callback_args)
     if not args.neon_progress: 
         callbacks.add_callback(EMEpochCallback(args.callback_args['eval_freq'],train.nmacrobatches), insert_pos=None)
+    # xxx - thought of making this an option but not clear that it slows anything down?
+    callbacks.add_hist_callback()
     
     model.fit(train, optimizer=opt, num_epochs=num_epochs, cost=cost, callbacks=callbacks)
     print('Model training complete for %d epochs!' % (args.epochs,))

@@ -84,7 +84,7 @@ class NervanaEMDataIterator(ArrayIterator):
 
 class RandomEMDataIterator(NervanaEMDataIterator):
     def __init__(self, nexamples=256, image_in_size=64, nchan=1, image_out_size=16, nclass=3,
-                 independent_labels=True, name=None):
+                 independent_labels=False, name=None):
         self.parser = DummyEMDataParser(nexamples, image_in_size, nchan, image_out_size, nclass, independent_labels)
         super(RandomEMDataIterator, self).__init__(name=name)
 

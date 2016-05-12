@@ -22,7 +22,7 @@
 
 from neon.initializers import Constant, Gaussian, Uniform
 from neon.layers import Conv, Dropout, Pooling, Affine, LRN
-from neon.transforms import Rectlin, Identity, Logistic, Softmax
+from neon.transforms import Rectlin, Logistic, Softmax # Identity
 
 class EMModelArchitecture(object):
     def __init__(self, noutputs, use_softmax):
@@ -60,12 +60,12 @@ class fergus(EMModelArchitecture):
             Conv((3, 3, 256), init=Gaussian(scale=0.03), bias=Constant(1), activation=Rectlin(), 
                  padding=1, strides=1),
             Pooling(3, strides=2),
-            Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Identity()),
+            Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin()),
             Dropout(keep=0.5),
-            Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Identity()),
+            Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin()),
             Dropout(keep=0.5),
             Affine(nout=self.noutputs, init=Gaussian(scale=0.01), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic())
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
 class cifar10(EMModelArchitecture):
@@ -82,7 +82,8 @@ class cifar10(EMModelArchitecture):
             Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=init_uni, activation=Softmax() if self.use_softmax else Logistic())
+            Affine(nout=self.noutputs, init=init_uni, 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
 class conv11_7(EMModelArchitecture):
@@ -104,5 +105,6 @@ class conv11_7(EMModelArchitecture):
             Dropout(keep=0.5),
             Affine(nout=1024, init=init_uni, activation=Rectlin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=init_uni, activation=Softmax() if self.use_softmax else Logistic())
+            Affine(nout=self.noutputs, init=init_uni, 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]

@@ -21,11 +21,9 @@
 # SOFTWARE.
 
 import numpy as np
-#from neon.transforms import Metric   # xxx - not exposed
-from neon import NervanaObject
+from neon.transforms.cost import Metric
 
-#class EMMetric(Metric):   # xxx - not exposed
-class EMMetric(NervanaObject):
+class EMMetric(Metric):
 
     """
     Compute the EM specific metrics
