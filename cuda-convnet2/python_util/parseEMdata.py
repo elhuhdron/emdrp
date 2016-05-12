@@ -34,7 +34,7 @@
 
 import h5py
 import numpy as np
-from operator import add, sub
+from operator import add #, sub
 import time
 import numpy.random as nr
 import os, sys
@@ -44,10 +44,10 @@ import random
 import pickle as myPickle
 import StringIO as myStringIO
 
-from scipy import linalg
-import scipy.ndimage.filters as filters
-from scipy import interpolate
-from threading import Thread
+#from scipy import linalg
+#import scipy.ndimage.filters as filters
+#from scipy import interpolate
+#from threading import Thread
 
 # no exception for plotting so this can still work from command line only (plotting is only for standalone validation)
 try: 
@@ -324,6 +324,10 @@ class EMDataParser():
         # xxx - the tiling procedure is confusing, see comments on this in makeTiledIndices
         self.output_size = list(self.labels_slice_size)
         self.output_size[0] /= self.image_out_size; self.output_size[1] /= self.image_out_size
+
+        # variables containing actual number of convnet outputs depending on label config
+        self.nclass = self.noutputs if self.independent_labels else self.nIndepLabels
+        self.oshape = (self.image_out_size, self.image_out_size, self.nIndepLabels)
 
         '''
         # inits for preprocessing
@@ -802,7 +806,7 @@ class EMDataParser():
             lblscntr = lbls[b[0]:-b[0],b[1]:-b[1]] if b[0] > 0 else lbls
 
             # change the view on the output for easy assignment
-            lblsout = labels.reshape((self.image_out_size,self.image_out_size,self.nIndepLabels))
+            lblsout = labels.reshape(self.oshape)
             # this code needs to be consistent with (independent) label meanings defined in getLabelMap
             if self.label_type == 'ICSorOUT':
                 if self.image_out_size==1:
@@ -1003,7 +1007,8 @@ class EMDataParser():
         
     # xxx - add asserts to check that labels select is inbounds in hdf5, currently not a graceful error
     def get_label_slices_from_indices(self, ind, size, dsize, isTiled):
-        xysel = self.zreslice_dim_ordering[0:2]; zsel = self.zreslice_dim_ordering[2]
+        #xysel = self.zreslice_dim_ordering[0:2]; 
+        zsel = self.zreslice_dim_ordering[2]
         beg = ind - self.segmented_labels_border[self.zreslice_dim_ordering] 
         end = ind + size + self.segmented_labels_border[self.zreslice_dim_ordering]
         beg[zsel] = beg[zsel] - self.nzslices/2; end[zsel] = end[zsel] + self.nzslices/2
@@ -1233,7 +1238,7 @@ class EMDataParser():
                     
                     alpha = 0.5 # overlay (independent) labels with data
                     pl.subplot(2,2,2*i+1)
-                    lbls = labels[:,imgno].reshape((self.image_out_size,self.image_out_size,self.nIndepLabels))
+                    lbls = labels[:,imgno].reshape(self.oshape)
                     print lbls[:,:,0].reshape((self.image_out_size,self.image_out_size))
                     if self.nIndepLabels > 1:
                         print lbls[:,:,1].reshape((self.image_out_size,self.image_out_size))
