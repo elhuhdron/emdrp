@@ -611,7 +611,7 @@ class EMDataParser():
         #    for i in range(self.naug_data):
         #        aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else self.aug_actual_mean[i]
         #        aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else self.aug_actual_std[i]
-        # xxx - major cleanup for this if this is useful
+        # xxx - major cleanup for this if this is useful, add a new option called batchnorm to ini (specifies bsz)
         ppi = self.pixels_per_image; cpb = self.num_cases_per_batch; bsz = 128; mpb = cpb / bsz
         if not plot_outputs:
             if self.EM_mean >= 0:
