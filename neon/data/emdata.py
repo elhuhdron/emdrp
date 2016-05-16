@@ -232,15 +232,18 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.iter_buf[self.lbuf].dbuf[i].set(self.pushdata[i])
             
     def _get_next_EMbatch(self):
-        nextdata = self.parser.getBatch(self.batchnum)
+        p = self.parser
+        nextdata = p.getBatch(self.batchnum)
 
         # need to manipulate data and labels returned by EM parser to be congruent with neon
         assert( len(nextdata) == self.num_data_labels)
         # re-arrange so that labels are last
-        nextdata = [nextdata[i] for i in ([0] + range(2,self.parser.naug_data+2) + [1])]
+        nextdata = [nextdata[i] for i in ([0] + range(2,p.naug_data+2) + [1])]
         # order from EM data parser is tranpose of neon data, so switch nexamples (num_cases_per_batch) to first dim
         for i in range(len(nextdata)-1):
-            self.nextdata[i] = nextdata[i].T.copy(order='C')
+            #self.nextdata[i] = nextdata[i].T.copy(order='C')
+            self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
+                transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
         # convert labels that are not onehot (independent_labels) to int
         if self.make_onehot:
             self.nextdata[-1] = nextdata[-1].T.astype(np.int32, order='C')
