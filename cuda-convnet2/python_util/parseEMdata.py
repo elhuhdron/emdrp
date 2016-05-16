@@ -605,9 +605,23 @@ class EMDataParser():
         '''
         
         # replaced preprocessing with scalar mean subtraction and scalar std division.
+        #if not plot_outputs:
+        #    data -= self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
+        #    data /= self.EM_std if self.EM_std > 0 else self.EM_actual_std
+        #    for i in range(self.naug_data):
+        #        aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else self.aug_actual_mean[i]
+        #        aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else self.aug_actual_std[i]
+        # xxx - major cleanup for this if this is useful
+        ppi = self.pixels_per_image; cpb = self.num_cases_per_batch; bsz = 128; mpb = cpb / bsz
         if not plot_outputs:
-            data -= self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
-            data /= self.EM_std if self.EM_std > 0 else self.EM_actual_std
+            if self.EM_mean >= 0:
+                data -= self.EM_mean
+            else:
+                d = data.reshape((ppi, mpb, bsz)); data = (d - np.mean(d,axis=2,keepdims=True)).reshape((ppi,cpb))
+            if self.EM_std > 0:
+                data /= self.EM_std
+            else:
+                d = data.reshape((ppi, mpb, bsz)); data = (d / np.std(d,axis=2,keepdims=True)).reshape((ppi,cpb))
             for i in range(self.naug_data):
                 aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else self.aug_actual_mean[i]
                 aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else self.aug_actual_std[i]
