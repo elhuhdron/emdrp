@@ -68,6 +68,35 @@ class fergus(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+class fergus_bn(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False):
+        super(fergus_bn, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn, 
+                 padding=3, strides=1),
+            Pooling(3, strides=2),
+            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn, 
+                 padding=2, strides=1),
+            Pooling(3, strides=2),
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Rectlin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Rectlin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Rectlin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Pooling(3, strides=2),
+            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(cifar10, self).__init__(noutputs, use_softmax)
@@ -75,7 +104,7 @@ class cifar10(EMModelArchitecture):
     @property
     def layers(self):
         init_uni = Uniform(low=-0.1, high=0.1)
-        bn = False
+        bn = True
         return [
             Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
@@ -94,7 +123,7 @@ class conv11_7(EMModelArchitecture):
     def layers(self):
         #init_uni = Uniform(low=-0.1, high=0.1)
         init_uni = Gaussian(scale=0.01)
-        bn = False
+        bn = True
         # 2 conv layers, 1 local layers
         return [
             Conv((11, 11, 96), init=init_uni, activation=Rectlin(), batch_norm=bn),
