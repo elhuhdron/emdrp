@@ -23,13 +23,15 @@ import time
 
 NUM_GPUS, GPU_JOB_SUBDIR, GPU_PREFIX = 10, 'gpu_jobs', 'gpu' # init NUM_GPUS as max gpus, set in get_paths
 GPU_STATUS, GPU_STARTED = 'gpu%d_status.log', 'gpu%d_last_started.log'
-CONVNET_OUT_DIR, CONVNET_OUT = os.path.join('Data','convnet_out'), 'EMalpha_out%d_%s.txt'
+CONVNET_OUT_DIR = os.path.join('Data','convnet_out')
 #CONVNET_DIR = os.path.join('workspace_eclipse','ctome_server','cuda-convnet-EM-alpha')
 #CONVNET_DIR = os.path.join('workspace_eclipse','ctome_server','cuda-convnet2')
 CONVNET_DIR = os.path.join('gits','emdrp','cuda-convnet2')
+NEON_DIR = os.path.join('gits','emdrp','neon')
+PYTHON_INIT_CMD = 'export PATH="/home/watkinspv/anaconda2/bin:$PATH"'
 
 def run_next_jobs(force=False):
-    job_path, convnet_out_path, convnet_path = get_paths()
+    job_path, convnet_out_path, convnet_paths = get_paths()
     
     # iterate over gpus looking for ready gpus and jobs to start
     for gpu in range(NUM_GPUS):
@@ -51,7 +53,8 @@ def run_next_jobs(force=False):
                     if check_pid(pid): active_pids.append(pid)
                     else: os.remove(pidlck)
             if len(active_pids) > 0:
-                outfile.write('GPU %d locked with active pids ' % (gpu,) + str(active_pids)); outfile.close(); continue
+                outfile.write('GPU %d locked with active pids ' % (gpu,) + str(active_pids) + '\n')
+                outfile.close(); continue
 
         ''' nVidia's change in their pocket was never enough, so they're like F-U and F-U too
         # check if any process is currently running on this gpu, write to status file
@@ -69,20 +72,35 @@ def run_next_jobs(force=False):
         job_files = filter( os.path.isfile, (os.path.join(cur_gpu_path,s) for s in os.listdir(cur_gpu_path)) )
         job_tuple = sorted( zip( job_files, (os.path.getmtime(s) for s in job_files) ), key=lambda tup: tup[1] )
         if len(job_tuple) < 1: 
-            outfile.write('GPU %d free, but no jobs queued' % (gpu,)); outfile.close(); continue
+            outfile.write('GPU %d free, but no jobs queued' % (gpu,) + '\n')
+            outfile.close(); continue
         job_script = job_tuple[0][0]
-        cmd_to_start, cmd_gpu = parse_job_script(job_script)
+        cmd_to_start, cmd_gpu, cmd_type = parse_job_script(job_script)
         
         if cmd_to_start is None:
-            outfile.write('GPU %d free, but bad command ' % (gpu,)); outfile.close();
+            outfile.write('GPU %d free, but bad command ' % (gpu,) + '\n'); outfile.close();
             os.remove(job_script); continue
         if cmd_gpu != gpu:
-            outfile.write('GPU %d free, but command queued for wrong gpu ' % (gpu,) + str(cmd_gpu)); outfile.close();
+            outfile.write('GPU %d free, but command queued for wrong gpu ' % (gpu,) + str(cmd_gpu) + '\n')
+            outfile.close();
             os.remove(job_script); continue
 
-        # start the job, add cd to working dir, nohup and output redirect with "unique" file ID
-        convnet_out = os.path.join(convnet_out_path, CONVNET_OUT % (gpu,binascii.hexlify(os.urandom(4))))
-        cmd_to_start = 'cd ' + convnet_path + '; nohup ' + cmd_to_start + ' >& ' + convnet_out + ' &'
+        # create unique output name
+        convnet_out_name = '%s-%s-gpu%d-%s' % (time.strftime('%Y-%m-%d-%H%M%S'),cmd_type,gpu,
+                                               binascii.hexlify(os.urandom(4)))
+
+        # add items specific to cmd_type
+        if cmd_type=='cc2':
+            python_init = PYTHON_INIT_CMD
+        elif cmd_type=='neon':
+            python_init = PYTHON_INIT_CMD + '; source activate neon'
+            cmd_to_start += (' -s %s ' % (os.path.join(convnet_out_path, convnet_out_name + '-model.prm'),))
+            cmd_to_start += (' -o %s ' % (os.path.join(convnet_out_path, convnet_out_name + '-output.h5'),))
+        
+        # start the job, add python init; add cd to working dir, nohup and output redirect with "unique" file ID
+        convnet_out = os.path.join(convnet_out_path, convnet_out_name + '-out.txt')
+        cmd_to_start = python_init + '; cd ' + convnet_paths[cmd_type] + '; nohup ' + cmd_to_start + ' >& ' \
+            + convnet_out + ' &'
         #print 'Starting (see log) "' + cmd_to_start + '"'
         outfile2 = open(os.path.join(job_path, GPU_STARTED % (gpu,)), 'a')
         outfile2.write(time.strftime('%Y-%m-%d %H:%M:%S') + '\t\t' + cmd_to_start + '\n\n'); outfile2.close()
@@ -96,32 +114,51 @@ def run_next_jobs(force=False):
         cmd_to_start = ['/usr/sbin/lsof', convnet_out]
         p = subprocess.Popen(cmd_to_start, stdout=subprocess.PIPE); out, err = p.communicate()
         if err is not None:
-            outfile.write('GPU %d error invoking lsof "' + cmd_to_start + '"'); outfile.close(); continue
+            outfile.write('GPU %d error invoking lsof "' % (gpu,) + cmd_to_start + '"\n'); outfile.close(); continue
         pids = out.split();
         if len(pids) < 11:
-            outfile.write('GPU %d error job did not start???'); outfile.close(); continue
+            outfile.write('GPU %d error job did not start???\n' % (gpu,)); outfile.close(); continue
         pid = pids[10]; cmd_to_start = 'touch ' + os.path.join(cur_gpu_path,pid + '.lck')
         os.system(cmd_to_start)
         
-        outfile.write('GPU %d free! starting queued job (see log) with pid ' % (gpu,) + pid); outfile.close();
+        outfile.write('GPU %d free! starting queued job (see log) with pid ' % (gpu,) + pid + '\n')
+        outfile.close();
         
 
 def parse_job_script(job_script):
     infile = open(job_script, 'r'); job_command = infile.read(); infile.close()
     job_command = filter( lambda x: not re.match(r'^\s*$',x), job_command.split('\n') ) # remove whitespace lines
     job_command = filter( lambda x: not re.match(r'^\s*#.*$',x), job_command ) # remove commented lines
-    if job_command is None or len(job_command) == 0: return None, None
+    if job_command is None or len(job_command) == 0: return None, None, None
     job_command = job_command[0] # use first non-commented command only
     # remove any nohups and redirects, will append separately before making system call
     m = re.search(r'^\s*(nohup\s+)*(?P<cmd>.+)\>\&*.+', job_command)
     if m is not None: job_command = m.group('cmd')
-    m = re.search(r'\-\-gpu=([0-9]+)', job_command); job_gpu = -1 
-    if m is not None: job_gpu = m.group(1)
-    return job_command, int(job_gpu)
+
+    cmd_types = ['cc2','neon']; cmd_type_strs = [r'convnet\.py', r'neon\.py']
+    for cmd_type, cmd_type_str in zip(cmd_types, cmd_type_strs):
+        m = re.search(cmd_type_str, job_command)
+        if m is not None: break
+    if m is None: return None, None, None
+
+    job_gpu = -1
+    if cmd_type=='cc2':
+        m = re.search(r'\-\-gpu=([0-9]+)', job_command)
+        if m is not None: job_gpu = m.group(1)
+    elif cmd_type=='neon':
+        m = re.search(r'\-\-device_id\s+([0-9]+)', job_command)
+        if m is not None: 
+            job_gpu = m.group(1)
+        else:
+            m = re.search(r'\-i\s+([0-9]+)', job_command)
+            if m is not None: job_gpu = m.group(1)
+    if job_gpu==-1: return None, None, None
+            
+    return job_command, int(job_gpu), cmd_type
     
 def submit_job( script, relink ):
-    job_path, convnet_out_path, convnet_path = get_paths()
-    cmd_to_queue, cmd_gpu = parse_job_script(script)
+    job_path, convnet_out_path, convnet_paths = get_paths()
+    cmd_to_queue, cmd_gpu, cmd_type = parse_job_script(script)
     if cmd_to_queue is None:
         print 'Bad command in ' + script; return
     cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(cmd_gpu))
@@ -133,7 +170,7 @@ def submit_job( script, relink ):
     print 'Queued "' + script + '" to gpu' + str(cmd_gpu)
 
 def clear_jobs():
-    job_path, convnet_out_path, convnet_path = get_paths()
+    job_path, convnet_out_path, convnet_paths = get_paths()
     for gpu in range(NUM_GPUS):
         silent_remove(os.path.join(job_path, GPU_STATUS % (gpu,)))
         silent_remove(os.path.join(job_path, GPU_STARTED % (gpu,)))
@@ -155,7 +192,8 @@ def get_paths():
         gpu = gpu+1
     NUM_GPUS = gpu
     
-    return job_path, os.path.join(homedir, CONVNET_OUT_DIR), os.path.join(homedir, CONVNET_DIR)
+    convnet_paths = {'cc2':os.path.join(homedir, CONVNET_DIR), 'neon':os.path.join(homedir, NEON_DIR)}
+    return job_path, os.path.join(homedir, CONVNET_OUT_DIR), convnet_paths
 
 def silent_remove(fn):
     try: os.remove(fn)
@@ -171,7 +209,7 @@ def check_pid(pid):
         return True
 
 def create_pid_lck(pid, gpu):
-    job_path, convnet_out_path, convnet_path = get_paths()
+    job_path, convnet_out_path, convnet_paths = get_paths()
     if gpu < NUM_GPUS:
         cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(gpu))
         cmd_to_start = 'touch ' + os.path.join(cur_gpu_path, str(pid) + '.lck')
