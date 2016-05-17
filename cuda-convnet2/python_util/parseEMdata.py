@@ -603,28 +603,18 @@ class EMDataParser():
             if plot_outputs: dataProc = self.preprocessData(data, reScale=False)
             else: data = self.preprocessData(data)
         '''
-        
+
         # replaced preprocessing with scalar mean subtraction and scalar std division.
-        #if not plot_outputs:
-        #    data -= self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
-        #    data /= self.EM_std if self.EM_std > 0 else self.EM_actual_std
-        #    for i in range(self.naug_data):
-        #        aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else self.aug_actual_mean[i]
-        #        aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else self.aug_actual_std[i]
-        # xxx - major cleanup for this if this is useful, add a new option called batchnorm to ini (specifies bsz)
-        ppi = self.pixels_per_image; cpb = self.num_cases_per_batch; bsz = 128; mpb = cpb / bsz
+        # For means: < 0 and >= -1 for mean over batch, < -1 for mean over current loaded chunk, 0 to do nothing
+        # For stds: <= 0 and >= -1 for std over batch, < -1 for std over current loaded chunk, 1 to do nothing
         if not plot_outputs:
-            if self.EM_mean >= 0:
-                data -= self.EM_mean
-            else:
-                d = data.reshape((ppi, mpb, bsz)); data = (d - np.mean(d,axis=2,keepdims=True)).reshape((ppi,cpb))
-            if self.EM_std > 0:
-                data /= self.EM_std
-            else:
-                d = data.reshape((ppi, mpb, bsz)); data = (d / np.std(d,axis=2,keepdims=True)).reshape((ppi,cpb))
+            data -= self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean if self.EM_mean < -1 else data.mean()
+            data /= self.EM_std if self.EM_std > 0 else self.EM_actual_std if self.EM_std < -1 else data.std()
             for i in range(self.naug_data):
-                aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else self.aug_actual_mean[i]
-                aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else self.aug_actual_std[i]
+                aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else \
+                    self.aug_actual_mean[i] if self.aug_mean[i] < -1 else aug_data[i].mean()
+                aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else \
+                    self.aug_actual_std[i] if self.aug_std[i] < -1 else aug_data[i].std()
         
         if self.verbose and not self.silent: 
             print 'EMDataParser: Got batch ', batchnum, ' (%.3f s)' % (time.time()-t,)
