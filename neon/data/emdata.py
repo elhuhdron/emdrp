@@ -241,6 +241,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         nextdata = [nextdata[i] for i in ([0] + range(2,p.naug_data+2) + [1])]
         # order from EM data parser is tranpose of neon data, so switch nexamples (num_cases_per_batch) to first dim
         for i in range(len(nextdata)-1):
+            # image dimensions and pixels / examples dimensions both need to be transposed relative to cc2 input
             #self.nextdata[i] = nextdata[i].T.copy(order='C')
             self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
                 transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')

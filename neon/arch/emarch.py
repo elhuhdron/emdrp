@@ -69,15 +69,19 @@ class fergus(EMModelArchitecture):
         ]
 
 class fergus_bn(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
         super(fergus_bn, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
 
     @property
     def layers(self):
         bn = True
         return [
             Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn, 
-                 padding=3, strides=1),
+                    padding=3, strides=1)\
+                if self.bn_first_layer else\
+                Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+                    padding=3, strides=1),
             Pooling(3, strides=2),
             Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn, 
                  padding=2, strides=1),
@@ -96,6 +100,10 @@ class fergus_bn(EMModelArchitecture):
             Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
+
+class fergus_bn1(fergus_bn):
+    def __init__(self, noutputs, use_softmax=False):
+        super(fergus_bn1, self).__init__(noutputs, use_softmax, bn_first_layer=True)
 
 class cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
