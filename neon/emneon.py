@@ -59,7 +59,7 @@ parser.add_argument('--model_arch', type=str, default='fergus', help='Specify co
 parser.add_argument('--rate_decay', type=float, default=5.0, 
                     help='Learning schedule rate decay time constant (in epochs)')
 parser.add_argument('--rate_freq', type=int, default=0, 
-                    help='Batch frequency to update rate decay (< 1 means twice per EM epoch (training macrobatches))')
+                    help='Batch frequency to update rate decay (< 1 is 5 times per EM epoch (training macrobatches))')
 parser.add_argument('--weight_decay', type=float, default=0.02, help='Weight decay')
 parser.add_argument('--rate_init', nargs=2, type=float, default=[0.00005, 0.0001], 
                     help='Initial learning rates [weight, bias]')
@@ -71,7 +71,7 @@ parser.add_argument('--neon_progress', action="store_true",
 parser.add_argument('--data_config', type=str, default=None, help='Specify em data configuration ini file')
 parser.add_argument('--write_output', type=str, default='', help='File to to write outputs for test batches')
 parser.add_argument('--train_range', nargs=2, type=int, default=[1,200], help='emcc2-style training batch range')
-parser.add_argument('--test_range', nargs=2, type=int, default=[200001,200001], 
+parser.add_argument('--test_range', nargs=2, type=int, default=[200001,200002], 
                     help='emcc2-style testing batch range, concatenated into single "neon epoch" (macrobatch)')
 parser.add_argument('--chunk_skip_list', nargs='*', type=int, default=[], 
                     help='Skip these random EM chunks, usually for test, override .ini')
@@ -128,7 +128,7 @@ if not args.write_output:
     # configure optimizers and weight update schedules
     num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
     # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
-    if args.rate_freq < 1: args.rate_freq = train.nmacrobatches//2
+    if args.rate_freq < 1: args.rate_freq = train.nmacrobatches//5
     if args.rate_freq > 1:
         weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
     else:
