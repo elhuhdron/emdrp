@@ -139,7 +139,16 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.lbuf_event = threading.Event(); self.cbuf_event = threading.Event()
         else:
             self.push_event = threading.Event(); self.push_done_event = threading.Event()
-    
+
+        # set pycuda driver for gpu backend
+        # xxx - this is a bit hacky, is there a better way to do this?
+        if type(self.be) == NervanaGPU:
+            import pycuda.driver as drv
+            self.drv = drv
+            self.stream = None # xxx - what to do with this?
+        else:
+            self.drv = None
+            
         # start the thread and wait for initialization to complete.
         # initialization of backend memory has to occur within the thread.
         self.daemon = True  # so that stop event is not necessary to terminate threads when process completes.
@@ -147,13 +156,12 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         self.init_event.wait()
 
     def run(self):
-        # xxx - this is a bit hacky, find a better way to do this?
-        #   this allows the current running thread to push data to the gpu memory buffer.
-        #   ArrayIterator constructor has to be called within this thread also,
-        #     so that the memory is allocated in this context.
-        if type(self.be) == NervanaGPU:
-            import pycuda.driver as drv
-            self.ctx = drv.Device(self.be.device_id).make_context()
+        # this allows the current running thread to push data to the gpu memory buffer.
+        # ArrayIterator constructor has to be called within this thread also,
+        #   so that the memory is allocated in this context.
+        # xxx - cleanup call to self.ctx.detach() ???
+        if self.drv is not None:
+            self.ctx = self.drv.Device(self.be.device_id).make_context()
 
         # iterator initilizes random batches but will be overwritten with first batch in __iter__
         super(EMDataIterator, self).__init__(name=self.name, nexamples=self.nexamples)
@@ -204,10 +212,6 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
                 self._push_be_buffer()
                 self.push_done_event.set()
 
-        # xxx - see above, this is a bit hacky, find a better way to do this?
-        if type(self.be) == NervanaGPU:
-            self.ctx.detach()
-
     def reset_batchnum(self, batchnum):
         # xxx - purpose of this is to start training a model at the batch where it left off.
         #   this is pretty minor in the grand scheme of training, and a pain to implement here.
@@ -230,6 +234,11 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         # push batch onto backend buffer
         for i in range(self.num_data_labels):
             self.iter_buf[self.lbuf].dbuf[i].set(self.pushdata[i])
+
+        if self.drv is not None:
+            end = self.drv.Event()
+            end.record(self.stream)
+            end.synchronize()
             
     def _get_next_EMbatch(self):
         p = self.parser
@@ -245,6 +254,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             #self.nextdata[i] = nextdata[i].T.copy(order='C')
             self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
                 transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
+                
         # convert labels that are not onehot (independent_labels) to int
         if self.make_onehot:
             self.nextdata[-1] = nextdata[-1].T.astype(np.int32, order='C')
