@@ -721,10 +721,11 @@ class EMDataParser():
         assert( zslc < self.ntotal_zslice ) # usually fails then specified tiled batch is out of range of cube
 
         inds = np.zeros((3,),dtype=self.cubeSubType)
+        chunk = self.cur_chunk if self.chunk_list_all else 0
         for imgi in range(self.num_cases_per_batch):
             inds[:] = self.inds_tiled[:,ind0 + imgi]; inds[2] += zslc
-            self.getAllDataAtPoint(inds,data,aug_data,imgi,aug)
-            self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],aug)
+            self.getAllDataAtPoint(inds,data,aug_data,imgi,aug,chunk=chunk)
+            self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],aug,chunk=chunk)
 
     # set to a specific chunk, re-initBatches if the new chunk is different from the current one
     def setChunkList(self, chunk, chunk_list):
