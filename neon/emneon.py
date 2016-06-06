@@ -101,8 +101,7 @@ if not args.write_output:
                                batch_range=args.train_range, name='train', NBUF=args.nbebuf)
         # test batches need to be concatenated into a single "neon epoch" for built-in neon eval_set to work correctly
         test = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
-                              batch_range=args.test_range, name='test', concatenate_batches=True,
-                              NBUF=args.nbebuf)
+                              batch_range=args.test_range, name='test', isTest=True, NBUF=args.nbebuf)
     else:
         # make dummy random data just for testing model inits
         train = RandomEMDataIterator(name='train')
@@ -162,7 +161,7 @@ else:
     if args.data_config:
         test = EMDataIterator(args.data_config, write_output=args.write_output,
                               chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
-                              batch_range=args.test_range, name='test', NBUF=args.nbebuf)
+                              batch_range=args.test_range, name='test', isTest=True, NBUF=args.nbebuf)
     else:
         # make dummy random data just for testing model inits
         test = RandomEMDataIterator(name='outputs')

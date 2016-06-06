@@ -94,8 +94,8 @@ class RandomEMDataIterator(NervanaEMDataIterator):
 
 class EMDataIterator(NervanaEMDataIterator, Thread):
 
-    def __init__(self, cfg_file, write_output=None, chunk_skip_list=[], dim_ordering='', 
-                 batch_range=[1,10], name='emdata', concatenate_batches=False, NBUF=2):
+    def __init__(self, cfg_file, write_output=None, chunk_skip_list=[], dim_ordering='', batch_range=[1,10], 
+                 name='emdata', isTest=False, NBUF=2):
         Thread.__init__(self)
         self.name = name
 
@@ -109,6 +109,9 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         # this needs to be done first so that nmacrobatches property works.
         self.batch_range = batch_range; self.batchnum = batch_range[0]
 
+        # previously parser was agnostic to test or train, but needed it for allowing single ini in chunk_list_all mode
+        self.isTest = isTest
+
         # if the output an hdf file name, then this is a single whole-dataset hdf5 file.
         # xxx - initializations for writing output features could be cleaned up.
         write_outputs = (write_output is not None); append_features = False
@@ -118,7 +121,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             write_outputs = not append_features
         # instantiate the actual em data parser, code shared with cuda-convnets2 em data parser
         self.parser = EMDataParser(cfg_file, write_outputs=write_outputs, append_features=append_features, 
-                                    chunk_skip_list=chunk_skip_list, dim_ordering=dim_ordering)
+                                    chunk_skip_list=chunk_skip_list, dim_ordering=dim_ordering, isTest=self.isTest)
         if write_outputs or append_features:
             # force some properties if in mode for writing outputs.
             self.parser.outpath = write_output
@@ -127,7 +130,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         self.parser.initBatches()
 
         # no need for special code to concatenate if there is only one macrobatch anyways
-        self.concatenate_batches = concatenate_batches and (self.nmacrobatches > 1)
+        self.concatenate_batches = isTest and (self.nmacrobatches > 1)
 
         self.nexamples = self.parser.num_cases_per_batch
         if self.concatenate_batches: self.nexamples *= self.nmacrobatches

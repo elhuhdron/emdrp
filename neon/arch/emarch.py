@@ -175,6 +175,39 @@ class sfergus_explin_bn(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+class dfergus_explin_bn(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(dfergus_explin_bn, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            Conv((11, 11, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+                    padding=5, strides=2)\
+                if self.bn_first_layer else\
+                Conv((11, 11, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Explin(), 
+                    padding=5, strides=2),
+            Pooling(3, strides=2),
+            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+                 padding=2, strides=1),
+            Pooling(3, strides=2),
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Pooling(3, strides=2),
+            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(cifar10, self).__init__(noutputs, use_softmax)
