@@ -20,9 +20,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Generate EM data for cuda-convnet2. Does all the work for the EMDataProvider.
-# Also added "unpackager" routine for recreating output probabilities from feature writer for convnet prob layer.
-# New method adopted from datapkgEMnew.py that generated data for EMGPUInd provider in cuda-convnet-EM-alpha.
+# Generate EM data for cuda-convnet2 and neon.
+# Also added "unpackager" routine for recreating output probabilities convnet outputs.
 # Data is parsed out of hdf5 files for raw EM data and for labels.
 # Each batch is then generated on-demand (in parallel with training previous batch).
 #     This process should not take more than a few seconds per batch (use verbose flag to print run times).
@@ -44,30 +43,11 @@ import random
 import pickle as myPickle
 import StringIO as myStringIO
 
-#from scipy import linalg
-#import scipy.ndimage.filters as filters
-#from scipy import interpolate
-#from threading import Thread
-
 # no exception for plotting so this can still work from command line only (plotting is only for standalone validation)
 try: 
     from matplotlib import pylab as pl
     import matplotlib as plt
 except: pass 
-
-
-'''
-# for easy parallelization of raw em standard processing (upsample, median filter, downsample)
-class EMStandardFilterThread(Thread):
-    def __init__(self, dp, data, reScale):
-        Thread.__init__(self)
-        self.dp = dp
-        self.data = data
-        self.reScale = reScale
-        
-    def run(self):
-        EMDataParser.emStandardFilterProc(self.dp, self.data, self.reScale)
-'''
 
 
 class EMDataParser():
@@ -85,9 +65,10 @@ class EMDataParser():
     PRIOR_DATASET = 'prior_train'
     
     # Where a batch is within these ranges allows for different types of batches to be selected:
-    # 1 to FIRST_RAND_NOLOOKUP_BATCH-1 are randomized examples from rand cube based on lookup table
-    # FIRST_RAND_NOLOOKUP_BATCH - FIRST_TILED_BATCH-1 are randomized examples from rand cube without lookup table
+    # 1 to FIRST_RAND_NOLOOKUP_BATCH-1 are randomized examples from all training cubes
+    # FIRST_RAND_NOLOOKUP_BATCH - FIRST_TILED_BATCH-1 are randomized examples from all training cubes
     # FIRST_TILED_BATCH - (batch with max test chunk / zslice) are tiled examples from the rand then test cubes
+    #   or all sequential cubes in chunk list or range mode
     FIRST_RAND_NOLOOKUP_BATCH = 100001
     FIRST_TILED_BATCH = 200001 
 
@@ -100,12 +81,12 @@ class EMDataParser():
     HDF5_CLVL = 5           # compression level in hdf5
     
     def __init__(self, cfg_file, write_outputs=False, init_load_path='', save_name=None, append_features=False,
-            chunk_skip_list=[], dim_ordering=''):
+            chunk_skip_list=[], dim_ordering='', isTest=False):
         self.cfg_file = cfg_file
         self.write_outputs = write_outputs; self.save_name = save_name; self.append_features = append_features
 
         print 'EMDataParser: config file ''%s''' % cfg_file
-        # retrieve / save options from ini files, see definitions parseEMdataspec.ini
+        # retrieve / save options from ini files, see definitions parseEMdata.ini
         opts = EMDataParser.get_options(cfg_file)
         for k, v in opts.items(): 
             if type(v) is list and k not in ['chunk_skip_list','aug_datasets']: 
@@ -119,6 +100,8 @@ class EMDataParser():
                 setattr(self,k,v)
 
         # Options / Inits
+
+        self.isTest = isTest   # added this for allowing test/train to use same ini file in chunk_list_all mode
 
         # Previously had these as constants, but moved label data type to ini file and special labels are defined 
         #   depending on the data type.
@@ -152,6 +135,7 @@ class EMDataParser():
 
         # initialize for "chunkrange" or "chunklist" mode if these parameters are not empty
         self.use_chunk_list = (len(self.chunk_range_beg) > 0); self.use_chunk_range = False
+        assert( self.use_chunk_list or self.chunk_list_all )  # no chunk_list_all if not chunk_list mode
         if self.use_chunk_list:
             assert( self.nz_tiled == 0 ) # do not define tiled cube for chunklist mode
             self.chunk_range_beg = self.chunk_range_beg.reshape(-1,3); self.chunk_list_index = -1
@@ -229,13 +213,15 @@ class EMDataParser():
                     self.chunk_range_beg, self.offset_list), axis=1), fmt='\t(%d) chunk %d %d %d, offset %d %d %d', 
                     delimiter='', newline='\n', header='', footer='', comments='')            
             cstr = fh.getvalue(); fh.close(); print cstr
-            print '\tchunk_list_rand %d, chunk_range_rand %d' % (self.chunk_list_rand, self.chunk_range_rand)
+            #print '\tchunk_list_rand %d, chunk_range_rand %d' % (self.chunk_list_rand, self.chunk_range_rand)
             print '\tchunk_skip_list: ' + str(self.chunk_skip_list)
+            print '\tchunk_list_all: ' + str(self.chunk_list_all)
 
         # need these for appending features in chunklist mode, otherwise they do nothing
         #self.last_chunk_rand = self.chunk_rand; self.last_offset_rand = self.offset_rand
         # need special case for first chunk incase there is no next ever loaded (if only one chunk written)
         self.last_chunk_rand = None; self.last_offset_rand = None
+        self.cur_chunk = None   # started needing this for chunk_list_all mode
 
         # some calculated values based on constants and input arguments for tiled batches
         
@@ -245,6 +231,8 @@ class EMDataParser():
         assert( (self.image_size % 2) == (self.image_out_size % 2) )
         assert( self.independent_labels or self.image_out_size == 1 ) # need independent labels for multiple pixels out
         assert( not self.no_labels or self.no_label_lookup )    # must have no_label_lookup in no_labels mode
+        assert( not self.chunk_list_all or self.no_label_lookup )   # must have no_label_lookup for all chunks loaded
+        assert( not self.chunk_list_all or not self.write_outputs ) # write_outputs not supported for all chunks loaded
 
         # number of cases per batch should be kept lower than number of rand streams in convnet (128*128 = 16384)
         self.num_cases_per_batch = self.tile_size.prod()
@@ -329,33 +317,19 @@ class EMDataParser():
         self.nclass = self.noutputs if self.independent_labels else self.nIndepLabels
         self.oshape = (self.image_out_size, self.image_out_size, self.nIndepLabels)
 
-        '''
-        # inits for preprocessing
-        
-        # check for file to load whitening matrix from
-        if self.whiten_load:
-            if not os.path.isfile(self.whiten_load):
-                self.whiten_load = os.path.join(init_load_path,self.whiten_load)
-                if not os.path.isfile(self.whiten_load) and not os.path.isdir(self.whiten_load):
-                    self.whiten_load = init_load_path
-        else:
-            self.whiten_load = init_load_path
-        self.do_whiten_load = os.path.isfile(self.whiten_load)
-
-        assert( all([d <= 1 for d in self.em_standard_idelta]) )
-        # optimization for integer multiple interpolations
-        self.em_standard_interpn = [int(round(1/d)) for d in self.em_standard_idelta];
-        self.em_standard_iinterp = all([np.equal(np.mod(1/d, 1), 0) for d in self.em_standard_idelta])
-        '''
-        
         # augmented data cubes can be presented in parallel with raw EM data
         self.naug_data = len(self.aug_datasets)
-        self.aug_data = [None]*self.naug_data
-        self.aug_actual_mean = np.zeros((self.naug_data,),dtype=np.double)
-        self.aug_actual_std = np.zeros((self.naug_data,),dtype=np.double)
         assert( len(self.aug_mean) >= self.naug_data )
         assert( len(self.aug_std) >= self.naug_data )
-        
+
+        # Originally these were not arrays, but changed so same code can be used without lots of conditionals to
+        #   support chunk_list_all mode which loads all chunks into system memory at once.
+        n = self.nchunks if self.chunk_list_all else 1
+        self.aug_data = [[None]*self.naug_data for i in range(n)]
+        self.data_cube = [None]*n
+        self.segmented_labels_cube = [None]*n
+        self.labels_cube = [None]*n
+            
         # print out all initialized variables in verbose mode
         if self.verbose: 
             tmp = vars(self); #tmp['indep_label_names_out'] = 'removed from print for brevity'
@@ -381,8 +355,17 @@ class EMDataParser():
             outfile = open(os.path.join(self.outpath, self.INFO_FILE), 'w'); outfile.close(); # truncate
             outfile = h5py.File(os.path.join(self.outpath, self.OUTPUT_H5_CVIN), 'w'); outfile.close(); # truncate
             
-        self.readCubeToBuffers()
-        self.setupLabels()
+        if self.chunk_list_all:
+            # This allows different test and train parsers that both do not have to load all chunks but can still use
+            #   the same ini file.
+            cl = self.chunk_tiled_list if self.isTest else self.chunk_rand_list
+            for c in range(len(cl)):
+                self.setChunkList(c, cl)
+                self.readCubeToBuffers(cl[c])
+                self.setupAllLabels(cl[c])
+        else:
+            self.readCubeToBuffers()
+            self.setupAllLabels()
         if not self.no_label_lookup: self.makeRandLabelLookup()
         if self.write_outputs: self.enumerateTiledLabels()
         # for chunklist or chunkrange modes, the tiled indices do not change, so no need to regenerate them
@@ -395,13 +378,14 @@ class EMDataParser():
         self.silent = False
 
     def makeRandLabelLookup(self):
+        #assert( not self.chunk_list_all )  # random batches with lookup not intended for all chunks loaded mode
         if not self.silent: print 'EMDataParser: Creating rand label lookup for specified zslices'
         self.label_priors[:] = self.initial_label_priors     # incase prior was modified below in chunk mode
         max_total_voxels = self.size_rand.prod() # for heuristic below - xxx - rethink this, or add param?
         total_voxels = 0
         self.inds_label_lookup = self.nlabels*[None]
         for i in range(self.nlabels):
-            inds = np.transpose(np.nonzero(self.labels_cube[:,:,0:self.nrand_zslice] == i))
+            inds = np.transpose(np.nonzero(self.labels_cube[0][:,:,0:self.nrand_zslice] == i))
             if inds.shape[0] > 0:
                 # don't select from end slots for multiple zslices per case
                 inds = inds[np.logical_and(inds[:,2] >= self.nzslices/2, 
@@ -461,7 +445,7 @@ class EMDataParser():
         #total_voxels = self.size_tiled.prod() # because of potential index selects or missing labels, sum instead
         tiled_count = self.nlabels * [0]; total_voxels = 0 
         for i in range(self.nlabels):
-            inds = np.transpose(np.nonzero(self.labels_cube[:,:,self.nrand_zslice:self.ntotal_zslice] == i))
+            inds = np.transpose(np.nonzero(self.labels_cube[0][:,:,self.nrand_zslice:self.ntotal_zslice] == i))
             if inds.shape[0] > 0:
                 # don't select from end slots for multiple zslices per case
                 inds = inds[np.logical_and(inds[:,2] >= self.nzslices/2, 
@@ -485,8 +469,8 @@ class EMDataParser():
             outfile.write('Priors rand:    %s\n\n' % ','.join('%.8f' % i for i in self.rand_priors))
         
         # other useful info (for debugging / validating outputs)
-        outfile.write('data_shape %dx%dx%d ' % self.data_cube.shape)
-        outfile.write('labels_shape %dx%dx%d\n' % self.labels_cube.shape)
+        outfile.write('data_shape %dx%dx%d ' % self.data_cube[0].shape)
+        outfile.write('labels_shape %dx%dx%d\n' % self.labels_cube[0].shape)
         outfile.write('num_rand_zslices %d, num_tiled_zslices %d, zslice size %dx%d\n' %\
             (self.size_rand[2], self.nz_tiled, self.size_rand[0], self.size_rand[1]))
         outfile.write('num_cases_per_batch %d, tiles_per_zslice %dx%dx%d\n' %\
@@ -495,8 +479,6 @@ class EMDataParser():
         outfile.write('image_out_size %d, tile_size %dx%dx%d, shape_per_batch %dx%dx%d\n' %\
             (self.image_out_size, self.tile_size[0], self.tile_size[1], self.tile_size[2], 
             self.shape_per_batch[0], self.shape_per_batch[1], self.shape_per_batch[2]))
-        outfile.write('data specified mean %.4f, actual mean %.4f, actual std %.4f\n' % (self.EM_mean,
-            self.EM_actual_mean, self.EM_actual_std))
         outfile.close()
 
     def makeTiledIndices(self):
@@ -551,15 +533,15 @@ class EMDataParser():
         print 'EMDataParser: Exporting raw data / labels to hdf5 for validation at "%s"' % (self.outpath,)
         
         outfile = h5py.File(os.path.join(self.outpath, self.OUTPUT_H5_CVIN), 'a'); 
-        outfile.create_dataset('data',data=self.data_cube.transpose((2,1,0)),
+        outfile.create_dataset('data',data=self.data_cube[0].transpose((2,1,0)),
             compression='gzip', compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
         # copy the attributes over
         for name,value in self.data_attrs.items():
             outfile['data'].attrs.create(name,value)
-        if self.labels_cube.size > 0:
-            outfile.create_dataset('labels',data=self.labels_cube.transpose((2,1,0)),
+        if self.labels_cube[0].size > 0:
+            outfile.create_dataset('labels',data=self.labels_cube[0].transpose((2,1,0)),
                 compression='gzip', compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
-            outfile.create_dataset('segmented_labels',data=self.segmented_labels_cube.transpose((2,1,0)),
+            outfile.create_dataset('segmented_labels',data=self.segmented_labels_cube[0].transpose((2,1,0)),
                 compression='gzip', compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
             for name,value in self.labels_attrs.items():
                 outfile['segmented_labels'].attrs.create(name,value)
@@ -598,23 +580,15 @@ class EMDataParser():
         if self.zero_labels:
             labels = np.zeros((self.noutputs, self.num_cases_per_batch), dtype=np.single, order='C')
         
-        '''
-        if do_preprocess: 
-            if plot_outputs: dataProc = self.preprocessData(data, reScale=False)
-            else: data = self.preprocessData(data)
-        '''
-
         # replaced preprocessing with scalar mean subtraction and scalar std division.
         # For means: < 0 and >= -1 for mean over batch, < -1 for mean over current loaded chunk, 0 to do nothing
         # For stds: <= 0 and >= -1 for std over batch, < -1 for std over current loaded chunk, 1 to do nothing
         if not plot_outputs:
-            data -= self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean if self.EM_mean < -1 else data.mean()
-            data /= self.EM_std if self.EM_std > 0 else self.EM_actual_std if self.EM_std < -1 else data.std()
+            data -= self.EM_mean if self.EM_mean >= 0 else data.mean()
+            data /= self.EM_std if self.EM_std > 0 else data.std()
             for i in range(self.naug_data):
-                aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else \
-                    self.aug_actual_mean[i] if self.aug_mean[i] < -1 else aug_data[i].mean()
-                aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else \
-                    self.aug_actual_std[i] if self.aug_std[i] < -1 else aug_data[i].std()
+                aug_data[i] -= self.aug_mean[i] if self.aug_mean[i] >= 0 else aug_data[i].mean()
+                aug_data[i] /= self.aug_std[i] if self.aug_std[i] > 0 else aug_data[i].std()
         
         if self.verbose and not self.silent: 
             print 'EMDataParser: Got batch ', batchnum, ' (%.3f s)' % (time.time()-t,)
@@ -626,20 +600,31 @@ class EMDataParser():
         #time.sleep(5) # useful for "brute force" memory leak debug
         #return data, labels
         return [data, labels] + aug_data
-        
+
     def generateRandBatch(self,data,aug_data,labels,seglabels):
-        assert( not self.no_label_lookup )      # do not use rand batches without label lookup
+        assert( not self.no_labels )
         if self.use_chunk_list: self.randChunkList()    # load a new cube in chunklist or chunkrange modes
-        
-        # generate random indices based on lookup table for labels
+
+        # pick labels that will be used to select images to present
         lbls = nr.choice(self.nlabels, self.num_cases_per_batch, p=self.label_priors)
         augs = np.bitwise_and(nr.choice(self.NAUGS, self.num_cases_per_batch), self.augs_mask)
 
-        # generate any possible random choices for each label type, will not use all of these, for efficiency
-        inds_lbls = np.zeros((self.nlabels, self.num_cases_per_batch), dtype=np.uint64)
-        for i in range(self.nlabels): 
-            if self.label_lookup_lens[i]==0: continue   # do not attempt to select labels if there are none
-            inds_lbls[i,:] = nr.choice(self.label_lookup_lens[i], self.num_cases_per_batch)
+        if self.no_label_lookup:
+            assert(False)   # never implemented balanced randomized batch creation without label lookup
+            #inds, chunks = self.generateRandNoLookupInds(factor=10)
+            ## generate an inds label lookup on the fly
+            #inds_label_lookup = [None]*self.nlabels
+            #for i in range(self.nlabels): 
+            #    inds_label_lookup[i] = np.transpose(np.nonzero(self.labels_cube[0][:,:,0:self.nrand_zslice] == i))
+        else:
+            # generate any possible random choices for each label type, will not use all of these, for efficiency
+            inds_lbls = np.zeros((self.nlabels, self.num_cases_per_batch), dtype=np.uint64)
+            for i in range(self.nlabels): 
+                if self.label_lookup_lens[i]==0: continue   # do not attempt to select labels if there are none
+                inds_lbls[i,:] = nr.choice(self.label_lookup_lens[i], self.num_cases_per_batch)
+            inds_label_lookup = self.inds_label_lookup
+            # random batches with lookup table can not use chunk_list_all mode
+            chunks = np.zeros((self.num_cases_per_batch,), dtype=np.int64)
 
         # generate a random offset from the selected location.
         # this prevents the center pixel from being the pixel that is used to select the image every time and
@@ -653,34 +638,44 @@ class EMDataParser():
             (self.image_out_offset, self.image_out_offset))], axis=1) - self.image_out_offset/2
 
         for imgi in range(self.num_cases_per_batch):
-            inds = self.inds_label_lookup[lbls[imgi]][inds_lbls[lbls[imgi], imgi],:] + offset[imgi,:]
-            #self.getImgDataAtPoint(inds,data[:,imgi],augs[imgi])
-            self.getAllDataAtPoint(inds,data,aug_data,imgi,augs[imgi])
-            self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],augs[imgi])
+            inds = inds_label_lookup[lbls[imgi]][inds_lbls[lbls[imgi], imgi],:] + offset[imgi,:]
+            self.getAllDataAtPoint(inds,data,aug_data,imgi,augs[imgi],chunk=chunks[imgi])
+            self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunks[imgi])
         self.tallyTrainingPrior(labels)
 
     def generateRandNoLookupBatch(self,data,aug_data,labels,seglabels):
-        if self.use_chunk_list: self.randChunkList()    # load a new cube in chunklist or chunkrange modes
+        # load a new cube in chunklist or chunkrange modes        
+        if self.use_chunk_list and not self.chunk_list_all: self.randChunkList()    
         
+        inds, chunks = self.generateRandNoLookupInds()
+        augs = np.bitwise_and(nr.choice(self.NAUGS, self.num_cases_per_batch), self.augs_mask)
+        
+        for imgi in range(self.num_cases_per_batch):
+            self.getAllDataAtPoint(inds[imgi,:],data,aug_data,imgi,augs[imgi],chunk=chunks[imgi])
+            if not self.no_labels:
+                self.getLblDataAtPoint(inds[imgi,:],labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunks[imgi])
+        if not self.no_labels: self.tallyTrainingPrior(labels)
+
+    def generateRandNoLookupInds(self, factor=2):
         # generate random indices from anywhere in the rand cube
         if self.no_labels:
             size = self.size_rand; offset = self.labels_offset
         else:
             size = self.size_rand - 2*self.read_border; offset = self.labels_offset + self.read_border
-        nrand_inds = 2*self.num_cases_per_batch
+        nrand_inds = factor*self.num_cases_per_batch
         inds = np.concatenate([x.reshape((nrand_inds,1)) for x in np.unravel_index(nr.choice(size.prod(), 
             nrand_inds), size)], axis=1) + offset
             
         # don't select from end slots for multiple zslices per case
         inds = inds[np.logical_and(inds[:,2] >= self.nzslices/2, inds[:,2] < self.nrand_zslice-self.nzslices/2),:]
-        augs = np.bitwise_and(nr.choice(self.NAUGS, self.num_cases_per_batch), self.augs_mask)
-        
-        for imgi in range(self.num_cases_per_batch):
-            #self.getImgDataAtPoint(inds[imgi,:],data[:,imgi],augs[imgi])
-            self.getAllDataAtPoint(inds[imgi,:],data,aug_data,imgi,augs[imgi])
-            if not self.no_labels:
-                self.getLblDataAtPoint(inds[imgi,:],labels[:,imgi],seglabels[:,imgi],augs[imgi])
-        if not self.no_labels: self.tallyTrainingPrior(labels)
+
+        # randomize the chunks were are presented also if all chunks are loaded
+        if self.chunk_list_all:
+            chunks = nr.choice(self.chunk_rand_list, (self.num_cases_per_batch,))
+        else:
+            chunks = np.zeros((self.num_cases_per_batch,), dtype=np.int64)
+            
+        return inds, chunks
 
     def tallyTrainingPrior(self, labels):
         if 'prior_train_count' not in self.batch_meta: return
@@ -728,7 +723,6 @@ class EMDataParser():
         inds = np.zeros((3,),dtype=self.cubeSubType)
         for imgi in range(self.num_cases_per_batch):
             inds[:] = self.inds_tiled[:,ind0 + imgi]; inds[2] += zslc
-            #self.getImgDataAtPoint(inds,data[:,imgi],aug)
             self.getAllDataAtPoint(inds,data,aug_data,imgi,aug)
             self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],aug)
 
@@ -746,6 +740,8 @@ class EMDataParser():
         else:
             self.chunk_list_index = chunk
             chunk_rand = self.chunk_range_beg[chunk,:]; offset_rand = self.offset_list[chunk,:]
+
+        self.cur_chunk = chunk   # started needing this for chunk_list_all mode
             
         # compare with actual chunks and offsets here instead of index to avoid loading the first chunk twice
         if (chunk_rand != self.chunk_rand).any() or (offset_rand != self.offset_rand).any():
@@ -755,7 +751,7 @@ class EMDataParser():
             else:
                 self.last_chunk_rand = self.chunk_rand; self.last_offset_rand = self.offset_rand; 
             self.chunk_rand = chunk_rand; self.offset_rand = offset_rand; 
-            self.initBatches(silent=not self.verbose)
+            if not self.chunk_list_all: self.initBatches(silent=not self.verbose)
         elif self.last_chunk_rand is None: 
             # special case incase there is no next chunk ever loaded (only one chunk being written)
             self.last_chunk_rand = chunk_rand; self.last_offset_rand = offset_rand; 
@@ -763,18 +759,19 @@ class EMDataParser():
     def randChunkList(self):
         assert( self.chunk_range_rand > 0 )     # do not request rand chunk with zero range
         # should only be called from chunklist or chunkrange modes
-        if self.chunk_list_rand:
-            nextchunk = random.randrange(self.chunk_range_rand)
-        else:
-            if self.use_chunk_range: nextchunk = (self.chunk_range_index+1) % self.chunk_range_rand
-            else: nextchunk = (self.chunk_list_index+1) % self.chunk_range_rand
+        # xxx - randomizing chunks performed very poorly, so removed in favor of chunk_list_all mode
+        #if self.chunk_list_rand:
+        #    nextchunk = random.randrange(self.chunk_range_rand)
+        #else:
+        if self.use_chunk_range: nextchunk = (self.chunk_range_index+1) % self.chunk_range_rand
+        else: nextchunk = (self.chunk_list_index+1) % self.chunk_range_rand
         # draw from the list of random chunks only, set in init depending on parameters.
         self.setChunkList(nextchunk, self.chunk_rand_list)
 
-    def getAllDataAtPoint(self,inds,data,aug_data,imgi,aug=0):
-        self.getImgDataAtPoint(self.data_cube,inds,data[:,imgi],aug)
+    def getAllDataAtPoint(self,inds,data,aug_data,imgi,aug=0,chunk=0):
+        self.getImgDataAtPoint(self.data_cube[chunk],inds,data[:,imgi],aug)
         for i in range(self.naug_data):
-            self.getImgDataAtPoint(self.aug_data[i],inds,aug_data[i][:,imgi],aug)
+            self.getImgDataAtPoint(self.aug_data[chunk][i],inds,aug_data[i][:,imgi],aug)
         
     def getImgDataAtPoint(self,data_cube,inds,data,aug):
         # don't simplify this... it's integer math
@@ -785,15 +782,15 @@ class EMDataParser():
         data[:] = EMDataParser.augmentData(data_cube[selx,sely,selz].astype(np.single),
             aug).transpose(2,0,1).flatten('C')  # z last because channel data must be contiguous for convnet
 
-    def getLblDataAtPoint(self,inds,labels,seglabels,aug=0):
+    def getLblDataAtPoint(self,inds,labels,seglabels,aug=0,chunk=0):
         if labels.size == 0: return
         # some conditions can not happen here, and this should have been asserted in getLabelMap
         if not self.independent_labels:
             assert( self.noutputs == 1 ) # just make sure
             # image out size has to be one in this case, just take the center label
             # the image in and out size must both be even or odd for this to work (asserted in init)
-            indsl = inds - self.labels_offset; labels[:] = self.labels_cube[indsl[0],indsl[1],indsl[2]]
-            seglabels[:] = self.segmented_labels_cube[indsl[0],indsl[1],indsl[2]]
+            indsl = inds - self.labels_offset; labels[:] = self.labels_cube[chunk][indsl[0],indsl[1],indsl[2]]
+            seglabels[:] = self.segmented_labels_cube[chunk][indsl[0],indsl[1],indsl[2]]
         else:
             # NOTE from getLabelMap for border: make 3d for (convenience) in ortho reslice code, but always need same 
             #   in xy dir and zero in z for lbl slicing. xxx - maybe too confusing, fix to just use scalar? 
@@ -801,8 +798,8 @@ class EMDataParser():
             # don't simplify this... it's integer math
             selx = slice(indsl[0]-self.seg_out_size/2,indsl[0]-self.seg_out_size/2+self.seg_out_size)
             sely = slice(indsl[1]-self.seg_out_size/2,indsl[1]-self.seg_out_size/2+self.seg_out_size)
-            lbls = EMDataParser.augmentData(self.segmented_labels_cube[selx,sely,indsl[2]].reshape((self.seg_out_size,
-                self.seg_out_size,1)),aug).reshape((self.seg_out_size,self.seg_out_size))
+            lbls = EMDataParser.augmentData(self.segmented_labels_cube[chunk][selx,sely,indsl[2]].reshape((\
+                self.seg_out_size,self.seg_out_size,1)),aug).reshape((self.seg_out_size,self.seg_out_size))
             seglabels[:] = lbls.flatten('C')
             # xxx - currently affinity labels assume a single pixel border around the segmented labels only.
             #   put other views here if decide to expand label border for selection (currently does not seem neccessary)
@@ -875,19 +872,21 @@ class EMDataParser():
     # h5py requires that for read_direct data must be C order and contiguous. this means F-order must be dealt with 
     #   "manually". for F-order the cube will be in C-order, but shaped like F-order, and then the view 
     #   transposed back to C-order so that it's transparent in the rest of the code.
-    def readCubeToBuffers(self):
+    def readCubeToBuffers(self, chunkind=0):
         if not self.silent: print 'EMDataParser: Buffering data and labels chunk %d,%d,%d offset %d,%d,%d' % \
             (self.chunk_rand[0], self.chunk_rand[1], self.chunk_rand[2], 
             self.offset_rand[0], self.offset_rand[1], self.offset_rand[2])
 
-        self.data_cube, self.data_attrs, self.chunksize, self.datasize, self.EM_actual_mean, self.EM_actual_std = \
-            self.loadData( self.data_cube if hasattr(self, 'data_cube') else None, self.imagesrc, self.dataset )
-        self.loadSegmentedLabels()
+        c = chunkind   
+        assert( c==0 or self.chunk_list_all ) # sanity check
+        self.data_cube[c], self.data_attrs, self.chunksize, self.datasize = \
+            self.loadData( self.data_cube[c], self.imagesrc, self.dataset )
+        self.segmented_labels_cube[c], self.label_attrs = self.loadSegmentedLabels(self.segmented_labels_cube[c])
 
         # load augmented data cubes
         for i in range(self.naug_data):
-            self.aug_data[i], data_attrs, chunksize, datasize, self.aug_actual_mean[i], self.aug_actual_std[i] = \
-                self.loadData( self.aug_data[i], self.augsrc, self.aug_datasets[i] )
+            self.aug_data[c][i], data_attrs, chunksize, datasize = \
+                self.loadData( self.aug_data[c][i], self.augsrc, self.aug_datasets[i] )
             if not self.silent: print '\tbuffered aug data ' + self.aug_datasets[i]
 
     def loadData(self, data_cube, fname, dataset):
@@ -929,7 +928,7 @@ class EMDataParser():
         hdf.close()
 
         # calculate mean and std over all of the data cube
-        mean = float(data_cube.mean(dtype=np.float64)); std = float(data_cube.std(dtype=np.float64))
+        #mean = float(data_cube.mean(dtype=np.float64)); std = float(data_cube.std(dtype=np.float64))
 
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
         if not self.hdf5_Corder: 
@@ -940,54 +939,56 @@ class EMDataParser():
         if self.verbose and not self.silent: 
             print 'After re-ordering ' + fname + ' ' + dataset + ' data cube shape ' + str(data_cube.shape)
             
-        return data_cube, data_attrs, chunksize, datasize, mean, std
+        return data_cube, data_attrs, chunksize, datasize
 
-    def loadSegmentedLabels(self):
+    def loadSegmentedLabels(self, segmented_labels_cube):
         if self.no_labels: seglabels_size = [0, 0, 0]
         else: seglabels_size = list(self.segmented_labels_slice_size[i] for i in self.zreslice_dim_ordering)
         size_rand = self.size_rand[self.zreslice_dim_ordering]; size_tiled = self.size_tiled[self.zreslice_dim_ordering]
         if self.verbose and not self.silent: print 'seglabels size ' + str(seglabels_size) + \
             ' size rand ' + str(size_rand) + ' size tiled ' + str(size_tiled)
             
-        if not hasattr(self, 'segmented_labels_cube'):
+        if segmented_labels_cube is None:
             # for chunkrange / chunklist mode, this function is recalled, don't reallocate in this case
             if self.hdf5_Corder: 
-                self.segmented_labels_cube = np.zeros(seglabels_size, dtype=self.cubeLblType, order='C')
+                segmented_labels_cube = np.zeros(seglabels_size, dtype=self.cubeLblType, order='C')
             else: 
-                self.segmented_labels_cube = np.zeros(seglabels_size[::-1], dtype=self.cubeLblType, order='C')
+                segmented_labels_cube = np.zeros(seglabels_size[::-1], dtype=self.cubeLblType, order='C')
         else:
             # change back to the original view (same view changes as below, opposite order)
 
             # zreslice un-re-ordering, so data is in original view in this function           
-            self.segmented_labels_cube = self.segmented_labels_cube.transpose(self.zreslice_dim_ordering)
+            segmented_labels_cube = segmented_labels_cube.transpose(self.zreslice_dim_ordering)
 
             # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
             if not self.hdf5_Corder: 
-                self.segmented_labels_cube = self.segmented_labels_cube.transpose(2,1,0)
+                segmented_labels_cube = segmented_labels_cube.transpose(2,1,0)
 
         # slice out the labels hdf except for no_labels mode (save memory)
         hdf = h5py.File(self.labelsrc,'r');
         if not self.no_labels: 
             ind = self.get_hdf_index_from_chunk_index(hdf[self.username], self.chunk_rand, self.offset_rand)
             slc,slcd = self.get_label_slices_from_indices(ind, size_rand, seglabels_size, False)
-            hdf[self.username].read_direct(self.segmented_labels_cube, slc, slcd)
+            hdf[self.username].read_direct(segmented_labels_cube, slc, slcd)
             if self.nz_tiled > 0:
                 ind = self.get_hdf_index_from_chunk_index(hdf[self.username], self.chunk_tiled, self.offset_tiled)
                 slc,slcd = self.get_label_slices_from_indices(ind, size_tiled, seglabels_size, True)
-                hdf[self.username].read_direct(self.segmented_labels_cube, slc, slcd)
-        self.labels_attrs = {}
-        for name,value in hdf[self.username].attrs.items(): self.labels_attrs[name] = value
+                hdf[self.username].read_direct(segmented_labels_cube, slc, slcd)
+        labels_attrs = {}
+        for name,value in hdf[self.username].attrs.items(): labels_attrs[name] = value
         assert( (self.chunksize == np.array(hdf[self.username].chunks, dtype=np.int64)).all() )
         hdf.close()
         
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
         if not self.hdf5_Corder: 
-            self.segmented_labels_cube = self.segmented_labels_cube.transpose(2,1,0)
+            segmented_labels_cube = segmented_labels_cube.transpose(2,1,0)
 
         # zreslice re-ordering, so data is in re-sliced order view outside of this function           
-        self.segmented_labels_cube = self.segmented_labels_cube.transpose(self.zreslice_dim_ordering)
+        segmented_labels_cube = segmented_labels_cube.transpose(self.zreslice_dim_ordering)
         if self.verbose and not self.silent: print 'After re-ordering segmented labels cube shape ' + \
-            str(self.segmented_labels_cube.shape)
+            str(segmented_labels_cube.shape)
+
+        return segmented_labels_cube, labels_attrs
 
     def get_hdf_index_from_chunk_index(self, hdf_dataset, chunk_index, offset):
         datasize = np.array(hdf_dataset.shape, dtype=np.int64)
@@ -1040,8 +1041,6 @@ class EMDataParser():
         else:
             noutputs = self.noutputs
             label_names = self.indep_label_names_out if self.independent_labels else self.label_names
-        #data_mean = self.EM_mean if self.EM_mean >= 0 else self.EM_actual_mean
-        #data_std = self.EM_std if self.EM_std > 0 else self.EM_actual_std
         # do not re-assign meta dict so this works with chunklist mode (which reloads each time)
         if not hasattr(self, 'batch_meta'): self.batch_meta = {}
         b = self.batch_meta; b['num_cases_per_batch']=self.num_cases_per_batch; b['label_names']=label_names; 
@@ -1055,16 +1054,21 @@ class EMDataParser():
         #    dtype=np.int64)
         #self.batch_meta['prior_total_count'] = np.zeros((1,),dtype=np.int64)
 
+    def setupAllLabels(self, chunkind=0):
+        c = chunkind   # for chunk_list_all mode
+        assert( c==0 or self.chunk_list_all ) # sanity check
+        self.labels_cube[c] = self.setupLabels(self.labels_cube[c], self.segmented_labels_cube[c])
+
     # labels_cube is used for label priors for selecting pixels for presentation to convnet.
     # The actual labels are calculated on-demand using the segmented labels (not using the labels created here),
     #   unless NOT independent_labels in which case the labels cube is also the labels sent to the network.
-    def setupLabels(self):
+    def setupLabels(self, labels_cube, segmented_labels_cube):
         # init labels to empty and return if no label mode
         if self.no_labels: 
-            self.labels_cube = np.zeros((0,0,0), dtype=self.cubeLblType, order='C'); return
+            return np.zeros((0,0,0), dtype=self.cubeLblType, order='C')
             
-        num_empty = (self.segmented_labels_cube == self.EMPTY_LABEL).sum()
-        assert( self.no_label_lookup or num_empty != self.segmented_labels_cube.size ) # a completely unlabeled chunk
+        num_empty = (segmented_labels_cube == self.EMPTY_LABEL).sum()
+        assert( self.no_label_lookup or num_empty != segmented_labels_cube.size ) # a completely unlabeled chunk
         if num_empty > 0:
             if not self.silent: print 'EMDataParser: WARNING: %d empty label voxels selected' % float(num_empty)
 
@@ -1076,45 +1080,47 @@ class EMDataParser():
             self.ECS_label_value = self.ECS_LABEL     # specifies ECS label is single defined value (like EMPTY_LABEL)
         elif self.ECS_label == -1:
             # specifies that ECS is labeled with whatever the last label is, ignore the empty label
-            self.ECS_label_value = (self.segmented_labels_cube[self.segmented_labels_cube != self.EMPTY_LABEL]).max()
+            self.ECS_label_value = (segmented_labels_cube[segmented_labels_cube != self.EMPTY_LABEL]).max()
         else:
             self.ECS_label_value = self.ECS_label     # use supplied value for ECS
 
-        if not hasattr(self, 'labels_cube'):
+        if labels_cube is None:
             # do not re-allocate if just setting up labels for a new cube for cubelist / cuberange mode
-            self.labels_cube = np.zeros(self.labels_slice_size, dtype=self.cubeLblType, order='C')
+            labels_cube = np.zeros(self.labels_slice_size, dtype=self.cubeLblType, order='C')
 
         if self.select_label_type == 'ICS_OUT':
-            self.labels_cube[self.segmented_labels_cube == 0] = self.labels['OUT']
-            self.labels_cube[self.segmented_labels_cube >  0] = self.labels['ICS']
+            labels_cube[segmented_labels_cube == 0] = self.labels['OUT']
+            labels_cube[segmented_labels_cube >  0] = self.labels['ICS']
         elif self.select_label_type == 'ICS_ECS_MEM':
-            self.labels_cube[self.segmented_labels_cube == 0] = self.labels['MEM']
-            self.labels_cube[np.logical_and(self.segmented_labels_cube > 0, 
-                self.segmented_labels_cube != self.ECS_label_value)] = self.labels['ICS']
-            self.labels_cube[self.segmented_labels_cube == self.ECS_label_value] = self.labels['ECS']
+            labels_cube[segmented_labels_cube == 0] = self.labels['MEM']
+            labels_cube[np.logical_and(segmented_labels_cube > 0, 
+                segmented_labels_cube != self.ECS_label_value)] = self.labels['ICS']
+            labels_cube[segmented_labels_cube == self.ECS_label_value] = self.labels['ECS']
         elif self.select_label_type == 'ICS_OUT_BRD':
-            self.labels_cube[:] = self.labels['ICS']
-            self.labels_cube[np.diff(self.segmented_labels_cube[1:,1:-1],1,0) != 0] = self.labels['BORDER']
-            self.labels_cube[np.diff(self.segmented_labels_cube[0:-1,1:-1],1,0) != 0] = self.labels['BORDER']
-            self.labels_cube[np.diff(self.segmented_labels_cube[1:-1,1:],1,1) != 0] = self.labels['BORDER']
-            self.labels_cube[np.diff(self.segmented_labels_cube[1:-1,0:-1],1,1) != 0] = self.labels['BORDER']
+            labels_cube[:] = self.labels['ICS']
+            labels_cube[np.diff(segmented_labels_cube[1:,1:-1],1,0) != 0] = self.labels['BORDER']
+            labels_cube[np.diff(segmented_labels_cube[0:-1,1:-1],1,0) != 0] = self.labels['BORDER']
+            labels_cube[np.diff(segmented_labels_cube[1:-1,1:],1,1) != 0] = self.labels['BORDER']
+            labels_cube[np.diff(segmented_labels_cube[1:-1,0:-1],1,1) != 0] = self.labels['BORDER']
             # xxx - this would highlight membrane areas that are near border also, better method of balancing priors?
-            self.labels_cube[np.logical_and(self.segmented_labels_cube[1:-1,1:-1] == 0,
-                self.labels_cube != self.labels['BORDER'])] = self.labels['OUT']
-            #self.labels_cube[self.segmented_labels_cube[1:-1,1:-1] == 0] = self.labels['OUT']
+            labels_cube[np.logical_and(segmented_labels_cube[1:-1,1:-1] == 0,
+                labels_cube != self.labels['BORDER'])] = self.labels['OUT']
+            #labels_cube[segmented_labels_cube[1:-1,1:-1] == 0] = self.labels['OUT']
         elif self.select_label_type == 'ICS_ECS_MEM_BRD':
-            self.labels_cube[:] = self.labels['ICS']
-            self.labels_cube[np.diff(self.segmented_labels_cube[1:,1:-1],1,0) != 0] = self.labels['BORDER']
-            self.labels_cube[np.diff(self.segmented_labels_cube[0:-1,1:-1],1,0) != 0] = self.labels['BORDER']
-            self.labels_cube[np.diff(self.segmented_labels_cube[1:-1,1:],1,1) != 0] = self.labels['BORDER']
-            self.labels_cube[np.diff(self.segmented_labels_cube[1:-1,0:-1],1,1) != 0] = self.labels['BORDER']
+            labels_cube[:] = self.labels['ICS']
+            labels_cube[np.diff(segmented_labels_cube[1:,1:-1],1,0) != 0] = self.labels['BORDER']
+            labels_cube[np.diff(segmented_labels_cube[0:-1,1:-1],1,0) != 0] = self.labels['BORDER']
+            labels_cube[np.diff(segmented_labels_cube[1:-1,1:],1,1) != 0] = self.labels['BORDER']
+            labels_cube[np.diff(segmented_labels_cube[1:-1,0:-1],1,1) != 0] = self.labels['BORDER']
             # xxx - this would highlight membrane areas that are near border also, better method of balancing priors?
-            self.labels_cube[np.logical_and(self.segmented_labels_cube[1:-1,1:-1] == 0,
-                self.labels_cube != self.labels['BORDER'])] = self.labels['MEM']
-            #self.labels_cube[self.segmented_labels_cube[1:-1,1:-1] == 0] = self.labels['MEM']
-            self.labels_cube[self.segmented_labels_cube[1:-1,1:-1] == self.ECS_label_value] = self.labels['ECS']
+            labels_cube[np.logical_and(segmented_labels_cube[1:-1,1:-1] == 0,
+                labels_cube != self.labels['BORDER'])] = self.labels['MEM']
+            #labels_cube[segmented_labels_cube[1:-1,1:-1] == 0] = self.labels['MEM']
+            labels_cube[segmented_labels_cube[1:-1,1:-1] == self.ECS_label_value] = self.labels['ECS']
         else:
             raise Exception('Unknown select_label_type ' + self.select_label_type)
+
+        return labels_cube
 
     def getLabelMap(self):
         # NEW: change how labels work so that labels that use priors for selection are seperate from how the labels are
@@ -1303,213 +1309,6 @@ class EMDataParser():
                 pl.title('preproc imgno %d, min %.2f, max %.2f, naninf %d' % (imgno, mn, mx, numpix - fc))
             pl.show()
 
-    '''
-    # moved preprocessing into convnet for the most part, so these methods are maybe obsolete?
-    #   keeping this here incase, at least scalar mean and std are potentially useful.
-    def preprocessData(self, d, doSetup=False, reScale=False):
-        d = d.astype(self.PDTYPE)   # do all preprocessing as same type (double)
-        if reScale:
-            dmean = d.mean(0,keepdims=True,dtype=self.PDTYPE); dstd = d.std(0,keepdims=True,dtype=self.PDTYPE)
-
-        if any(self.em_standard_filter):
-            #EMDataParser.emStandardFilterProc(self, d, reScale=False)
-            self.emStandardFilter(d, reScale=False)    # threaded version
-        if self.batch_meta['scalar_data_mean'] > 0:
-            d -= self.batch_meta['scalar_data_mean']
-        if self.batch_meta['scalar_data_std'] != 1:
-            d /= self.batch_meta['scalar_data_std']
-        if self.overall_normalize: 
-            self.normalizeOverall(d, calcUS=doSetup)
-        if self.pixel_normalize: 
-            self.normalizePerPixel(d, calcUS=doSetup)
-        if self.case_normalize: 
-            EMDataParser.normalizePerCase(d)
-        # if whiten starts with c that means the whitening is done in convnet, used for initializing whitening matrix
-        if self.whiten and self.whiten != 'none' and self.whiten[0] != 'c': 
-            d = self.whitening(d, calcW=doSetup, wtype=self.whiten, epsilon=self.whiten_epsilon)
-
-        if d.size > 0 and reScale:
-            dmean2 = d.mean(0,keepdims=True,dtype=self.PDTYPE); dstd2 = d.std(0,keepdims=True,dtype=self.PDTYPE)
-            d = (d - dmean2)/dstd2*dstd + dmean
-        return d.astype(np.single)  # return in convnet precision (single)
-
-    def initPreprocessData(self):
-        if not self.silent: print 'EMDataParser: Initializing batch data pre-process with whiten %s epslion %g, '\
-            'scalar mean %.4f, scalar std %.4f, overall normalize %d, pixel normalize %d, case normalize %d, '\
-            'em standard filter %d (%d %d) idelta (%.4f %.4f) iinterp %d gamma %.4f' % \
-            (self.whiten, self.whiten_epsilon, self.batch_meta['scalar_data_mean'], self.batch_meta['scalar_data_std'], 
-            self.overall_normalize, self.pixel_normalize, self.case_normalize, any(self.em_standard_filter), 
-            self.em_standard_filter[0], self.em_standard_filter[1], self.em_standard_idelta[0], 
-            self.em_standard_idelta[1], self.em_standard_iinterp, self.em_standard_gamma)
-        if not self.silent: print '\tactual EM u=%.16g s=%.16g' % (self.EM_actual_mean, self.EM_actual_std)
-        
-        # optionally load the whitening matrix
-        if self.whiten and self.whiten != 'none' and self.do_whiten_load:
-            d = self.whitening(np.zeros((0,1),dtype=self.PDTYPE), calcW=True)
-
-        # the init is slowish no matter what, so only do it if we have to
-        self.anyInitPreProcess = (self.whiten and self.whiten != 'none' and self.whiten[0] != 'c' and \
-            not self.do_whiten_load) or self.pixel_normalize or self.overall_normalize
-        if not self.anyInitPreProcess: 
-            if not self.silent: print '\tno batch pre-processing required'
-            return
-        # xxx - this causes a infinite recursion, decided not to fix because migrating to pre-processing in convnet
-        assert( not self.use_chunk_list )   # preproc not currently allowed with chunklist mode
-    
-        t = time.time()
-        preproc_data = np.zeros((self.pixels_per_image,0), dtype=np.single, order='C')
-        start_batch = self.FIRST_RAND_NOLOOKUP_BATCH if self.no_labels else 1
-        if not self.silent: 
-            print '\tpre-processing based on %d rand batches starting at %d' % (self.preproc_nbatches, start_batch)
-        for i in range(start_batch,start_batch+self.preproc_nbatches): 
-            data, labels = self.getBatch(i, do_preprocess=False)
-            preproc_data = np.concatenate((preproc_data,data),1)
-        self.preprocessData(preproc_data, doSetup=True)
-        print '\tdone with batch pre-processing init in %.3f s' % (time.time()-t,)
-        
-        if self.overall_normalize:
-            if not self.silent: print '\toverall u=%.16g s=%.16g' % (self.X_overall_mean, self.X_overall_std)
-
-    def initWhitenData(self, feature_path, batch_range):
-        plot_smoothed = False
-        plot_whitened = False
-        
-        nbatches = len(batch_range); cpb = self.num_cases_per_batch; ntotal = cpb*nbatches
-        print 'convnet pre-processing based on %d batches starting at %d with whiten %s epsilon %g' % (nbatches, 
-            batch_range[0], self.whiten, self.whiten_epsilon)
-        # have to specify convnet whitening mode for write_features_type 'data'
-        assert( self.whiten != 'none' and self.whiten[0]=='c')  
-        t = time.time()
-        d = np.zeros((self.pixels_per_out_image, ntotal), dtype=np.single, order='C')
-        for i,batchnum in zip(range(0,ntotal,cpb),batch_range):
-            # xxx - transpose or not depends on if feature layer is transpose layer.... assuming transpose layer here
-            d[:,i:i+cpb] = np.load(os.path.join(feature_path,'data_batch_data_%d.npy' % batchnum)).T
-            ##d['labels'] = np.load(os.path.join(feature_path,'data_batch_lbls_%d.npy' % batchnum)) # no labels needed
-            if plot_smoothed:
-                data = np.load(os.path.join(feature_path,'data_batch_%d.npy' % batchnum))
-                self.plotData(data,d[:,i:i+cpb],False)
-            # batches take up way too make space and won't need these again so remove
-            os.remove(os.path.join(feature_path,'data_batch_data_%d.npy' % batchnum)) 
-            os.remove(os.path.join(feature_path,'data_batch_lbls_%d.npy' % batchnum)) 
-            os.remove(os.path.join(feature_path,'data_batch_%d.npy' % batchnum)) 
-        print '\tloaded %d total examples from %d batches with %d cases per batch in %.3f s, whitening' % (ntotal, 
-            nbatches, cpb, time.time()-t)
-
-        t = time.time()
-        d = d.astype(self.PDTYPE)   # do all preprocessing as same type (double)
-        # sample overall mean and std are supplied as parameters to whitening module to apply before whitening
-        amean = d.mean(); astd = d.std(); print '\tsampled EM u=%.20g s=%.20g' % (amean, astd)
-        if plot_whitened:
-            dmean = d.mean(0,keepdims=True); dstd = d.std(0,keepdims=True); dorig = d
-        d -= amean; d /= astd   # subtract mean and divide std before whitening
-        d = self.whitening(d, calcW=True, wtype=self.whiten[1:], epsilon=self.whiten_epsilon, whiten=plot_whitened)
-        if plot_whitened:
-            dmean2 = d.mean(0,keepdims=True); dstd2 = d.std(0,keepdims=True)
-            d = ((d - dmean2)/dstd2*dstd + dmean).astype(np.single)
-            self.plotData(dorig,d,False,image_size=self.image_out_size)
-        print '\twhitened in %.3f s' % (time.time()-t,)
-
-    # see "Learning Multiple Layers of Features from Tiny Images" Krizhevsky 2009
-    # https://gist.github.com/duschendestroyer/5170087
-    # http://ufldl.stanford.edu/wiki/index.php/Implementing_PCA/Whitening
-    def whitening(self, X, epsilon=1e-7, calcW=False, wtype='zca', whiten=False):
-        if calcW:
-            if self.do_whiten_load:
-                print '\tloading %s whitening matrix from %s' % (wtype,self.whiten_load)
-                self.W_whiten = np.fromfile(self.whiten_load,dtype=X.dtype).\
-                    reshape((self.pixels_per_image,self.pixels_per_image))
-            else:
-                sigma = np.dot(X,X.T) / (X.shape[1] - 1); U, S, V = linalg.svd(sigma,overwrite_a=True)
-                if wtype == 'zca':
-                    self.W_whiten = np.dot(np.dot(U, np.diag(1/np.sqrt(S+epsilon))), U.T)
-                elif wtype == 'pca':
-                    self.W_whiten = np.dot(np.diag(1/np.sqrt(S+epsilon)), U.T)
-                else:
-                    assert(False)
-                if self.save_name:
-                    if os.path.isdir(self.whiten_load):
-                        fn = os.path.join(self.whiten_load, self.save_name + '_W_whiten.raw')
-                    else:
-                        # just save to cwd if path to save not specified
-                        fn = self.save_name + '_W_whiten.raw'
-                    print '\tsaving %s whitening matrix to %s' % (wtype,fn)
-                    self.W_whiten.tofile(fn)
-            # for speed / memory, don't whiten and return nothing when calc'ing whitening matrix
-            Xr = np.zeros((0,))
-        if not calcW or whiten:
-            Xr = np.dot(self.W_whiten, X)
-        return Xr
-
-    # subtract overall mean and divide variance in place
-    def normalizeOverall(self, X, calcUS=False):
-        if calcUS:
-            self.X_overall_mean = X.mean(dtype=self.PDTYPE)
-            self.X_overall_std = X.std(dtype=self.PDTYPE)
-        X -= self.X_overall_mean; X /= self.X_overall_std;
-
-    # subtract pixel mean and divide variance in place
-    def normalizePerPixel(self, X, calcUS=False):
-        if calcUS:
-            self.X_pixel_mean = X.mean(1,keepdims=True,dtype=self.PDTYPE)
-            self.X_pixel_std = X.std(1,keepdims=True,dtype=self.PDTYPE)
-        X -= self.X_pixel_mean; X /= self.X_pixel_std;
-
-    # easy parallelization of raw em standard preprocessing method (each image processed independently)
-    def emStandardFilter(self, X, reScale=False):
-        threads = self.NUM_FILTER_THREADS * [None]
-        assert( X.shape[1] % self.NUM_FILTER_THREADS == 0 ) # xxx - currently not dealing with remainders
-        imgs_per_thread = X.shape[1] / self.NUM_FILTER_THREADS
-        for i in range(self.NUM_FILTER_THREADS):
-            threads[i] = EMStandardFilterThread(self, X[:,i*imgs_per_thread:(i+1)*imgs_per_thread], reScale)
-            threads[i].start()
-        for i in range(self.NUM_FILTER_THREADS):
-            threads[i].join()
-
-    # standard method of preprocessing raw EM data (minus contrast enhancement)
-    # code adapted from preprocessing raw EM for frontend in lbPreprocessRawEM.py
-    # upsample data, filter, downsample back to original sampling, optionally return to original mean/std per image
-    # xxx - this is slowish, so kindof limited what we can do here; could instead apply this to whole dataset, 
-    #   but this is super slow (~1 hour for 27 cubes), so would have to save preprocessed data to be practical.
-    @staticmethod
-    def emStandardFilterProc(dp, X, reScale=False):
-        # save the original mean and std per image, reshape into images
-        if reScale:
-            dmean = X.mean(0,keepdims=True,dtype=dp.PDTYPE); dstd = X.std(0,keepdims=True,dtype=dp.PDTYPE)
-        sorig = X.shape; s = (dp.image_size,dp.image_size,X.shape[1]); X = X.reshape(s)
-        
-        x = np.arange(s[0], dtype=dp.PDTYPE); y = np.arange(s[1], dtype=dp.PDTYPE); d = dp.em_standard_idelta
-        xi = np.arange(0, s[0], d[0], dtype=dp.PDTYPE); yi = np.arange(0, s[1], d[1], dtype=dp.PDTYPE)
-        #W = np.ones(dp.em_standard_filter, dtype=dp.PDTYPE) / dp.em_standard_filter.prod()
-        for zind in range(s[2]):
-            #t = time.time()
-            z = X[:,:,zind].reshape((s[0],s[1]))
-            f = interpolate.interp2d(x, y, z, kind='linear', copy=False)
-            # xxx - add an option for the filter type?
-            #zi = filters.convolve(f(xi,yi), W, mode='reflect', cval=0.0, origin=0)
-            zi = filters.median_filter(f(xi,yi), size=dp.em_standard_filter, mode='reflect', cval=0.0)
-            if dp.em_standard_iinterp:
-                X[:,:,zind] = zi[0:-1:dp.em_standard_interpn[0],0:-1:dp.em_standard_interpn[1]]
-            else:
-                assert(False) # not recommended, much slower
-                f = interpolate.interp2d(xi, yi, zi, kind='linear', copy=False)
-                X[:,:,zind] = f(x,y)
-            #print '%.5f s' % (time.time() - t,)
-
-        if dp.em_standard_gamma != 1: np.power(X, dp.em_standard_gamma, out=X)
-        
-        # return back to original shape and mean/std per image (case)
-        X = X.reshape(sorig);
-        if reScale:
-            dmean2 = X.mean(0,keepdims=True,dtype=dp.PDTYPE); dstd2 = X.std(0,keepdims=True,dtype=dp.PDTYPE)
-            X = (X - dmean2)/dstd2*dstd + dmean
-
-    # subtract example mean and divide variance in place
-    @staticmethod
-    def normalizePerCase(X):
-        Xmean = X.mean(0,keepdims=True, dtype=self.PDTYPE); Xstd = X.std(0,keepdims=True, dtype=self.PDTYPE)
-        X -= Xmean; X /= Xstd;
-    '''
-
     @staticmethod
     def augmentData(d,augment):
         if augment == 0: return d                               # no augmentation
@@ -1522,7 +1321,7 @@ class EMDataParser():
     @staticmethod
     def get_options(cfg_file):
         config = ConfigObj(cfg_file, 
-            configspec=os.path.join(os.path.dirname(os.path.realpath(__file__)),'parseEMdataspec.ini'))
+            configspec=os.path.join(os.path.dirname(os.path.realpath(__file__)),'parseEMdata.ini'))
 
         # Validator handles missing / type / range checking
         validator = Validator()
