@@ -90,6 +90,7 @@ print('emneon / neon options:'); print(args)
 be_args = extract_valid_args(args, gen_backend)
 # mutiple gpus accessing the cache dir for autotuning winograd was causing crashes / reboots
 be_args['cache_dir'] = tempfile.mkdtemp()  # create temp dir
+be_args['deterministic'] = None  # xxx - why was this set?
 be = gen_backend(**be_args)
 
 # xxx - this doesn't work, interrupt is caught by neon for saving the model which then raises KeyboardInterrupt
