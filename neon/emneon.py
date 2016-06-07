@@ -29,13 +29,15 @@ import shutil
 import tempfile
 #import cPickle as myPickle
 import pickle as myPickle
+#import signal
 
+from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
 from neon.optimizers import GradientDescentMomentum, MultiOptimizer
 from neon.transforms import CrossEntropyBinary, CrossEntropyMulti
 from neon.models import Model
 from neon.callbacks.callbacks import Callbacks
-from neon.util.argparser import NeonArgparser
+from neon.util.argparser import NeonArgparser, extract_valid_args
 
 from data.emdata import EMDataIterator, RandomEMDataIterator
 from arch.emarch import EMModelArchitecture
@@ -81,111 +83,142 @@ parser.add_argument('--nbebuf', type=int, default=2,
                     help='How many backend buffers to use, 1 for no double buffering (saves gpu memory, slower)')
 
 # parse the command line arguments (generates the backend)
-args = parser.parse_args()
+args = parser.parse_args(gen_be=False)
 print('emneon / neon options:'); print(args)
 
-# other command line checks
-assert( not args.data_config or os.path.isfile(args.data_config) ) # EMDataParser config file not found
-assert( not args.write_output or args.model_file )  # also specify model file for write_output
+# setup backend
+be_args = extract_valid_args(args, gen_backend)
+# mutiple gpus accessing the cache dir for autotuning winograd was causing crashes / reboots
+be_args['cache_dir'] = tempfile.mkdtemp()  # create temp dir
+be = gen_backend(**be_args)
 
-if args.model_file:
-    print('Loading model file ''%s''' % (args.model_file,))
-    model = Model(args.model_file)
+# xxx - this doesn't work, interrupt is caught by neon for saving the model which then raises KeyboardInterrupt
+#def signal_handler(signal, frame):
+#    #print('You pressed Ctrl+C!')
+#    shutil.rmtree(be_args['cache_dir'])  # delete directory
+#signal.signal(signal.SIGINT, signal_handler)
 
-if not args.write_output:
-    # training mode, can start from existing model file or start a new model based on specified architecture    
+try:
+
+    # other command line checks
+    assert( not args.data_config or os.path.isfile(args.data_config) ) # EMDataParser config file not found
+    assert( not args.write_output or args.model_file )  # also specify model file for write_output
     
-    if args.data_config:
-        # initialize the em data parser
-        train = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
-                               batch_range=args.train_range, name='train', NBUF=args.nbebuf)
-        # test batches need to be concatenated into a single "neon epoch" for built-in neon eval_set to work correctly
-        test = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
-                              batch_range=args.test_range, name='test', isTest=True, NBUF=args.nbebuf)
-    else:
-        # make dummy random data just for testing model inits
-        train = RandomEMDataIterator(name='train')
-        test = RandomEMDataIterator(name='test')
-
-    if not args.model_file:
-        # create the model based on the architecture specified via command line
-        arch = EMModelArchitecture.init_model_arch(args.model_arch, train.parser.nclass, 
-                                                   not train.parser.independent_labels)
-        model = Model(layers=arch.layers)
-
-    assert( train.nmacrobatches > 0 )    # no training batches specified and not in write_output mode
-    macro_epoch = model.epoch_index//train.nmacrobatches+1
-    macro_batch = model.epoch_index%train.nmacrobatches+1
-    if args.data_config and macro_batch > train.batch_range[0]:
-        print('Model loaded at model epoch %d, setting to training batch %d' % (model.epoch_index,macro_batch,))
-        train.reset_batchnum(macro_batch)
+    if args.model_file:
+        print('Loading model file ''%s''' % (args.model_file,))
+        model = Model(args.model_file)
     
-    # print out epoch and batch as they were in cuda-convnets2, starting at 1
-    print('Training from epoch %d to %d with %d/%d training/testing batches per epoch, %d examples/batch' \
-        % (macro_epoch, args.epochs, train.nmacrobatches, test.nmacrobatches, train.parser.num_cases_per_batch))
-
-    # configure optimizers and weight update schedules
-    num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
-    # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
-    if args.rate_freq < 1: args.rate_freq = train.nmacrobatches//2
-    if args.rate_freq > 1:
-        weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
-    else:
-        weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
-    opt_gdm = GradientDescentMomentum(args.rate_init[0], args.momentum[0], wdecay=args.weight_decay, 
-                                      schedule=weight_sched, stochastic_round=args.rounding)
-    opt_biases = GradientDescentMomentum(args.rate_init[1], args.momentum[1], 
-                                         schedule=weight_sched, stochastic_round=args.rounding)
-    opt = MultiOptimizer({'default': opt_gdm, 'Bias': opt_biases})
-
-    # configure cost and test metrics
-    cost = GeneralizedCost(costfunc=(CrossEntropyBinary() if train.parser.independent_labels else CrossEntropyMulti()))
-    metric = EMMetric(oshape=test.parser.oshape, use_softmax=not train.parser.independent_labels)
-
-    # configure callbacks
-    if not args.neon_progress: args.callback_args['progress_bar'] = False
-    if not args.callback_args['eval_freq']: args.callback_args['eval_freq'] = train.nmacrobatches
-    callbacks = Callbacks(model, eval_set=test, metric=metric, **args.callback_args)
-    if not args.neon_progress: 
-        callbacks.add_callback(EMEpochCallback(args.callback_args['eval_freq'],train.nmacrobatches), insert_pos=None)
-    # xxx - thought of making this an option but not clear that it slows anything down?
-    callbacks.add_hist_callback()
+    if not args.write_output:
+        # training mode, can start from existing model file or start a new model based on specified architecture    
+        
+        if args.data_config:
+            # initialize the em data parser
+            train = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, 
+                                   dim_ordering=args.dim_ordering, batch_range=args.train_range, name='train', 
+                                   NBUF=args.nbebuf)
+            # test batches need to be concatenated into a single "neon epoch" for built-in neon eval_set to work 
+            test = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, 
+                                  dim_ordering=args.dim_ordering, batch_range=args.test_range, name='test', 
+                                  isTest=True, NBUF=args.nbebuf)
+        else:
+            # make dummy random data just for testing model inits
+            train = RandomEMDataIterator(name='train')
+            test = RandomEMDataIterator(name='test')
     
-    model.fit(train, optimizer=opt, num_epochs=num_epochs, cost=cost, callbacks=callbacks)
-    print('Model training complete for %d epochs!' % (args.epochs,))
-    #test.stop(); train.stop()
-
-else:
-    # write_output mode, must have model loaded
+        if not args.model_file:
+            # create the model based on the architecture specified via command line
+            arch = EMModelArchitecture.init_model_arch(args.model_arch, train.parser.nclass, 
+                                                       not train.parser.independent_labels)
+            model = Model(layers=arch.layers)
+    
+        assert( train.nmacrobatches > 0 )    # no training batches specified and not in write_output mode
+        macro_epoch = model.epoch_index//train.nmacrobatches+1
+        macro_batch = model.epoch_index%train.nmacrobatches+1
+        if args.data_config and macro_batch > train.batch_range[0]:
+            print('Model loaded at model epoch %d, setting to training batch %d' % (model.epoch_index,macro_batch,))
+            train.reset_batchnum(macro_batch)
         
-    if args.data_config:
-        test = EMDataIterator(args.data_config, write_output=args.write_output,
-                              chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
-                              batch_range=args.test_range, name='test', isTest=True, NBUF=args.nbebuf)
+        # print out epoch and batch as they were in cuda-convnets2, starting at 1
+        print('Training from epoch %d to %d with %d/%d training/testing batches per epoch, %d examples/batch' \
+            % (macro_epoch, args.epochs, train.nmacrobatches, test.nmacrobatches, train.parser.num_cases_per_batch))
+    
+        # configure optimizers and weight update schedules
+        num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
+        # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
+        if args.rate_freq < 1: args.rate_freq = train.nmacrobatches//2
+        if args.rate_freq > 1:
+            weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
+        else:
+            weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
+        opt_gdm = GradientDescentMomentum(args.rate_init[0], args.momentum[0], wdecay=args.weight_decay, 
+                                          schedule=weight_sched, stochastic_round=args.rounding)
+        opt_biases = GradientDescentMomentum(args.rate_init[1], args.momentum[1], 
+                                             schedule=weight_sched, stochastic_round=args.rounding)
+        opt = MultiOptimizer({'default': opt_gdm, 'Bias': opt_biases})
+    
+        # configure cost and test metrics
+        cost = GeneralizedCost(costfunc=(CrossEntropyBinary() \
+            if train.parser.independent_labels else CrossEntropyMulti()))
+        metric = EMMetric(oshape=test.parser.oshape, use_softmax=not train.parser.independent_labels)
+    
+        # configure callbacks
+        if not args.neon_progress: args.callback_args['progress_bar'] = False
+        if not args.callback_args['eval_freq']: args.callback_args['eval_freq'] = train.nmacrobatches
+        callbacks = Callbacks(model, eval_set=test, metric=metric, **args.callback_args)
+        if not args.neon_progress: 
+            callbacks.add_callback(EMEpochCallback(args.callback_args['eval_freq'],train.nmacrobatches), 
+                                   insert_pos=None)
+        # xxx - thought of making this an option but not clear that it slows anything down?
+        callbacks.add_hist_callback()
+        
+        model.fit(train, optimizer=opt, num_epochs=num_epochs, cost=cost, callbacks=callbacks)
+        print('Model training complete for %d epochs!' % (args.epochs,))
+        #test.stop(); train.stop()
+    
     else:
-        # make dummy random data just for testing model inits
-        test = RandomEMDataIterator(name='outputs')
-        
-    print('Model output (forward prop) for %d testing batches, %d examples/batch' % (test.nmacrobatches,
-        test.parser.num_cases_per_batch)); 
-    feature_path = tempfile.mkdtemp()  # create temp dir
-    for i in range(test.nmacrobatches):
-        batchnum = test.batch_range[0]+i
-        sys.stdout.write('%d ... ' % (batchnum,)); t = time.time()
+        # write_output mode, must have model loaded
+            
+        if args.data_config:
+            test = EMDataIterator(args.data_config, write_output=args.write_output,
+                                  chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
+                                  batch_range=args.test_range, name='test', isTest=True, NBUF=args.nbebuf)
+        else:
+            # make dummy random data just for testing model inits
+            test = RandomEMDataIterator(name='outputs')
+            
+        print('Model output (forward prop) for %d testing batches, %d examples/batch' % (test.nmacrobatches,
+            test.parser.num_cases_per_batch)); 
+        feature_path = tempfile.mkdtemp()  # create temp dir
+        for i in range(test.nmacrobatches):
+            batchnum = test.batch_range[0]+i
+            sys.stdout.write('%d ... ' % (batchnum,)); t = time.time()
+    
+            # xxx - for now just write pickled batches to a temp folder, just as feature writer in cuda-convnets2 does
+            outputs = model.get_outputs(test)
+            path_out = os.path.join(feature_path, 'data_batch_%d' % (batchnum,))
+            pickle(path_out, {'data': outputs})
+            
+            test.parser.checkOutputCubes(feature_path, batchnum, i==test.nmacrobatches-1)
+            sys.stdout.write('\tdone in %.2f s\n' % (time.time() - t,))
+            sys.stdout.flush()
+        shutil.rmtree(feature_path)  # delete directory
+            
+        if args.data_config:
+            print('Model output complete for %d test batches!' % (test.nmacrobatches,))
+        else:
+            print('WARNING: DummyEMDataParser does not actually write outputs, forward prop only')
+        #test.stop();
+    
+    shutil.rmtree(be_args['cache_dir'])  # delete directory
 
-        # xxx - for now just write pickled batches to a temp folder, just as feature writer in cuda-convnets2 does
-        outputs = model.get_outputs(test)
-        path_out = os.path.join(feature_path, 'data_batch_%d' % (batchnum,))
-        pickle(path_out, {'data': outputs})
-        
-        test.parser.checkOutputCubes(feature_path, batchnum, i==test.nmacrobatches-1)
-        sys.stdout.write('\tdone in %.2f s\n' % (time.time() - t,))
-        sys.stdout.flush()
-    shutil.rmtree(feature_path)  # delete directory
-        
-    if args.data_config:
-        print('Model output complete for %d test batches!' % (test.nmacrobatches,))
-    else:
-        print('WARNING: DummyEMDataParser does not actually write outputs, forward prop only')
-    #test.stop();
+except KeyboardInterrupt:
+    print('Killed with Ctrl-C, cleaning up')
+
+    # xxx - consider going back to normal threads instead of daemon threads in emdata?
+    #   this would prevent the "multiple process" situation
+    try:
+        shutil.rmtree(be_args['cache_dir'])  # delete directory
+        shutil.rmtree(feature_path)  # delete directory
+    except:
+        pass
     
