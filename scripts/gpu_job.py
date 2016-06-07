@@ -95,6 +95,8 @@ def run_next_jobs(force=False):
         elif cmd_type=='neon':
             python_init = PYTHON_INIT_CMD + '; source activate neon'
             cmd_to_start += (' -s %s ' % (os.path.join(convnet_out_path, convnet_out_name + '-model.prm'),))
+            cmd_to_start += (' --save_best_path %s ' % (os.path.join(convnet_out_path, 
+                                                                     convnet_out_name + '-model-best.prm'),))
             cmd_to_start += (' -o %s ' % (os.path.join(convnet_out_path, convnet_out_name + '-output.h5'),))
         
         # start the job, add python init; add cd to working dir, nohup and output redirect with "unique" file ID
