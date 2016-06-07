@@ -69,6 +69,7 @@ parser.add_argument('--momentum', nargs=2, type=float, default=[0.9, 0.9],
                     help='Gradient descent learning momentums [weight, bias]')
 parser.add_argument('--neon_progress', action="store_true",
                     help='Use neon builtin progress display instead of emneon display')
+parser.add_argument('--save_best_path', type=str, default=None, help='Specify save path for best model so far (train)')
 # extra arguments controlling data
 parser.add_argument('--data_config', type=str, default=None, help='Specify em data configuration ini file')
 parser.add_argument('--write_output', type=str, default='', help='File to to write outputs for test batches')
@@ -171,6 +172,8 @@ try:
                                    insert_pos=None)
         # xxx - thought of making this an option but not clear that it slows anything down?
         callbacks.add_hist_callback()
+        if args.save_best_path:
+            callbacks.add_save_best_state_callback(args.save_best_path)
         
         model.fit(train, optimizer=opt, num_epochs=num_epochs, cost=cost, callbacks=callbacks)
         print('Model training complete for %d epochs!' % (args.epochs,))
