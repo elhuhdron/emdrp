@@ -95,7 +95,7 @@ class RandomEMDataIterator(NervanaEMDataIterator):
 class EMDataIterator(NervanaEMDataIterator, Thread):
 
     def __init__(self, cfg_file, write_output=None, chunk_skip_list=[], dim_ordering='', batch_range=[1,10], 
-                 name='emdata', isTest=False, NBUF=2):
+                 name='emdata', isTest=False, concatenate_batches=False, NBUF=2):
         Thread.__init__(self)
         self.name = name
 
@@ -130,7 +130,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         self.parser.initBatches()
 
         # no need for special code to concatenate if there is only one macrobatch anyways
-        self.concatenate_batches = isTest and (self.nmacrobatches > 1)
+        self.concatenate_batches = concatenate_batches and (self.nmacrobatches > 1)
 
         self.nexamples = self.parser.num_cases_per_batch
         if self.concatenate_batches: self.nexamples *= self.nmacrobatches

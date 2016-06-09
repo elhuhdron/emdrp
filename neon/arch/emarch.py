@@ -215,7 +215,7 @@ class cifar10(EMModelArchitecture):
     @property
     def layers(self):
         init_uni = Uniform(low=-0.1, high=0.1)
-        bn = True
+        bn = False
         return [
             Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
