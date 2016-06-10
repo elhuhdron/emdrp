@@ -23,6 +23,7 @@
 from neon.initializers import Constant, Gaussian, Uniform
 from neon.layers import Conv, Dropout, Pooling, Affine, LRN
 from neon.transforms import Rectlin, Logistic, Softmax, Identity, Explin
+from layers.emlayers import DOG
 
 class EMModelArchitecture(object):
     def __init__(self, noutputs, use_softmax):
@@ -142,6 +143,36 @@ class fergus_explin_bn1(fergus_explin_bn):
     def __init__(self, noutputs, use_softmax=False):
         super(fergus_explin_bn1, self).__init__(noutputs, use_softmax, bn_first_layer=True)
 
+class DOG_fergus_explin_bn(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False):
+        super(DOG_fergus_explin_bn, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            DOG(4, (0.5, 0.5, 1.0, 1.0), (1.6, 4.0, 1.6, 4.0)),
+            Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+                 padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+                 padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class sfergus_explin_bn(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
         super(sfergus_explin_bn, self).__init__(noutputs, use_softmax)
@@ -245,6 +276,25 @@ class conv11_7(EMModelArchitecture):
             Dropout(keep=0.5),
             Affine(nout=1024, init=init_uni, activation=Rectlin(), batch_norm=bn),
             Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=init_uni, 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
+class DOG_cifar10(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False):
+        super(DOG_cifar10, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        init_uni = Uniform(low=-0.1, high=0.1)
+        bn = False
+        return [
+            DOG(4, (0.5, 0.5, 1.0, 1.0), (1.6, 4.0, 1.6, 4.0)),
+            Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Pooling((2, 2)),
+            Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Pooling((2, 2)),
+            Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=init_uni, 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
