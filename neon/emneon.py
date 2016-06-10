@@ -31,6 +31,11 @@ import tempfile
 import pickle as myPickle
 #import signal
 
+from functools import reduce # Valid in Python 2.6+, required in Python 3
+import operator
+from math import ceil, sqrt
+import numpy as np
+
 from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
 from neon.optimizers import GradientDescentMomentum, MultiOptimizer
@@ -70,6 +75,7 @@ parser.add_argument('--momentum', nargs=2, type=float, default=[0.9, 0.9],
 parser.add_argument('--neon_progress', action="store_true",
                     help='Use neon builtin progress display instead of emneon display')
 parser.add_argument('--save_best_path', type=str, default=None, help='Specify save path for best model so far (train)')
+
 # extra arguments controlling data
 parser.add_argument('--data_config', type=str, default=None, help='Specify em data configuration ini file')
 parser.add_argument('--write_output', type=str, default='', help='File to to write outputs for test batches')
@@ -82,6 +88,14 @@ parser.add_argument('--dim_ordering', type=str, default='xyz',
                     help='Which reslice ordering for EM provider, override .ini')
 parser.add_argument('--nbebuf', type=int, default=2, 
                     help='How many backend buffers to use, 1 for no double buffering (saves gpu memory, slower)')
+parser.add_argument('--plot_weight_layer', type=int, default=-1, 
+                    help='Plot weights for specified layer (must specify model_file)')
+parser.add_argument('--plot_norm_per_filter', action="store_true",
+                    help='With plotting weights, normalize each filter over range')
+parser.add_argument('--plot_combine_chans', action="store_true",
+                    help='With plotting weights, make plot that combines first three channels into colors')
+parser.add_argument('--plot_log', action="store_true", help='Plot weights on log scale')
+parser.add_argument('--plot_save_path', type=str, default='', help='Path to save weight plots instead of displaying')
 
 # parse the command line arguments (generates the backend)
 args = parser.parse_args(gen_be=False)
@@ -100,7 +114,59 @@ be = gen_backend(**be_args)
 #    shutil.rmtree(be_args['cache_dir'])  # delete directory
 #signal.signal(signal.SIGINT, signal_handler)
 
+# this function modified from cuda-convnets2 shownet.py
+def make_filter_fig(filters, filter_start, fignum, _title, num_filters, combine_chans, FILTERS_PER_ROW=None,
+                    plot_border=0.0):
+    MAX_ROWS = 24
+    filter_chans = 3 if combine_chans else filters.shape[0]
+    filter_plot_chans = 1 if combine_chans else filters.shape[0]
+    if FILTERS_PER_ROW is None: FILTERS_PER_ROW = min([filters.shape[2]*filter_plot_chans, 16])
+    MAX_FILTERS = FILTERS_PER_ROW * MAX_ROWS
+    num_colors = filters.shape[0]
+    f_per_row = int(ceil(FILTERS_PER_ROW / float(1 if combine_chans else num_colors)))
+    filter_end = min(filter_start+MAX_FILTERS, num_filters)
+    filter_rows = int(ceil(float(filter_end - filter_start) / f_per_row))
+
+    filters = filters[:filter_chans,:,:]  # only plot 3 channels if combine_chans
+    #filter_pixels = filters.shape[1]
+    filter_size = int(sqrt(filters.shape[1]))
+    fig = pl.figure(fignum)
+    fig.text(.5, .95, '%s %dx%d %d chans filters %d-%d' % (_title, filter_size, filter_size, filter_chans, 
+                                                           filter_start, filter_end-1), horizontalalignment='center',
+                                                           size='xx-large') 
+    num_filters = filter_end - filter_start
+    if not combine_chans:
+        bigpic = np.ones((filter_size * filter_rows + filter_rows + 1, 
+                          filter_size*num_colors * f_per_row + f_per_row + 1), dtype=np.single)*plot_border
+    else:
+        bigpic = np.ones((3, filter_size * filter_rows + filter_rows + 1, 
+                          filter_size * f_per_row + f_per_row + 1), dtype=np.single)*plot_border
+
+    for m in xrange(filter_start,filter_end ):
+        filter = filters[:,:,m]
+        y, x = (m - filter_start) / f_per_row, (m - filter_start) % f_per_row
+        if not combine_chans:
+            for c in xrange(num_colors):
+                filter_pic = filter[c,:].reshape((filter_size,filter_size))
+                bigpic[1 + (1 + filter_size) * y:1 + (1 + filter_size) * y + filter_size,
+                       1 + (1 + filter_size*num_colors) * x + filter_size*c:1 + (1 + filter_size*num_colors) * x + \
+                       filter_size*(c+1)] = filter_pic
+        else:
+            filter_pic = filter.reshape((3, filter_size,filter_size))
+            bigpic[:,
+                   1 + (1 + filter_size) * y:1 + (1 + filter_size) * y + filter_size,
+                   1 + (1 + filter_size) * x:1 + (1 + filter_size) * x + filter_size] = filter_pic
+            
+    pl.xticks([])
+    pl.yticks([])
+    if not combine_chans:
+        pl.imshow(bigpic, cmap=pl.cm.gray, interpolation='nearest')
+    else:
+        bigpic = bigpic.swapaxes(0,2).swapaxes(0,1)
+        pl.imshow(bigpic, interpolation='nearest')        
+
 try:
+    # xxx - this is not clean, how to fix?
 
     # other command line checks
     assert( not args.data_config or os.path.isfile(args.data_config) ) # EMDataParser config file not found
@@ -110,7 +176,7 @@ try:
         print('Loading model file ''%s''' % (args.model_file,))
         model = Model(args.model_file)
     
-    if not args.write_output:
+    if not args.write_output and args.plot_weight_layer < 0:
         # training mode, can start from existing model file or start a new model based on specified architecture    
         
         if args.data_config:
@@ -156,7 +222,8 @@ try:
                                           schedule=weight_sched, stochastic_round=args.rounding)
         opt_biases = GradientDescentMomentum(args.rate_init[1], args.momentum[1], 
                                              schedule=weight_sched, stochastic_round=args.rounding)
-        opt = MultiOptimizer({'default': opt_gdm, 'Bias': opt_biases})
+        opt_fixed = GradientDescentMomentum(0.0, 1.0, wdecay=0.0)
+        opt = MultiOptimizer({'default': opt_gdm, 'Bias': opt_biases, 'DOG': opt_fixed})
     
         # configure cost and test metrics
         cost = GeneralizedCost(costfunc=(CrossEntropyBinary() \
@@ -179,7 +246,7 @@ try:
         print('Model training complete for %d epochs!' % (args.epochs,))
         #test.stop(); train.stop()
     
-    else:
+    elif args.write_output:
         # write_output mode, must have model loaded
             
         if args.data_config:
@@ -213,10 +280,60 @@ try:
         else:
             print('WARNING: DummyEMDataParser does not actually write outputs, forward prop only')
         #test.stop();
+
+    elif args.plot_weight_layer >= 0:
+        # plot filters mode, must have model loaded
+        assert(args.model_file) # specify model to plot filters for
+        
+        from matplotlib import pylab as pl
+        from matplotlib import pyplot as plt
+        #from matplotlib import cm
+
+        # get the specified layer from the loaded model and copy the weights out
+        layer = model.layers.layers[args.plot_weight_layer]; filters = layer.W.get()
+        
+        # format to plot with cuda-convents2 shownet.py code        
+        fsize = reduce(operator.mul, layer.fshape, 1)
+        filters = filters.reshape([filters.size/fsize, layer.fshape[0]**2, layer.fshape[2]])
+
+        baseno = 1000; figno = baseno
+        print('Plotting weights at layer %d ''%s'' %s' % (args.plot_weight_layer,layer.name, 
+                                                          'log scale' if args.plot_log else ''))
+        if args.plot_norm_per_filter:
+            filters -= filters.min(axis=1,keepdims=True)
+            filters /= filters.max(axis=1,keepdims=True)
+        else:
+            filters -= filters.min()
+            filters /= filters.max()
+        if args.plot_log:
+            filters = np.log10(filters+filters[filters!=0].min())            
+            if args.plot_norm_per_filter:
+                filters -= filters.min(axis=1,keepdims=True)
+                filters /= filters.max(axis=1,keepdims=True)
+            else:
+                filters -= filters.min()
+                filters /= filters.max()
+        filter_start = 0; num_filters = filters.shape[2]
+        make_filter_fig(filters, filter_start, figno, 'Layer %s' % layer.name, num_filters, args.plot_combine_chans)
+        figno += 1
+
+        if args.plot_save_path:
+            print('Saving plots')
+            fignames = ['layer_%d_weights' % args.plot_weight_layer]
+            for f,i in zip(range(baseno, figno), range(figno-baseno)):
+                print('Exporting ',f,i,fignames[i])
+                pl.figure(f)
+                figure = plt.gcf() # get current figure
+                figure.set_size_inches(20, 20)
+                plt.savefig(os.path.join(args.plot_save_path, fignames[i] + '.png'), dpi=72)
+                plt.savefig(os.path.join(args.plot_save_path, fignames[i] + '.eps'))
+        else:
+            pl.show()
     
     shutil.rmtree(be_args['cache_dir'])  # delete directory
 
 except KeyboardInterrupt:
+    # xxx - this is not clean, how to fix?
     print('Killed with Ctrl-C, cleaning up')
 
     # xxx - consider going back to normal threads instead of daemon threads in emdata?
