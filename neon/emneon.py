@@ -63,10 +63,10 @@ def pickle(filename, data):
 parser = NeonArgparser(__doc__)
 # extra arguments controlling model and learning
 parser.add_argument('--model_arch', type=str, default='fergus', help='Specify convnet model architecture from arch/')
-parser.add_argument('--rate_decay', type=float, default=3.0, 
+parser.add_argument('--rate_decay', type=float, default=2.0, 
                     help='Learning schedule rate decay time constant (in epochs)')
 parser.add_argument('--rate_freq', type=int, default=0, 
-                    help='Batch frequency to update rate decay (< 1 is 2 times per EM epoch (training macrobatches))')
+                    help='Batch frequency to update rate decay (< 1 is once per EM epoch (training macrobatches))')
 parser.add_argument('--weight_decay', type=float, default=0.02, help='Weight decay')
 parser.add_argument('--rate_init', nargs=2, type=float, default=[0.0001, 0.0002], 
                     help='Initial learning rates [weight, bias]')
@@ -213,7 +213,7 @@ try:
         # configure optimizers and weight update schedules
         num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
         # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
-        if args.rate_freq < 1: args.rate_freq = train.nmacrobatches//2
+        if args.rate_freq < 1: args.rate_freq = train.nmacrobatches
         if args.rate_freq > 1:
             weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
         else:
