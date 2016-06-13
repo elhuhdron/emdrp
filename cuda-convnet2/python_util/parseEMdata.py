@@ -313,6 +313,10 @@ class EMDataParser():
         self.output_size = list(self.labels_slice_size)
         self.output_size[0] /= self.image_out_size; self.output_size[1] /= self.image_out_size
 
+        # for neon output mode that does not actually pickle the output batches
+        self.batch_outputs = [None] * self.batches_per_rand_cube
+        self.batch_outputs_ind = 0
+
         # variables containing actual number of convnet outputs depending on label config
         self.nclass = self.noutputs if self.independent_labels else self.nIndepLabels
         self.oshape = (self.image_out_size, self.image_out_size, self.nIndepLabels)
@@ -1345,7 +1349,11 @@ class EMDataParser():
         return config
 
     # xxx - moved logic out of convEMdata.py for better modularity, maybe can clean up more?
-    def checkOutputCubes(self, feature_path, batchnum, isLastbatch):
+    def checkOutputCubes(self, feature_path, batchnum, isLastbatch, outputs=None):
+        # for neon, allow outputs to be passed in without pickling
+        self.batch_outputs[self.batch_outputs_ind] = outputs
+        self.batch_outputs_ind = (self.batch_outputs_ind+1) % self.batches_per_rand_cube
+
         if self.use_chunk_list:
             # decide if it's appropriate to make output cubes (if at the end of the current chunk)
             self.chunklistOutputCubes(feature_path, batchnum, isLastbatch)
@@ -1438,13 +1446,21 @@ class EMDataParser():
                     prior_test_to_train = prior_test_to_train.reshape((1,size,size,nlabels+1))
     
         # load the pickled output batches and assign based on tiled indices created in packager (makeTiledIndices)
+        cnt = 0
         for z in range(0,self.ntotal_zslice,self.zslices_per_batch):
             for t in range(self.batches_per_zslice):
-                batchfn = os.path.join(feature_path,'data_batch_%d' % batchnum)
-                if os.path.isfile(batchfn):
-                    infile = open(batchfn, 'rb'); d = myPickle.load(infile); infile.close(); d = d['data']
+                # allows for data to either be unpickled, or saved in memory for each "chunk" (neon mode)
+                d = None
+                if feature_path:
+                    batchfn = os.path.join(feature_path,'data_batch_%d' % batchnum)
+                    if os.path.isfile(batchfn):
+                        infile = open(batchfn, 'rb'); d = myPickle.load(infile); infile.close(); d = d['data']
                     # batches take up way too make space for "large dumps" so remove them in append_features mode
                     if self.append_features: os.remove(batchfn)
+                else:
+                    d = self.batch_outputs[cnt]; self.batch_outputs[cnt] = None
+                    
+                if d is not None:
                     if prior_export:
                         # apply Bayesian reweighting, either independently or over the labels set
                         if self.independent_labels and self.prior_test_indep:
@@ -1466,7 +1482,7 @@ class EMDataParser():
                     begr = t*cpb; endr = begr + cpb
                     self.probs_out[self.inds_tiled_out[begr:endr,0],self.inds_tiled_out[begr:endr,1],
                         self.inds_tiled_out[begr:endr,2] + z,:] = d
-                batchnum += 1
+                batchnum += 1; cnt += 1
 
         if size > 1:
             # xxx - oh yah, this makes sense, see comments in makeTiledIndices

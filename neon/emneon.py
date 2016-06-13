@@ -260,20 +260,20 @@ try:
             
         print('Model output (forward prop) for %d testing batches, %d examples/batch' % (test.nmacrobatches,
             test.parser.num_cases_per_batch)); 
-        feature_path = tempfile.mkdtemp()  # create temp dir
+        #feature_path = tempfile.mkdtemp()  # create temp dir
+        feature_path = ''
         for i in range(test.nmacrobatches):
             batchnum = test.batch_range[0]+i
             sys.stdout.write('%d ... ' % (batchnum,)); t = time.time()
     
-            # xxx - for now just write pickled batches to a temp folder, just as feature writer in cuda-convnets2 does
             outputs = model.get_outputs(test)
-            path_out = os.path.join(feature_path, 'data_batch_%d' % (batchnum,))
-            pickle(path_out, {'data': outputs})
+            # xxx - for now just write pickled batches to a temp folder, just as feature writer in cuda-convnets2 does
+            #path_out = os.path.join(feature_path, 'data_batch_%d' % (batchnum,))
+            #pickle(path_out, {'data': outputs})
             
-            test.parser.checkOutputCubes(feature_path, batchnum, i==test.nmacrobatches-1)
-            sys.stdout.write('\tdone in %.2f s\n' % (time.time() - t,))
-            sys.stdout.flush()
-        shutil.rmtree(feature_path)  # delete directory
+            test.parser.checkOutputCubes(feature_path, batchnum, i==test.nmacrobatches-1,outputs=outputs)
+            sys.stdout.write('\tdone in %.2f s\n' % (time.time() - t,)); sys.stdout.flush()
+        #shutil.rmtree(feature_path)  # delete directory
             
         if args.data_config:
             print('Model output complete for %d test batches!' % (test.nmacrobatches,))
