@@ -38,7 +38,8 @@ import numpy as np
 
 from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
-from neon.optimizers import GradientDescentMomentum, MultiOptimizer, Schedule
+from neon.optimizers import GradientDescentMomentum, MultiOptimizer
+from neon.optimizers import Schedule
 from neon.transforms import CrossEntropyBinary, CrossEntropyMulti
 from neon.models import Model
 from neon.callbacks.callbacks import Callbacks
@@ -47,7 +48,7 @@ from neon.util.argparser import NeonArgparser, extract_valid_args
 from data.emdata import EMDataIterator, RandomEMDataIterator
 from arch.emarch import EMModelArchitecture
 from callbacks.emcallbacks import EMEpochCallback
-from optimizers.emoptimizers import DiscreteTauExpSchedule, TauExpSchedule
+#from optimizers.emoptimizers import DiscreteTauExpSchedule, TauExpSchedule
 from transforms.emcost import EMMetric
 
 # stole from cuda-convnets2 python_util/util.py
@@ -63,12 +64,15 @@ def pickle(filename, data):
 parser = NeonArgparser(__doc__)
 # extra arguments controlling model and learning
 parser.add_argument('--model_arch', type=str, default='fergus', help='Specify convnet model architecture from arch/')
-parser.add_argument('--rate_decay', type=float, default=0.0, 
-                    help='Learning schedule rate decay time constant (in epochs)')
-parser.add_argument('--rate_freq', type=int, default=0, 
-                    help='Batch frequency to update rate decay (< 1 is once per EM epoch (training macrobatches))')
+#parser.add_argument('--rate_decay', type=float, default=0.0, 
+#                    help='Learning schedule rate decay time constant (in epochs)')
+#parser.add_argument('--rate_freq', type=int, default=0, 
+#                    help='Batch frequency to update rate decay (< 1 is once per EM epoch (training macrobatches))')
+parser.add_argument('--rate_step', type=float, default=1.0, help='Learning schedule rate step (in emneon epochs)')
+parser.add_argument('--rate_change', type=float, default=0.5, 
+                    help='Learning schedule rate change (occurs each rate_step)')
 parser.add_argument('--weight_decay', type=float, default=0.02, help='Weight decay')
-parser.add_argument('--rate_init', nargs=2, type=float, default=[0.0001, 0.0002], 
+parser.add_argument('--rate_init', nargs=2, type=float, default=[0.001, 0.002], 
                     help='Initial learning rates [weight, bias]')
 parser.add_argument('--momentum', nargs=2, type=float, default=[0.9, 0.9], 
                     help='Gradient descent learning momentums [weight, bias]')
@@ -212,15 +216,21 @@ try:
     
         # configure optimizers and weight update schedules
         num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
-        # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
-        if args.rate_freq < 1: args.rate_freq = train.nmacrobatches
-        if args.rate_decay > 0:
-            if args.rate_freq > 1:
-                weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
-            else:
-                weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
-        else:
-            weight_sched = Schedule()
+
+        # old method using exp schedules specified with tau and epoch freq
+        ## rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
+        #if args.rate_freq < 1: args.rate_freq = train.nmacrobatches
+        #if args.rate_decay > 0:
+        #    if args.rate_freq > 1:
+        #        weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
+        #    else:
+        #        weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
+        #else:
+        #    weight_sched = Schedule()
+
+        # simpler method directly from neon Schedule(), specify step and change on command line
+        weight_sched = Schedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
+        
         opt_gdm = GradientDescentMomentum(args.rate_init[0], args.momentum[0], wdecay=args.weight_decay, 
                                           schedule=weight_sched, stochastic_round=args.rounding)
         opt_biases = GradientDescentMomentum(args.rate_init[1], args.momentum[1], 
