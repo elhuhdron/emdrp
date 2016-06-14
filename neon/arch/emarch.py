@@ -151,7 +151,7 @@ class DOG_fergus_explin_bn(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            DOG(4, (0.6, 0.8, 1.0, 1.2), (4.0, 4.0, 4.0, 4.0)),
+            DOG((5.0, 4.0, 3.0, 1.6), 1.5),
             Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
                  padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
@@ -181,7 +181,7 @@ class DOG_bfergus_explin_bn(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            DOG(4, (0.6, 0.8, 1.0, 1.2), (4.0, 4.0, 4.0, 4.0)),
+            DOG((5.0, 4.0, 3.0, 1.6), 1.5),
             Conv((11, 11, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
                  padding=5, strides=1),
             Pooling(3, strides=2, padding=1),
@@ -319,7 +319,7 @@ class DOG_cifar10(EMModelArchitecture):
         init_uni = Uniform(low=-0.1, high=0.1)
         bn = False
         return [
-            DOG(4, (0.6, 0.8, 1.0, 1.2), (4.0, 4.0, 4.0, 4.0)),
+            DOG((5.0, 4.0, 3.0, 1.6), 1.5),
             Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),

@@ -38,7 +38,7 @@ import numpy as np
 
 from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
-from neon.optimizers import GradientDescentMomentum, MultiOptimizer
+from neon.optimizers import GradientDescentMomentum, MultiOptimizer, Schedule
 from neon.transforms import CrossEntropyBinary, CrossEntropyMulti
 from neon.models import Model
 from neon.callbacks.callbacks import Callbacks
@@ -63,7 +63,7 @@ def pickle(filename, data):
 parser = NeonArgparser(__doc__)
 # extra arguments controlling model and learning
 parser.add_argument('--model_arch', type=str, default='fergus', help='Specify convnet model architecture from arch/')
-parser.add_argument('--rate_decay', type=float, default=2.0, 
+parser.add_argument('--rate_decay', type=float, default=0.0, 
                     help='Learning schedule rate decay time constant (in epochs)')
 parser.add_argument('--rate_freq', type=int, default=0, 
                     help='Batch frequency to update rate decay (< 1 is once per EM epoch (training macrobatches))')
@@ -214,10 +214,13 @@ try:
         num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
         # rate update frequency less than one means update twice per EM epoch (full set of training macrobatches)
         if args.rate_freq < 1: args.rate_freq = train.nmacrobatches
-        if args.rate_freq > 1:
-            weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
+        if args.rate_decay > 0:
+            if args.rate_freq > 1:
+                weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
+            else:
+                weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
         else:
-            weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
+            weight_sched = Schedule()
         opt_gdm = GradientDescentMomentum(args.rate_init[0], args.momentum[0], wdecay=args.weight_decay, 
                                           schedule=weight_sched, stochastic_round=args.rounding)
         opt_biases = GradientDescentMomentum(args.rate_init[1], args.momentum[1], 
@@ -238,7 +241,7 @@ try:
             callbacks.add_callback(EMEpochCallback(args.callback_args['eval_freq'],train.nmacrobatches), 
                                    insert_pos=None)
         # xxx - thought of making this an option but not clear that it slows anything down?
-        callbacks.add_hist_callback()
+        #callbacks.add_hist_callback() # xxx - not clear what information this conveys
         if args.save_best_path:
             callbacks.add_save_best_state_callback(args.save_best_path)
         

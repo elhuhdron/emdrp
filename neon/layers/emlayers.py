@@ -59,20 +59,19 @@ class DOG(Convolution):
     Difference of Gaussians (DOG) layer implementation.
 
     Arguments:
-        nchans (int): number of DOG channels
-        sigmas (tuple of floats): initial standard deviation for DOG kernel
-        K: intial large sigma ratio for DOG kernel
+        KD (tuple of floats): large sigma ratios for DOG kernels
+        pooled_sigma (floats): pooled standard deviation Gaussians in DOG kernel
         name (str, optional): layer name. Defaults to "DOGLayer"
     """
 
     # constructor and initialize buffers
-    def __init__(self, nchans, sigma, KD, name=None):
-        self.nchans = nchans
-        assert(len(sigma)==self.nchans)
-        assert(len(KD)==self.nchans)
-        self.sigma = sigma
+    def __init__(self, KD, pooled_sigma, name=None):
+        self.nchans = len(KD)
+        assert( self.nchans % 4 == 0 ) # requirement for Conv layer
+        self.pooled_sigma = pooled_sigma
         self.KD = KD
-        shape = max([2*int(math.ceil(2*s*k))+1 for s,k in zip(sigma,KD)])
+        self.sigma = [self.pooled_sigma*math.sqrt(2.0) / math.sqrt(1.0 + x**2) for x in self.KD]
+        shape = max([2*int(math.ceil(2*s*k))+1 for s,k in zip(self.sigma,self.KD)])
         if shape < 3: shape = 3
         #padding = shape//2
         padding = 0  # crop off edges
