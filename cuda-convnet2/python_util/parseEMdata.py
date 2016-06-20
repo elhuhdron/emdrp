@@ -81,7 +81,7 @@ class EMDataParser():
     HDF5_CLVL = 5           # compression level in hdf5
     
     def __init__(self, cfg_file, write_outputs=False, init_load_path='', save_name=None, append_features=False,
-            chunk_skip_list=[], dim_ordering='', isTest=False):
+            chunk_skip_list=[], dim_ordering='', image_in_size=None, isTest=False):
         self.cfg_file = cfg_file
         self.write_outputs = write_outputs; self.save_name = save_name; self.append_features = append_features
 
@@ -224,6 +224,9 @@ class EMDataParser():
         self.cur_chunk = None   # started needing this for chunk_list_all mode
 
         # some calculated values based on constants and input arguments for tiled batches
+
+        # allow command line override of image size
+        if image_in_size: self.image_size = image_in_size
         
         # few checks here on inputs if not checkable by ini specifications
         assert( self.nzslices == 1 or self.nzslices == 3 ) # xxx - 1 or 3 (or multiple of 4?) only supported by convnet

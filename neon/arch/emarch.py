@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from neon.initializers import Constant, Gaussian, Uniform
+from neon.initializers import Constant, Gaussian, Uniform, GlorotUniform
 from neon.layers import Conv, Dropout, Pooling, Affine, LRN
 from neon.transforms import Rectlin, Logistic, Softmax, Identity, Explin
 from layers.emlayers import DOG
@@ -69,221 +69,130 @@ class fergus(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-class fergus_bn(EMModelArchitecture):
+class nfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
-        super(fergus_bn, self).__init__(noutputs, use_softmax)
+        super(nfergus, self).__init__(noutputs, use_softmax)
         self.bn_first_layer = bn_first_layer
 
     @property
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn, 
+            Conv((7, 7, 96), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                     padding=3, strides=1)\
                 if self.bn_first_layer else\
-                Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+                Conv((7, 7, 96), init=GlorotUniform(), bias=Constant(0), activation=Explin(), 
                     padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn, 
+            Conv((5, 5, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=2, strides=1),
             Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Rectlin(), batch_norm=bn, 
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Rectlin(), batch_norm=bn, 
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Rectlin(), batch_norm=bn, 
+            Conv((3, 3, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn),
+            Affine(nout=4096, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Rectlin(), batch_norm=bn),
+            Affine(nout=4096, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
+            Affine(nout=self.noutputs, init=GlorotUniform(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-class fergus_bn1(fergus_bn):
+class DOG_nfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
-        super(fergus_bn1, self).__init__(noutputs, use_softmax, bn_first_layer=True)
-
-class fergus_explin_bn(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
-        super(fergus_explin_bn, self).__init__(noutputs, use_softmax)
-        self.bn_first_layer = bn_first_layer
+        super(DOG_nfergus, self).__init__(noutputs, use_softmax)
 
     @property
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
-                    padding=3, strides=1)\
-                if self.bn_first_layer else\
-                Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Explin(), 
-                    padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
-                 padding=2, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
-                 padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
-                 padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
-                 padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
-            Dropout(keep=0.5),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
-            Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class fergus_explin_bn1(fergus_explin_bn):
-    def __init__(self, noutputs, use_softmax=False):
-        super(fergus_explin_bn1, self).__init__(noutputs, use_softmax, bn_first_layer=True)
-
-class DOG_fergus_explin_bn(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(DOG_fergus_explin_bn, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            DOG((5.0, 4.0, 3.0, 1.6), 1.5),
-            Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+            DOG((5.0, 4.0, 3.0, 1.6), 1.8),
+            Conv((7, 7, 96), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+            Conv((5, 5, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=2, strides=1),
             Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Affine(nout=4096, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Affine(nout=4096, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
+            Affine(nout=self.noutputs, init=GlorotUniform(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-class DOG_bfergus_explin_bn(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(DOG_bfergus_explin_bn, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            DOG((5.0, 4.0, 3.0, 1.6), 1.5),
-            Conv((11, 11, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
-                 padding=5, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((7, 7, 256), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
-                 padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
-                 padding=2, strides=1),
-            Conv((5, 5, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
-                 padding=2, strides=1),
-            Conv((5, 5, 256), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
-                 padding=2, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Affine(nout=5120, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
-            Dropout(keep=0.5),
-            Affine(nout=5120, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
-            Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class sfergus_explin_bn(EMModelArchitecture):
+class sfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
-        super(sfergus_explin_bn, self).__init__(noutputs, use_softmax)
+        super(sfergus, self).__init__(noutputs, use_softmax)
         self.bn_first_layer = bn_first_layer
 
     @property
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
-                    padding=3, strides=1)\
+            Conv((7, 7, 128), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                    padding=3, strides=2)\
                 if self.bn_first_layer else\
-                Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Explin(), 
-                    padding=3, strides=1),
+                Conv((7, 7, 128), init=GlorotUniform(), bias=Constant(0), activation=Explin(), 
+                    padding=3, strides=2),
             Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 384), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+            Conv((5, 5, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=2, strides=1),
             Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 512), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 512), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 512), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 512), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
-            Affine(nout=6144, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Affine(nout=6144, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=6144, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Affine(nout=6144, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
+            Affine(nout=self.noutputs, init=GlorotUniform(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-class dfergus_explin_bn(EMModelArchitecture):
+class DOG_sfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
-        super(dfergus_explin_bn, self).__init__(noutputs, use_softmax)
+        super(DOG_sfergus, self).__init__(noutputs, use_softmax)
         self.bn_first_layer = bn_first_layer
 
     @property
     def layers(self):
         bn = True
         return [
-            Conv((11, 11, 96), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
-                    padding=5, strides=2)\
-                if self.bn_first_layer else\
-                Conv((11, 11, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Explin(), 
-                    padding=5, strides=2),
+            DOG((5.0, 4.0, 3.0, 1.6), 1.8),
+            Conv((7, 7, 128), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                    padding=3, strides=2),
             Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn, 
+            Conv((5, 5, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=2, strides=1),
             Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 512), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 512), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.03), activation=Explin(), batch_norm=bn, 
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Affine(nout=6144, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=4096, init=Gaussian(scale=0.01), activation=Explin(), batch_norm=bn),
+            Affine(nout=6144, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class cifar10(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(cifar10, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        init_uni = Uniform(low=-0.1, high=0.1)
-        bn = False
-        return [
-            Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Pooling((2, 2)),
-            Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Pooling((2, 2)),
-            Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=init_uni, 
+            Affine(nout=self.noutputs, init=GlorotUniform(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -310,6 +219,24 @@ class conv11_7(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+class cifar10(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False):
+        super(cifar10, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        init_uni = Uniform(low=-0.1, high=0.1)
+        bn = False
+        return [
+            Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Pooling((2, 2)),
+            Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Pooling((2, 2)),
+            Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=init_uni, 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class DOG_cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(DOG_cifar10, self).__init__(noutputs, use_softmax)
@@ -319,7 +246,7 @@ class DOG_cifar10(EMModelArchitecture):
         init_uni = Uniform(low=-0.1, high=0.1)
         bn = False
         return [
-            DOG((5.0, 4.0, 3.0, 1.6), 1.5),
+            DOG((5.0, 4.0, 3.0, 1.6), 1.8),
             Conv((5, 5, 16), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),

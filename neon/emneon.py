@@ -71,7 +71,7 @@ parser.add_argument('--model_arch', type=str, default='fergus', help='Specify co
 parser.add_argument('--rate_step', type=float, default=1.0, help='Learning schedule rate step (in emneon epochs)')
 parser.add_argument('--rate_change', type=float, default=0.5, 
                     help='Learning schedule rate change (occurs each rate_step)')
-parser.add_argument('--weight_decay', type=float, default=0.02, help='Weight decay')
+parser.add_argument('--weight_decay', type=float, default=0.01, help='Weight decay')
 parser.add_argument('--rate_init', nargs=2, type=float, default=[0.001, 0.002], 
                     help='Initial learning rates [weight, bias]')
 parser.add_argument('--momentum', nargs=2, type=float, default=[0.9, 0.9], 
@@ -86,6 +86,7 @@ parser.add_argument('--write_output', type=str, default='', help='File to to wri
 parser.add_argument('--train_range', nargs=2, type=int, default=[1,200], help='emcc2-style training batch range')
 parser.add_argument('--test_range', nargs=2, type=int, default=[200001,200002], 
                     help='emcc2-style testing batch range, concatenated into single "neon epoch" (macrobatch)')
+parser.add_argument('--image_in_size', type=int, default=None, help='Specify input image size, override .ini')
 parser.add_argument('--chunk_skip_list', nargs='*', type=int, default=[], 
                     help='Skip these random EM chunks, usually for test, override .ini')
 parser.add_argument('--dim_ordering', type=str, default='xyz', 
@@ -187,11 +188,12 @@ try:
             # initialize the em data parser
             train = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, 
                                    dim_ordering=args.dim_ordering, batch_range=args.train_range, name='train', 
-                                   NBUF=args.nbebuf)
+                                   NBUF=args.nbebuf, image_in_size=args.image_in_size)
             # test batches need to be concatenated into a single "neon epoch" for built-in neon eval_set to work 
             test = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, 
                                   dim_ordering=args.dim_ordering, batch_range=args.test_range, name='test', 
-                                  isTest=True, concatenate_batches=True, NBUF=args.nbebuf)
+                                  isTest=True, concatenate_batches=True, NBUF=args.nbebuf,
+                                  image_in_size=args.image_in_size)
         else:
             # make dummy random data just for testing model inits
             train = RandomEMDataIterator(name='train')
@@ -266,7 +268,7 @@ try:
             test = EMDataIterator(args.data_config, write_output=args.write_output,
                                   chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
                                   batch_range=args.test_range, name='test', isTest=True, concatenate_batches=False,
-                                  NBUF=args.nbebuf)
+                                  NBUF=args.nbebuf, image_in_size=args.image_in_size)
         else:
             # make dummy random data just for testing model inits
             test = RandomEMDataIterator(name='outputs')

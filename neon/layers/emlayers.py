@@ -60,17 +60,19 @@ class DOG(Convolution):
 
     Arguments:
         KD (tuple of floats): large sigma ratios for DOG kernels
-        pooled_sigma (floats): pooled standard deviation Gaussians in DOG kernel
+        zero_radius (float): zero crossing radius of DOG kernel
         name (str, optional): layer name. Defaults to "DOGLayer"
     """
 
     # constructor and initialize buffers
-    def __init__(self, KD, pooled_sigma, name=None):
+    def __init__(self, KD, zero_radius, name=None):
         self.nchans = len(KD)
         assert( self.nchans % 4 == 0 ) # requirement for Conv layer
-        self.pooled_sigma = pooled_sigma
-        self.KD = KD
-        self.sigma = [self.pooled_sigma*math.sqrt(2.0) / math.sqrt(1.0 + x**2) for x in self.KD]
+        self.KD = [float(x) for x in KD]
+        #self.pooled_sigma = pooled_sigma
+        #self.sigma = [self.pooled_sigma*math.sqrt(2.0) / math.sqrt(1.0 + x**2) for x in self.KD]
+        self.zero_radius = float(zero_radius)
+        self.sigma = [self.zero_radius / ( 2*x * math.sqrt(math.log(x) / (x**2 - 1)) ) for x in self.KD]
         shape = max([2*int(math.ceil(2*s*k))+1 for s,k in zip(self.sigma,self.KD)])
         if shape < 3: shape = 3
         #padding = shape//2
@@ -92,6 +94,6 @@ class DOG(Convolution):
                      spatial_str + " inputs, " + spatial_str + " outputs, " + \
                      padstr_str + " padding, " + padstr_str + " stride, " + \
                      ','.join([str(x) for x in self.sigma]) + ' sigmas, ' + \
-                     ','.join([str(x) for x in self.KD]) + ' ratios'
+                     ','.join([str(x) for x in self.KD]) + ' ratios, ' + str(self.zero_radius) + ' zero radius'
 
         return ((fmt_string % fmt_tuple))

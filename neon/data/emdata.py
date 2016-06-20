@@ -95,7 +95,7 @@ class RandomEMDataIterator(NervanaEMDataIterator):
 class EMDataIterator(NervanaEMDataIterator, Thread):
 
     def __init__(self, cfg_file, write_output=None, chunk_skip_list=[], dim_ordering='', batch_range=[1,10], 
-                 name='emdata', isTest=False, concatenate_batches=False, NBUF=2):
+                 name='emdata', isTest=False, concatenate_batches=False, NBUF=2, image_in_size=None):
         Thread.__init__(self)
         self.name = name
 
@@ -121,7 +121,8 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             write_outputs = not append_features
         # instantiate the actual em data parser, code shared with cuda-convnets2 em data parser
         self.parser = EMDataParser(cfg_file, write_outputs=write_outputs, append_features=append_features, 
-                                    chunk_skip_list=chunk_skip_list, dim_ordering=dim_ordering, isTest=self.isTest)
+                                    chunk_skip_list=chunk_skip_list, dim_ordering=dim_ordering, isTest=self.isTest,
+                                    image_in_size=image_in_size)
         if write_outputs or append_features:
             # force some properties if in mode for writing outputs.
             self.parser.outpath = write_output
