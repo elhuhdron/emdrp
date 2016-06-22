@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -44,10 +44,10 @@ class dpLoadh5(object):
 
     def __init__(self, args):
         # save command line arguments from argparse, see definitions in main or run with --help
-        for k, v in vars(args).items(): 
+        for k, v in vars(args).items():
             # do not override any values that are already set as a method of allowing inherited classes to specify
             if hasattr(self,k): continue
-            if type(v) is list and k not in ['subgroups','subgroups_out']: 
+            if type(v) is list and k not in ['subgroups','subgroups_out']:
                 if len(v)==1:
                     setattr(self,k,v[0])  # save single element lists as first element
                 elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
@@ -56,40 +56,40 @@ class dpLoadh5(object):
                     setattr(self,k,v)   # store other list types as usual (floats)
             else:
                 setattr(self,k,v)
-                
+
         # method of forcing data-type from inherited classes (xxx - yeah, yeah, yeah)
-        if not hasattr(self,'default_data_type'): 
+        if not hasattr(self,'default_data_type'):
             self.default_data_type = self.data_type if self.data_type else np.uint8
-                
+
         self.inith5()
 
     def inith5(self):
 
         # Options / Inits
-        
+
         # old throwbacks, kept just incase, not doing these in this context so not revealed as options
         self.origin_chunk_inds = False; self.image_size = 0; self.nzslices = 1
-        
+
         # use the string input to decide on the numpy data type to load into
         if self.data_type and isinstance(self.data_type, str): self.data_type = eval('np.' + self.data_type)
 
         # read attributes from the hdf5 first, possibly need for inits
-        self.isFile = False; self.isDataset = False
+        self.isFile = False; self.isDataset = False; self.data_attrs = {}
         if os.path.isfile(self.srcfile):
             hdf = h5py.File(self.srcfile,'r');
-            self.isFile = True; self.data_attrs = {}
+            self.isFile = True
             self.dset, self.group, self.dsetpath = self.getDataset(hdf)
             if self.dset:
                 self.isDataset = True
                 for name,value in self.dset.attrs.items(): self.data_attrs[name] = value
                 self.data_attrs['chunks'] = self.dset.chunks    # xxx - where is this used again?
                 self.datasize = np.array(self.dset.shape); self.chunksize = np.array(self.dset.chunks)
-                if not self.hdf5_Corder: 
+                if not self.hdf5_Corder:
                     self.datasize = self.datasize[::-1]; self.chunksize = self.chunksize[::-1]
                 if not self.data_type: self.data_type = self.dset.dtype
             elif not self.data_type:
                 self.data_type = self.default_data_type
-                    
+
             # xxx - this probably should be refactored at some point.
             # maybe a single dataset in all hdf5 files that contain the "global" information?
             # did this for now to just maintain compatibility.
@@ -97,13 +97,13 @@ class dpLoadh5(object):
             if 'scale' not in self.data_attrs:
                 dset_found = None
                 dsets = ['data', 'data_mag1', 'labels', 'voxel_type', 'probabilities', 'ICS', 'warpx']
-                for dset in dsets: 
+                for dset in dsets:
                     if dset in hdf: dset_found = dset; break
                 if dset_found is not None:
                     for name,value in hdf[dset_found].attrs.items():
                         if name not in self.data_attrs: self.data_attrs[name] = value
                 #else:  # xxx - dangerous to add default here?
-                    
+
             hdf.close()
         elif not self.data_type:
             self.data_type = self.default_data_type
@@ -125,13 +125,13 @@ class dpLoadh5(object):
         # these orders were chosen because the "unsort" is the same as the "sort" indexing, so re-order->data not needed
         self.zreslice_dim_ordering = self.RESLICES[self.dim_ordering]
 
-        # immediately re-order any arguments that need it because of reslice. this prevents from having to do this on 
+        # immediately re-order any arguments that need it because of reslice. this prevents from having to do this on
         #   command line, which ended up being annoying.
         # originally reading the hdf5 was done using arguments that were re-ordered on command line, so those needed
         #   during read are un-re-ordered (back to normal order) in readCubeToBuffers.
         self.size = self.size[self.zreslice_dim_ordering]   # size more intuitive re-order, un-re-order during load
 
-        # inits that depend on re-ordering        
+        # inits that depend on re-ordering
         self.ntotal_zslice = self.size[2] + self.nzslices - 1
         self.data_slice_size = (self.size[0] + self.image_size, self.size[1] + self.image_size, self.ntotal_zslice)
 
@@ -143,7 +143,7 @@ class dpLoadh5(object):
         dset = h5file; dsetpath = ''; allgroups = self.subgroups + [self.dataset]; group = dset
         for i in range(len(allgroups)):
             group = dset
-            if dset and allgroups[i] in dset: 
+            if dset and allgroups[i] in dset:
                 dset = dset[allgroups[i]]
             else:
                 dset = None
@@ -151,39 +151,39 @@ class dpLoadh5(object):
         return dset, group, dsetpath
 
     def readCubeToBuffers(self):
-        if self.dpLoadh5_verbose: 
+        if self.dpLoadh5_verbose:
             print('dpLoadh5: Buffering data to memory')
             t = time.time()
 
         # xxx - might think of a better way to "reslice" the dimensions later, for now, here's the method:
         # read_direct requires the same size for the numpy array as in the hdf5 file. so if we're re-ordering the dims:
-        #   (1) re-order the sizes to allocate here as if in original xyz order. 
-        #   (2) re-order the dims and sizes used in the *slices_from_indices functions into original xyz order. 
+        #   (1) re-order the sizes to allocate here as if in original xyz order.
+        #   (2) re-order the dims and sizes used in the *slices_from_indices functions into original xyz order.
         #       chunk indices are not changed.
         #   (3) at the end of this function re-order the data into the specified dim ordering
         #   (4) the rest of the packager is then blind to the reslice dimension ordering
         # NOTE ORIGINAL: chunk indices should be given in original hdf5 ordering.
         #   all other command line arguments should be given in the re-ordered ordering.
         #   the C/F order re-ordering needs to be done nested inside the reslice re-ordering
-        # NEW NOTE: had the re-ordering of command line inputs for reslice done automatically, meaning all inputs on 
+        # NEW NOTE: had the re-ordering of command line inputs for reslice done automatically, meaning all inputs on
         #   command line should be given in original ordering, but they are re-ordered in re-slice order in init, so
         #   un-re-order here to go back to original ordering again (minimal overhead, done to reduce debug time).
         data_size = list(self.data_slice_size[i] for i in self.zreslice_dim_ordering)
         size = self.size[self.zreslice_dim_ordering]
         if self.dpLoadh5_verbose: print('data slice size ' + str(self.data_slice_size) + ' data size ' + str(data_size))
-            
+
         # ulimately everything is accessed as C-order, but support loading from F-order hdf5 inputs.
-        # h5py requires that for read_direct data must be C order and contiguous. this means F-order must be dealt with 
-        #   "manually" here. for F-order the cube will be in C-order, but shaped like F-order, and then the view 
+        # h5py requires that for read_direct data must be C order and contiguous. this means F-order must be dealt with
+        #   "manually" here. for F-order the cube will be in C-order, but shaped like F-order, and then the view
         #   transposed back to C-order so that it's transparent in the rest of the code.
-        if self.hdf5_Corder: 
+        if self.hdf5_Corder:
             self.data_cube = np.zeros(data_size, dtype=self.data_type, order='C')
-        else: 
+        else:
             self.data_cube = np.zeros(data_size[::-1], dtype=self.data_type, order='C')
 
         # slice out the data hdf
         hdf = h5py.File(self.srcfile,'r'); self.dset, self.group, self.dsetpath = self.getDataset(hdf)
-        if not self.dset: 
+        if not self.dset:
             print('Missing',self.subgroups,self.dataset)
             assert( False )     # fail here if dataset does not exist in subgroups path
         #assert( self.dset )     # fail here if dataset does not exist in subgroups path
@@ -194,10 +194,10 @@ class dpLoadh5(object):
         hdf.close()
 
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
-        if not self.hdf5_Corder: 
+        if not self.hdf5_Corder:
             self.data_cube = self.data_cube.transpose(2,1,0)
 
-        # zreslice re-ordering, so data is in re-sliced order view outside of this function           
+        # zreslice re-ordering, so data is in re-sliced order view outside of this function
         self.data_cube = self.data_cube.transpose(self.zreslice_dim_ordering)
         if self.dpLoadh5_verbose:
             self.data_cube_min = self.data_cube.min(); self.data_cube_max = self.data_cube.max();
@@ -230,12 +230,12 @@ class dpLoadh5(object):
         beg[xysel] = beg[xysel] - self.image_size/2; beg[zsel] = beg[zsel] - self.nzslices//2
         end[xysel] = end[xysel] + self.image_size/2; end[zsel] = end[zsel] + self.nzslices//2
         return self.get_slices_from_limits(beg,end,dsize)
-        
+
     def get_slices_from_limits(self, beg, end, size):
         zsel = self.zreslice_dim_ordering[2]
         begd = np.zeros_like(size); endd = size;
         begd[zsel], endd[zsel] = 0, self.ntotal_zslice
-        if self.hdf5_Corder: 
+        if self.hdf5_Corder:
             slc = np.s_[beg[0]:end[0],beg[1]:end[1],beg[2]:end[2]]
             slcd = np.s_[begd[0]:endd[0],begd[1]:endd[1],begd[2]:endd[2]]
         else:
@@ -246,7 +246,7 @@ class dpLoadh5(object):
     def writeRaw(self):
         if not self.outraw: return
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
-        if self.dpLoadh5_verbose: 
+        if self.dpLoadh5_verbose:
             print('Writing raw output to "%s"' % self.outraw); t = time.time()
 
         # optional manipulations to write raw file
@@ -263,10 +263,10 @@ class dpLoadh5(object):
             data = np.lib.pad(data, s, 'constant',constant_values=tuple(np.zeros((3,2)).tolist()))
         else:
             if doGray or doLUTmod: data = np.copy(data)
-        if doGray: 
+        if doGray:
             data -= data.min(); data /= data.max(); data = (data*np.iinfo(dtypeGray).max).astype(dtypeGray)
         if doLUTmod: data = data % self.nColorsLUTraw
-        if self.relabel_seq and islabels:
+        if doRelabel:
             from skimage.segmentation import relabel_sequential
             data, fw, inv = relabel_sequential(data); data = data.astype(self.data_type)
             if self.dpLoadh5_verbose:
@@ -279,7 +279,7 @@ class dpLoadh5(object):
         shape = data.shape
         if self.legacy_transpose: data = data.transpose((2,0,1)); shape = tuple(np.array(shape)[[1,0,2]].tolist())
         else: data = data.transpose((2,1,0))
-        
+
         ext = os.path.splitext(self.outraw)[1][1:]
         if ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
@@ -307,8 +307,8 @@ class dpLoadh5(object):
             dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
         else:
             fh = open(self.outraw, 'wb'); data.tofile(fh); fh.close()
-            
-        if self.dpLoadh5_verbose: 
+
+        if self.dpLoadh5_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
 
     # xxx - move gipl stuff as a utility or a GIPL class?
@@ -335,15 +335,15 @@ class dpLoadh5(object):
             }
         trans_type = {
             1:'binary', 7:'char', 8:'uchar', 15:'short',
-            16:'ushort', 31:'uint', 32:'int', 64:'float', 
-            65:'double', 144:'C_short', 160:'C_int', 192:'C_float', 
+            16:'ushort', 31:'uint', 32:'int', 64:'float',
+            65:'double', 144:'C_short', 160:'C_int', 192:'C_float',
             193:'C_double', 200:'surface', 201:'polygon',
             }
         trans_orien = {
-            1:'UNDEFINED', 2:'UNDEFINED_PROJECTION', 3 : 'AP_PROJECTION', 
+            1:'UNDEFINED', 2:'UNDEFINED_PROJECTION', 3 : 'AP_PROJECTION',
             4 : 'LATERAL_PROJECTION', 5 : 'OBLIQUE_PROJECTION', 9 : 'UNDEFINED_TOMO',
             10 : 'AXIAL', 11 : 'CORONAL', 12 : 'SAGITTAL', 13 : 'OBLIQUE_TOMO',
-            }    
+            }
         # header fields in order of appearance in header
         hdr_fields = [
             'sizes', 'image_type', 'scales', 'patient', 'matrix',
@@ -353,7 +353,7 @@ class dpLoadh5(object):
             ]
         hdr_size_bytes = 256; magic_number = 4026526128; info = {}
         for k,v in locals().items(): info[k] = v
-        
+
         # all these header fields should sum up to hdr_size in bytes
         hdr = {
             'sizes' : np.ones((4,),dtype=np.uint16),
@@ -373,7 +373,7 @@ class dpLoadh5(object):
             'magic_number' : np.array([magic_number],dtype=np.uint32),
             }
         return hdr, info
-    
+
     @staticmethod
     def gipl_write_volume(I,shape,fname,scale):
         hdr, info = dpLoadh5.gipl_generate_header()
@@ -386,12 +386,12 @@ class dpLoadh5(object):
         # write binary header with correct order / data types, gipl format is big-endian!!!
         # xxx - this code assumes machine is little endian
         fh = open(fname, 'wb')
-        for field in info['hdr_fields']: 
+        for field in info['hdr_fields']:
             hdr[field].byteswap(True).tofile(fh)
             #print('\t',field,'\tsize',hdr[field].size,'\ttell ',fh.tell())
         assert( fh.tell() == info['hdr_size_bytes'] )
         I.byteswap(False).tofile(fh); fh.close()
-                    
+
     @classmethod
     def readData(cls, srcfile, dataset, chunk, offset, size, data_type='', subgroups=[], verbose=False):
         loadh5 = cls.readInith5(srcfile, dataset, chunk, offset, size, data_type, subgroups, verbose)
@@ -400,7 +400,7 @@ class dpLoadh5(object):
 
     @classmethod
     def readInith5(cls, srcfile, dataset, chunk, offset, size, data_type, subgroups=[], verbose=False):
-        parser = argparse.ArgumentParser(description='class:dpLoadh5', 
+        parser = argparse.ArgumentParser(description='class:dpLoadh5',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpLoadh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + srcfile
@@ -433,11 +433,11 @@ class dpLoadh5(object):
             help='Size in voxels to read')
         p.add_argument('--dim-ordering', nargs=1, type=str, default='xyz', choices=('xyz','xzy','zyx'),
             metavar='ORD', help='Specify the order to reslice the dimensions into (last one becomes new z)')
-        p.add_argument('--hdf5-Corder', dest='hdf5_Corder', action='store_true', 
+        p.add_argument('--hdf5-Corder', dest='hdf5_Corder', action='store_true',
             help='Specify hdf5 file is in C-order')
-        p.add_argument('--legacy-transpose', dest='legacy_transpose', action='store_true', 
+        p.add_argument('--legacy-transpose', dest='legacy_transpose', action='store_true',
             help='Specify transpose of x/y if writing raw')
-        p.add_argument('--outraw', nargs=1, type=str, default='', metavar='FILE', 
+        p.add_argument('--outraw', nargs=1, type=str, default='', metavar='FILE',
             help='Optional raw or nrrd output file')
         p.add_argument('--nColorsLUTraw', nargs=1, type=int, default=[0], metavar=('NCLRS'),
             help='Specify non-zero number of colors for uint data (apply modulo, raw output)')
@@ -445,9 +445,9 @@ class dpLoadh5(object):
             help='Specify data type for converting to grayscale (raw output)')
         p.add_argument('--sigmaLOG', nargs=1, type=float, default=[0], metavar=('DTYPE'),
             help='Specify sigma for applying gaussian laplacian filter')
-        p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0], 
+        p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0],
             metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'), help='Size in voxels to zero pad (b=before, a=after)')
-        p.add_argument('--relabel-seq', dest='relabel_seq', action='store_true', 
+        p.add_argument('--relabel-seq', dest='relabel_seq', action='store_true',
             help='Relabel sequentially (labels only)')
         p.add_argument('--size-in-chunks', action='store_true', help='Size is specified in chunks, not voxels')
         p.add_argument('--size-from-hdf5', action='store_true', help='Size is specified by attribute in hdf5')
@@ -459,7 +459,7 @@ if __name__ == '__main__':
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     dpLoadh5.addArgs(parser)
     args = parser.parse_args()
-    
+
     loadh5 = dpLoadh5(args)
     loadh5.readCubeToBuffers()
     loadh5.writeRaw()

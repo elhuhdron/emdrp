@@ -1,17 +1,17 @@
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -30,15 +30,15 @@
 import numpy as np
 from scipy import ndimage as nd
 import argparse
-import time
+#import time
 import networkx as nx
 from utils import optimal_color
 #import sys
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-from pyCext import type_components
-    
+from pyCext import type_components, remove_adjacencies
+
 class emVoxelType(dpWriteh5):
     VOXTYPE_DTYPE = np.uint8
     VOXTYPE_STR_DTYPE = 'uint8'
@@ -46,23 +46,23 @@ class emVoxelType(dpWriteh5):
     EMPTY_VOXTYPE = np.iinfo(VOXTYPE_DTYPE).max
 
     # dictionary lookups for voxel types
-    # xxx - currently nothing is maintaining consistency between emVoxelType.TYPES define and 
+    # xxx - currently nothing is maintaining consistency between emVoxelType.TYPES define and
     #   type order from watershed. the order for types in watershed must be same as these defines.
     TYPES = {'BG':0, 'ICS':1, 'ECS':2}
 
     # maps special classes string to where it is assigned (increment on top of max ICS label)
     TYPES_LBL_INCR = {'ECS':1}
-    
+
     def __init__(self, args):
         self.default_data_type = self.VOXTYPE_DTYPE
         #self.data_type = self.VOXTYPE_DTYPE
         self.dataset = self.VOXTYPE_DATASET
         self.fillvalue = self.EMPTY_VOXTYPE
         dpWriteh5.__init__(self,args)
- 
+
     @classmethod
     def readVoxType(cls, srcfile, chunk, offset, size, verbose=False):
-        parser = argparse.ArgumentParser(description='class:emVoxelType', 
+        parser = argparse.ArgumentParser(description='class:emVoxelType',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + srcfile
@@ -76,10 +76,10 @@ class emVoxelType(dpWriteh5):
         return loadh5
 
     @classmethod
-    def writeVoxType(cls, outfile, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None, inraw='', 
+    def writeVoxType(cls, outfile, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None, inraw='',
             outraw='', attrs={}, verbose=False):
         assert( data is not None or inraw )
-        parser = argparse.ArgumentParser(description='class:emVoxelType', 
+        parser = argparse.ArgumentParser(description='class:emVoxelType',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + outfile
@@ -118,11 +118,11 @@ class emLabels(dpWriteh5):
         # reinitialize these for non-default data-type
         self.EMPTY_LABEL = np.iinfo(self.data_type).max
         self.fillvalue = self.EMPTY_LABEL
- 
+
     @classmethod
     def readLabels(cls, srcfile, chunk, offset, size, data_type=None, subgroups=[], verbose=False):
         if not data_type: data_type = cls.LBLS_STR_DTYPE
-        parser = argparse.ArgumentParser(description='class:emLabels', 
+        parser = argparse.ArgumentParser(description='class:emLabels',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + srcfile
@@ -138,10 +138,10 @@ class emLabels(dpWriteh5):
         return loadh5
 
     @classmethod
-    def writeLabels(cls, outfile, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None, inraw='', 
+    def writeLabels(cls, outfile, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None, inraw='',
             strbits='32', outraw='', attrs={}, subgroups=[], verbose=False):
         assert( data is not None or inraw )
-        parser = argparse.ArgumentParser(description='class:emProbabilities', 
+        parser = argparse.ArgumentParser(description='class:emProbabilities',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + outfile
@@ -174,11 +174,11 @@ class emLabels(dpWriteh5):
         # xxx - all these methods should do something like this, would be better to move to normal class member methods
         assert( lbls.dtype.kind in 'ui' )
 
-        sizes = emLabels.getSizes(lbls); sizes = sizes[1:]; 
+        sizes = emLabels.getSizes(lbls); sizes = sizes[1:];
         # negative minSize means only keep labels < minSize, positive means only keep labels >= minSize
         if minSize < 0: bgsel = (sizes >= -minSize)
         else: bgsel = (sizes < minSize)
-        fgsel = np.logical_not(bgsel); sizes = sizes[fgsel]; fgcomps = np.cumsum(fgsel,dtype=emLabels.LBLS_DTYPE); 
+        fgsel = np.logical_not(bgsel); sizes = sizes[fgsel]; fgcomps = np.cumsum(fgsel,dtype=emLabels.LBLS_DTYPE);
         fgcomps[bgsel] = 0; fgcomps = np.insert(fgcomps,0,0); L = fgcomps[lbls.flatten()].reshape(lbls.shape)
         return L, sizes
 
@@ -203,10 +203,16 @@ class emLabels(dpWriteh5):
         type_components(labels, voxel_type, supervoxel_type, voxel_out_type, ntypes)
         return supervoxel_type, voxel_out_type
 
-    # remove connected adjacencies between labels, 6-connectivity
-    # xxx - would be ideal to have a way to do this for arbitrary connectivity, not sure how to do this.
+    # remove connected adjacencies between labels, arbitrary connectivity
     @staticmethod
-    def remove_adjacencies(labels):
+    def remove_adjacencies_nconn(labels, connectivity=1, bwconn=None):
+        if bwconn is None:
+            bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, connectivity)
+        return remove_adjacencies(labels, bwconn)
+
+    # remove connected adjacencies between labels, 6-connectivity
+    @staticmethod
+    def remove_adjacencies_6conn(labels):
         bgmask = (labels > 0)    # to mask out labels that border on background to prevent erosion
         adjmask = np.zeros(labels.shape, dtype=np.bool)
 
@@ -240,12 +246,12 @@ class emLabels(dpWriteh5):
             sampling = np.ones((3,),dtype=np.double)
         else:
             if sampling.size==2: sampling = np.concatenate((sampling, 1))
-        
+
         # find anchor points for each object that are at the max and min of the dimension with the biggest range.
         amask = mask.copy(); ucnlabels= uclabels.max()
         for lbl in range(1,ucnlabels):
             inds = np.transpose(np.nonzero(uclabels == lbl)); pts = inds*sampling
-            # what would really be good here would be to run something like pca to get the directions of variance 
+            # what would really be good here would be to run something like pca to get the directions of variance
             #   and use the end points along those vectors. xxx - implement this
             # OR, any superior method of finding endpoints at anchor points
             vmax = pts.max(axis=0); vmin = pts.min(axis=0); ptrng = vmax - vmin
@@ -253,29 +259,29 @@ class emLabels(dpWriteh5):
             else: dmax = ptrng.argmax()
 
             # take any point at ends of largest range
-            p1 = inds[pts[:,dmax] == vmax[dmax],:]; p2 = inds[pts[:,dmax] == vmin[dmax],:]; 
+            p1 = inds[pts[:,dmax] == vmax[dmax],:]; p2 = inds[pts[:,dmax] == vmin[dmax],:];
             #print(p1[0,:],p2[0,:],amask[p1[0,0],p1[0,1],p1[0,2]])
-            amask[p1[0,0],p1[0,1],p1[0,2]] = False; amask[p2[0,0],p2[0,1],p2[0,2]] = False; 
-    
+            amask[p1[0,0],p1[0,1],p1[0,2]] = False; amask[p2[0,0],p2[0,1],p2[0,2]] = False;
+
         # now warp all the way down but keeping two anchor points along max range dim.
         # this method assumes that original labels were unconnected.
         # xxx - add connectivity to this function and send it to binary_warping for loading simpleLUT
-        bwlabels, diff = binary_warping((uclabels > 0).copy(order='C'), 
+        bwlabels, diff = binary_warping((uclabels > 0).copy(order='C'),
             np.zeros(uclabels.shape,dtype=np.bool), mask=amask, borderval=False, slow=True)
         if nShrinkEndPoints > 0:
             # now warp down a few more iterations to move anchor endpoints away from the object borders
-            bwlabels, diff = binary_warping(bwlabels.copy(order='C'), np.zeros(uclabels.shape,dtype=np.bool), 
+            bwlabels, diff = binary_warping(bwlabels.copy(order='C'), np.zeros(uclabels.shape,dtype=np.bool),
                 mask=mask, borderval=False, slow=True, numiters=nShrinkEndPoints)
         # run connected components to get label values
         return nd.measurements.label(bwlabels)
 
-        keeping this here for reference, maybe implement as another method?        
+        keeping this here for reference, maybe implement as another method?
                         ## "node"-ize instead of skeletonize
                         ## warp all the way down to points for each object.
-                        #skbwlabels, diff = binary_warping(bwlabels.copy(order='C'), 
+                        #skbwlabels, diff = binary_warping(bwlabels.copy(order='C'),
                         #    np.zeros(self.size,dtype=np.bool), mask=cVoxTypeSel, borderval=False, slow=True)
                         ## now warp back up a few iterations to make circles or spheres around points
-                        #skbwlabels, diff = binary_warping(skbwlabels.copy(order='C'), 
+                        #skbwlabels, diff = binary_warping(skbwlabels.copy(order='C'),
                         #    np.ones(self.size,dtype=np.bool), mask=cVoxTypeSel, borderval=False, slow=True, numiters=2)
                         ## run connected components to get label values
                         #sklabels = np.zeros(self.size, dtype=emLabels.LBLS_DTYPE); sknlabels = 0;
@@ -305,7 +311,7 @@ class emLabels(dpWriteh5):
         wlabels = emLabels.nearest_neighbor_fill(labels, mask=None, sampling=sampling); nlabels = wlabels.max();
 
         # select the objects to color based on component sizes
-        sizes_obj = emLabels.getSizes(labels)[1:]; sel_obj = (sizes_obj >= graySize); 
+        sizes_obj = emLabels.getSizes(labels)[1:]; sel_obj = (sizes_obj >= graySize);
         ind_obj = np.transpose(np.nonzero(sel_obj)).reshape((-1,)); ncolor = ind_obj.size
 
         # create a graph for the nearest neighbors of each object for larger objects
@@ -319,7 +325,7 @@ class emLabels(dpWriteh5):
         neighbors.flatten()[::ncolor] = 0   # remove diagonal
 
         G = nx.Graph(neighbors)
-        
+
         # try greedy first using all strategies, then try optimal (slow) if chromatic is specified
         #   meaning that we want an exact number of colors for coloring the non-neighboring labels.
         strategies = [
@@ -329,14 +335,14 @@ class emLabels(dpWriteh5):
         ]
         interchange = np.ones((len(strategies),),dtype=np.bool); interchange[[2,6]] = 0; minclrs = ncolor
         for i in range(len(strategies)):
-            tmp = nx.coloring.greedy_color(G, strategy=eval('nx.coloring.'+strategies[i]), 
+            tmp = nx.coloring.greedy_color(G, strategy=eval('nx.coloring.'+strategies[i]),
                 interchange=bool(interchange[i]))
             nclrs = max(tmp.values())+1;
             if nclrs < minclrs: Gclr = tmp; minclrs = nclrs
             if chromatic is not None and minclrs <= chromatic: break
         if chromatic is not None and minclrs > chromatic:
             Gclr = optimal_color(G,chromatic); minclrs = chromatic
-        
+
         # create the initial colormap for each object which is specified as the first color in the specified RGB cmap.
         # objects with size less than graySize will have this color.
         cmap_obj = cmap[0,:]*np.ones((nlabels,3),dtype=cmap.dtype)
@@ -361,7 +367,7 @@ class emProbabilities(dpWriteh5):
 
     @classmethod
     def readProbs(cls, srcfile, probName, chunk, offset, size, verbose=False):
-        parser = argparse.ArgumentParser(description='class:emProbabilities', 
+        parser = argparse.ArgumentParser(description='class:emProbabilities',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + srcfile
@@ -376,10 +382,10 @@ class emProbabilities(dpWriteh5):
         return loadh5
 
     @classmethod
-    def writeProbs(cls, outfile, probName, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None, 
+    def writeProbs(cls, outfile, probName, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None,
             inraw='', outraw='', attrs={}, verbose=False):
         assert( data is not None or inraw )
-        parser = argparse.ArgumentParser(description='class:emProbabilities', 
+        parser = argparse.ArgumentParser(description='class:emProbabilities',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpWriteh5.addArgs(parser); arg_str = ''
         arg_str += ' --srcfile ' + outfile

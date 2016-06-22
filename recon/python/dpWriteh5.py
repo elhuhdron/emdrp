@@ -159,7 +159,9 @@ class dpWriteh5(dpLoadh5):
             #import nrrd
             #data, hdr = nrrd.read(self.inraw)
         elif ext == 'gipl':
-            data = dpWriteh5.gipl_read_volume(self.inraw)
+            data, hdr, info = dpWriteh5.gipl_read_volume(self.inraw)
+            if 'scale' not in self.data_attrs:
+                self.data_attrs['scale'] = hdr['scales'][:3]
         else:
             data = np.fromfile(self.inraw,dtype=self.data_type_out)
 
@@ -199,7 +201,7 @@ class dpWriteh5(dpLoadh5):
         fh.seek(info['hdr_size_bytes'])
         V = np.fromfile(fh, dtype=dtype, count=datasize).byteswap(True).reshape((hdr['sizes'][:3]))
 
-        return V
+        return V, hdr, info
 
     @classmethod
     def writeData(cls, outfile, dataset, chunk, offset, size, data_type, datasize, chunksize, fillvalue=None, data=None,

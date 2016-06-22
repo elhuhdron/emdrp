@@ -1,17 +1,17 @@
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -59,17 +59,17 @@ def label_affinities(affinities, labels, nextlabel, threshold):
         raise Exception( 'In label_affinities, nextlabel argument is not a integer')
     if nextlabel < 1:
         raise Exception( 'In label_components, nextlabel argument is less than one')
-        
+
     return _pyCext.label_affinities(affinities,labels,nextlabel,threshold)
 
 # perform warping from one binary image to another. only connectivity of 1,3 (6,26) supported
 # xxx - document all these optional parameters
-def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, borderval=False, numiters=-1, slow=False, 
+def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, borderval=False, numiters=-1, slow=False,
         simpleLUT=None, connectivity=1, return_nonSimple=False):
     sz =  [x+2 for x in source.shape]   # need border for neighborhoods around the edge voxels
     dtype = np.bool; pdtype = np.float32
     test=np.zeros((2,2),dtype=dtype)
-    
+
     if type(source) != type(test):
         raise Exception( 'In binary_warping, source is not *NumPy* array')
     if len(source.shape) != 3:
@@ -103,7 +103,7 @@ def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, bo
             raise Exception( 'In binary_warping, mask not correct data type')
         if not np.array_equal(mask.shape, source.shape):
             raise Exception( 'In binary_warping, mask not same shape as source')
-            
+
     if gray is None:
         # over-ride gray Thresholds if gray data is not provided
         gray = np.ones((0,), dtype=pdtype); grayThresholds = np.ones((0,), dtype=pdtype); gry = gray
@@ -118,7 +118,7 @@ def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, bo
             raise Exception( 'In binary_warping, gray not correct data type')
         if not np.array_equal(gray.shape, source.shape):
             raise Exception( 'In binary_warping, gray not same shape as source')
-    
+
         # xxx - grayThresholds need to be in decreasing order, assume caller does this instead of doing it here
         if type(grayThresholds) != type(test):
             raise Exception( 'In binary_warping, grayThresholds is not *NumPy* array')
@@ -143,7 +143,7 @@ def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, bo
     if simpleLUT is None:
         assert(connectivity in [1,3]);  # 18-connectivity is not supported (no LUT, see matlab generation code)
         #assert(connectivity in [1,2,3]);
-        
+
         # load the LUT from the current directory depending on connectivity
         if connectivity==1:
             fn = 'simpleLUT3d_6connFG_26connBG.raw'
@@ -161,16 +161,16 @@ def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, bo
     tgt = np.ones(sz, dtype=dtype) * borderval; tgt[1:-1,1:-1,1:-1] = target
     msk = np.zeros(sz, dtype=dtype); msk[1:-1,1:-1,1:-1] = mask
     if gray.size > 0: gry = np.zeros(sz, dtype=pdtype); gry[1:-1,1:-1,1:-1] = gray
-    
+
     # optionally return the type of the remaining non-simple points
     nonSimple = np.zeros(sz, dtype=np.uint8) if return_nonSimple else np.zeros((0,), dtype=np.uint8)
-    
+
     diff = _pyCext.binary_warping(src, tgt, msk, simpleLUT, gry, grayThresholds, nonSimple, numiters, slow)
     #assert( (nonSimple > 0).sum(dtype=np.int64) == diff )  # should be true, not worth the time
-    
+
     # the source is now the original source after warping towards the target
     if return_nonSimple:
-        # xxx - this should probably be stored along with the lookup table... 
+        # xxx - this should probably be stored along with the lookup table...
         # xxx - could also replace these with an ordered dict
         nonSimpleTypes = {
             'dic' : {'SIMPLE':0,
@@ -220,8 +220,34 @@ def merge_supervoxels(consensus_labels, data_cube, merged, nlabels):
 
     if type(nlabels) != int:
         raise Exception('In merge_supervoxels, nlabels is not an int')
-    
+
     _pyCext.merge_supervoxels(consensus_labels, data_cube, merged, nlabels)
+
+def remove_adjacencies(labels, bwconn):
+    test = np.zeros((2,2), dtype = np.uint32)
+    if type(labels) != type(test):
+        raise Exception('In remove_adjacencies, labels is not a *NumPy* array')
+    if len(labels.shape) != 3:
+        raise Exception('In remove_adjacencies, labels is not 3 dimensional')
+    if not labels.flags.contiguous or np.isfortran(labels):
+        raise Exception('In remove_adjacencies, labels not contiguous or not C-order')
+    if labels.dtype != test.dtype:
+        raise Exception('In remove_adjacencies, labels not uint32')
+
+    testB=np.zeros((2,2),dtype=np.bool)
+    if type(bwconn) != type(testB):
+        raise Exception( 'In remove_adjacencies, bwconn is not *NumPy* array')
+    if len(bwconn.shape) != 3:
+        raise Exception( 'In remove_adjacencies, bwconn is not 3 dimensional')
+    if not bwconn.flags.contiguous or np.isfortran(bwconn):
+        raise Exception( 'In remove_adjacencies, bwconn not C-order contiguous')
+    if bwconn.dtype != testB.dtype:
+        raise Exception( 'In remove_adjacencies, bwconn not correct data type')
+
+    sz =  [x+2 for x in labels.shape]   # need border for neighborhoods around the edge voxels
+    lbls = np.zeros(sz, dtype=labels.dtype); lbls[1:-1,1:-1,1:-1] = labels
+    _pyCext.remove_adjacencies(lbls, bwconn)
+    return lbls[1:-1,1:-1,1:-1]
 
 # assign type for each supervoxel using majority vote of contained voxels, output to supervoxel_type
 def type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_types=2):
@@ -267,7 +293,7 @@ def type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_typ
         raise Exception( 'In type_components, num_types argument is not an integer')
     if num_types < 2:
         raise Exception( 'In type_components, num_types < 2, need at least two types')
-        
+
     return _pyCext.type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_types)
 
 

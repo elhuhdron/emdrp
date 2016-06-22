@@ -1,18 +1,18 @@
 /*
  * The MIT License (MIT)
- * 
+ *
  * Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in all
  * copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -39,15 +39,15 @@ static PyMethodDef _pyCextMethods[] = {
     // EM data extensions
     {"label_affinities", label_affinities, METH_VARARGS},
     {"binary_warping", binary_warping, METH_VARARGS},
-    {"merge_supervoxels", merge_supervoxels, METH_VARARGS},
     {"type_components", type_components, METH_VARARGS},
+    {"remove_adjacencies", remove_adjacencies, METH_VARARGS},
 
     {NULL, NULL}     /* Sentinel - marks the end of this structure */
 };
 
 
 /* ==== Initialize the C_test functions ====================== */
-// Module name must be _pyCext in compile and linked 
+// Module name must be _pyCext in compile and linked
 
 // https://docs.python.org/3.3/howto/cporting.html
 // http://python3porting.com/cextensions.html
@@ -65,9 +65,9 @@ static struct PyModuleDef moduledef = {
         NULL                 /* m_free */
 };
 
-PyObject* PyInit__pyCext(void) 
+PyObject* PyInit__pyCext(void)
 #else
-void init_pyCext()  
+void init_pyCext()
 #endif
 {
 
@@ -99,22 +99,22 @@ static PyObject *label_affinities(PyObject *self, PyObject *args)
     npy_intp *dims, size, ind, nind, ptr=0, cursize;
     //npy_intp dimslbls[LBLS_ND];
     npy_uint16 *stack[LBLS_ND];
-    
+
     /* Inputs are affinity graph ndarray and threshold (single float) */
     // take the labels as input, so that this process can be repeated with different thresholds.
     // if a voxel has already been previously labeled, it will not be reassigned.
     // curlab is also taken as input as to the label to start with (usually one plus the max in the input labels)
-    if (!PyArg_ParseTuple(args, "O!O!If", &PyArray_Type, &affinities, &PyArray_Type, &labels, &curlab, &threshold)) 
+    if (!PyArg_ParseTuple(args, "O!O!If", &PyArray_Type, &affinities, &PyArray_Type, &labels, &curlab, &threshold))
         return NULL;
     if (NULL == affinities) return NULL;
-    
+
     /* Get the dimensions of the labels and the c pointer to the affinities and labels */
     dims = PyArray_DIMS(affinities); m = dims[0]; n = dims[1]; z = dims[2]; nd = dims[3]; size = m*n*z;
     affs = (float *) PyArray_DATA(affinities);
-    //dimslbls[0] = m; dimslbls[1] = n; dimslbls[2] = z;     
+    //dimslbls[0] = m; dimslbls[1] = n; dimslbls[2] = z;
     //labels=(PyArrayObject *) PyArray_SimpleNew(nd,dimslbls,NPY_UINT32);
     lbls = (npy_uint32 *) PyArray_DATA(labels);
-    
+
     /* Allocate the stack, allocate worst case which is all voxels. */
     // Assume no volume dimension is larger than 16 bit (safe assumption given memory required for larger volumes)
     for( i=0; i<LBLS_ND; i++ ) {
@@ -123,20 +123,20 @@ static PyObject *label_affinities(PyObject *self, PyObject *args)
             printf("In label_affinities allocation of memory for stack failed."); exit(0);
         }
     }
-    
+
     /* http://en.wikipedia.org/wiki/Connected-component_labeling
-    It is assumed that the input image is a binary image, with pixels being either background or foreground and that 
+    It is assumed that the input image is a binary image, with pixels being either background or foreground and that
     the connected components in the foreground pixels are desired. The algorithm steps can be written as:
 
     (1) Start from the first pixel in the image. Set "curlab" (short for "current label") to 1. Go to (2).
-    (2) If this pixel is a foreground pixel and it is not already labelled, then give it the label "curlab" and 
-        add it as the first element in a queue, then go to (3). If it is a background pixel, then repeat (2) for the 
+    (2) If this pixel is a foreground pixel and it is not already labelled, then give it the label "curlab" and
+        add it as the first element in a queue, then go to (3). If it is a background pixel, then repeat (2) for the
         next pixel in the image.
-    (3) Pop out an element from the queue, and look at its neighbours (based on any type of connectivity). If a 
-        neighbour is a foreground pixel and is not already labelled, give it the "curlab" label and add it to the queue. 
+    (3) Pop out an element from the queue, and look at its neighbours (based on any type of connectivity). If a
+        neighbour is a foreground pixel and is not already labelled, give it the "curlab" label and add it to the queue.
         Repeat (3) until there are no more elements in the queue.
     (4) Go to (2) for the next pixel in the image and increment "curlab" by 1.
-    
+
     This basic algorithm is used, but instead of using the voxels for connectivity, a threshold on the affinity graph
       is used instead to determine connectivity in each direction (3 dimension volume assumed in this code).
     */
@@ -146,7 +146,7 @@ static PyObject *label_affinities(PyObject *self, PyObject *args)
         for( j=0; j<n; j++ ) {
             for( k=0; k<z; k++ ) {
                 ind = i*n*z + j*z + k;  // single index into volume (C-order)
-                
+
                 if( !lbls[ind] ) {  // step (2)
                     lbls[ind] = curlab; cursize = 1;     // Not already labeled
                     stack[0][ptr] = i; stack[1][ptr] = j; stack[2][ptr] = k; ptr++;     // Push to stack
@@ -164,7 +164,7 @@ static PyObject *label_affinities(PyObject *self, PyObject *args)
                                 if( !lbls[nind] && affs[nsub[0]*n*z*N + nsub[1]*z*N + nsub[2]*N + nb] > threshold ) {
                                     // label this neighbor as same object, increment size, push to stack
                                     lbls[nind] = curlab; cursize++;
-                                    stack[0][ptr] = nsub[0]; stack[1][ptr] = nsub[1]; stack[2][ptr] = nsub[2]; ptr++; 
+                                    stack[0][ptr] = nsub[0]; stack[1][ptr] = nsub[1]; stack[2][ptr] = nsub[2]; ptr++;
                                 }
                             }
                             // check "up" in this dim
@@ -175,7 +175,7 @@ static PyObject *label_affinities(PyObject *self, PyObject *args)
                                 if( !lbls[nind] && affs[csub[0]*n*z*N + csub[1]*z*N + csub[2]*N + nb] > threshold ) {
                                     // label this neighbor as same object, increment size, push to stack
                                     lbls[nind] = curlab; cursize++;
-                                    stack[0][ptr] = nsub[0]; stack[1][ptr] = nsub[1]; stack[2][ptr] = nsub[2]; ptr++; 
+                                    stack[0][ptr] = nsub[0]; stack[1][ptr] = nsub[1]; stack[2][ptr] = nsub[2]; ptr++;
                                 }
                             }
                         } // for each dimension (hard-coded indices and loops for 3 dims, C-order)
@@ -218,13 +218,13 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
     npy_intp nGrayTs, gT, g;
     npy_bool *gry_msk = NULL, *cmsk;
     int useGray;
-    
+
     // diff = _pyCext.binary_warping(src, tgt, msk, simpleLUT, gry, grayThresholds, nonSimple, numiters, slow)
-    if (!PyArg_ParseTuple(args, "O!O!O!O!O!O!O!Li", &PyArray_Type, &source, &PyArray_Type, &target, 
-            &PyArray_Type, &mask, &PyArray_Type, &oSimpleLUT, &PyArray_Type, &gray, &PyArray_Type, &grayThresholds, 
-            &PyArray_Type, &oNonSimple, &numiters, &slow)) 
+    if (!PyArg_ParseTuple(args, "O!O!O!O!O!O!O!Li", &PyArray_Type, &source, &PyArray_Type, &target,
+            &PyArray_Type, &mask, &PyArray_Type, &oSimpleLUT, &PyArray_Type, &gray, &PyArray_Type, &grayThresholds,
+            &PyArray_Type, &oNonSimple, &numiters, &slow))
         return NULL;
-    
+
     /* Get the dimensions of the labels and the c pointer to the labels and components */
     dims = PyArray_DIMS(source); m = dims[0]; n = dims[1]; nz = dims[2]; numel = PyArray_SIZE(source);
     src = (npy_bool *) PyArray_DATA(source);
@@ -235,7 +235,7 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
     // will only watershed to the point where topology is not violated (simple points).
     gry = (npy_float32 *) PyArray_DATA(gray);
     grayTs = (npy_float32 *) PyArray_DATA(grayThresholds);
-    
+
     // simple LUT contains the classification of nonsimple points in a 3x3x3 neighborhood (patch)
     // the value identifies the type of nonsimple point, zero indicates that it is a simple point.
     // thus, code below uses !simpleLUT[ind] to identify simple points in the neighborhood patch.
@@ -256,7 +256,7 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
             printf("In binary_warping allocation of memory for new_src failed."); exit(0);
         }
         memcpy( new_src, src, numel*sizeof(npy_bool) );
-        
+
         // this is so misclassified points can be re-ordered, helps with better warps in slow (perimeter) mode.
         // on average does not give better warping errors in normal mode, so only enabled for slow mode.
         tmp_pts = (npy_intp *) malloc((size_t) (numel*sizeof(npy_intp)));
@@ -282,8 +282,8 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
             // do not include any points that were not in the original mask.
             for( g = 0; g < numel; g++ ) if( !cmsk[g] && msk[g] && (gry[g] > grayTs[gT]) ) cmsk[g] = 1;
         }
-        
-        // this is the main body of the warping descent loop. 
+
+        // this is the main body of the warping descent loop.
         // flip each mismatching simple point in the order of mismatching points returned by get_misclass_points.
         // continue for a specified number of iterations or until there are no more mismatching points.
         diff = numel + 1;
@@ -292,7 +292,7 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
             diff = get_misclass_points(src,tgt,cmsk,numel,pts,tmp_pts);
             //printf("iter is %d, diff is %d, diff_before is %d\n",iter,diff,diff_before);
             if( diff_before == diff ) break;
-    
+
             for( i = 0; i < diff; i++ ) {
                 //pt = pts[i]; x = pt % m; y = (pt / m) % n; z = pt / m / n; // ind2sub for 3d, F-order
                 pt = pts[i]; z = pt % nz; y = (pt / nz) % n; x = pt / n / nz; // ind2sub for 3d, C-order
@@ -306,12 +306,12 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
                     if( !simpleLUT[ind] ) src[pt] = !patch[13];
                 }
             } // for each misclassified point
-    
+
             //if( slow ) memcpy( src, new_src, numel*sizeof(npy_bool) );
             if( slow ) memcpy( src, new_src, numel );
             iter++;
         } // descent loop
-        
+
     } // for each gray level (only when useGray)
 
     // Optionally return by reference the type of all remaining nonsimple points after the warping.
@@ -324,9 +324,9 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
             nonSimple[pt] = simpleLUT[get_simpleLUTind_from_patch(patch)];
         } // for each misclassified point
     } // if returning type of remaining nonsimple points
-  
+
     // clean up
-    free(pts); 
+    free(pts);
     if( slow ) { free(new_src); free(tmp_pts); }
     if( useGray ) free(gry_msk);
 
@@ -335,63 +335,23 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
 }
 
 
-static PyObject *merge_supervoxels(PyObject *self, PyObject *args)
-{
-    PyArrayObject *data_cube, *merged, *consensus_label;
-    int nlabels;
-    if (!PyArg_ParseTuple(args, "O!O!O!i", &PyArray_Type, &consensus_label, &PyArray_Type, &data_cube, &PyArray_Type, 
-            &merged, &nlabels)) {
-        return NULL;
-    }
-    
-    npy_uint32 *original; original = (npy_uint32 *) PyArray_DATA(data_cube);
-    npy_int64 *to_merge; to_merge = (npy_int64 *) PyArray_DATA(merged);
-    npy_uint32 *consensus; consensus = (npy_uint32 *) PyArray_DATA(consensus_label);
-   
-    npy_int m,n,z;
-    npy_intp *dims;
-    dims = PyArray_DIMS(data_cube); m = dims[0]; n = dims[1]; z = dims[2];
- 
-    npy_intp data_size, merged_size;
-    data_size = PyArray_SIZE(data_cube);
-    merged_size = PyArray_SIZE(merged);
-    
-    npy_intp i, j; int a = 5;
-    //npy_intp a, b, c, rem;
-    for (i = 0; i < data_size; i++) {       //iterate through data_cube
-        for (j = 0; j < merged_size; j++) { //iterate through merged
-            if (original[i] == to_merge[j]) {
-                // for F-order:
-                //a = i % m; rem = i / m; b = rem % n; c = rem / n;
-                //consensus[(a * n * z) + (b * z) + c] = nlabels;
-                
-                // for C-order:
-                consensus[i] = nlabels;
-            }
-        }
-    }
-    
-    return Py_BuildValue("L", 0);
-}
-
-
 static PyObject *type_components(PyObject *self, PyObject *args)
 {
     PyArrayObject *labels, *voxel_type, *supervoxel_type, *voxel_out_type;
     npy_uint32 *lbls, num_types;
     npy_uint8 *svclass, *vclass, *voclass;
-    
+
     npy_int m,n,z, i,j,k, imax;
     npy_intp *dims, size, nsupervoxels, ind;
     npy_uint64 **counts, cmax;
 
-    // Using the same method as for affinities, mostly for convenience in not have to re-write much.    
+    // Using the same method as for affinities, mostly for convenience in not have to re-write much.
     // if a voxel has already been previously labeled, it will not be reassigned.
     // curlab is also taken as input as to the label to start with (usually one plus the max in the input labels)
-    if (!PyArg_ParseTuple(args, "O!O!O!O!I", &PyArray_Type, &labels, &PyArray_Type, &voxel_type, 
-            &PyArray_Type, &supervoxel_type, &PyArray_Type, &voxel_out_type, &num_types)) 
+    if (!PyArg_ParseTuple(args, "O!O!O!O!I", &PyArray_Type, &labels, &PyArray_Type, &voxel_type,
+            &PyArray_Type, &supervoxel_type, &PyArray_Type, &voxel_out_type, &num_types))
         return NULL;
-    
+
     /* Get the dimensions of the labels and the c pointer to the labels and components */
     dims = PyArray_DIMS(labels); m = dims[0]; n = dims[1]; z = dims[2]; size = m*n*z;
     nsupervoxels = PyArray_SIZE(supervoxel_type);
@@ -399,7 +359,7 @@ static PyObject *type_components(PyObject *self, PyObject *args)
     vclass = (npy_uint8 *) PyArray_DATA(voxel_type);
     svclass = (npy_uint8 *) PyArray_DATA(supervoxel_type);
     voclass = (npy_uint8 *) PyArray_DATA(voxel_out_type);
-    
+
     /* Allocate counts for each type. */
     counts = (npy_uint64 **) malloc((size_t) (num_types*sizeof(npy_uint64*)));
     if( counts == NULL ) {
@@ -431,7 +391,7 @@ static PyObject *type_components(PyObject *self, PyObject *args)
     for( ind=0; ind<size; ind++ ) {
         if( lbls[ind] ) voclass[ind] = svclass[lbls[ind]-1];
     } // for each voxel
-    
+
     // clean up
     for( i=0; i<num_types; i++ ) free(counts[i]);
     free(counts);
@@ -440,17 +400,64 @@ static PyObject *type_components(PyObject *self, PyObject *args)
 }
 
 
+static PyObject *remove_adjacencies(PyObject *self, PyObject *args)
+{
+    PyArrayObject *labels, *labels_out, *bwconnectivity;
+    npy_uint32 *lbls, *lout;
+    npy_bool *bwconn;
+
+    npy_int m,n,nz, x,y,z, xp,yp,zp, ip;
+    npy_intp pt, ind;
+    npy_intp *dims, size;
+    npy_bool adj;
+
+    if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &labels, &PyArray_Type, &bwconnectivity))
+        return NULL;
+
+    /* Get the dimensions of the labels and the c pointer to the labels and components */
+    dims = PyArray_DIMS(labels); m = dims[0]; n = dims[1]; nz = dims[2]; size = m*n*nz;
+    lbls = (npy_uint32 *) PyArray_DATA(labels);
+    bwconn = (npy_bool *) PyArray_DATA(bwconnectivity);
+
+    // get neighbors based on adjacency for all non-zero label voxels
+    for( pt = 0; pt < size; pt++ ) {
+        if( lbls[pt] ) {
+            // iterate neighborhood for this voxel and clear any voxels that are not the same label
+            adj = 0;
+            for( ip = 0; ip < 27; ip++ ) {
+                // if current voxel in 3d neighborhood (skip center) is adjacent based on supplied connectivity
+                if( bwconn[ip] && ip != 13 ) {
+                    zp = ip % 3; yp = (ip / 3) % 3; xp = ip / 9; // ind2sub in patch for 3d, C-order
+                    z = pt % nz; y = (pt / nz) % n; x = pt / n / nz; // ind2sub in volume for 3d, C-order
+                    // get patch location relative to center and sub2ind in volume for 3d, C-order
+                    ind = (npy_intp)(x+xp-1)*n*nz + (npy_intp)(y+yp-1)*nz + (npy_intp)(z+zp-1);
+
+                    // if adjacent label is not the same as center label, found adjacency, clear adjacent voxel
+                    if( lbls[ind] && lbls[pt] != lbls[ind] ) {
+                        lbls[ind] = 0; adj = 1;
+                    }
+                }
+            } // for each point in 3d neighborhood (3x3x3)
+            // if adjacency was found, also clear current voxel so that adjacency is removed symmetrically
+            if( adj ) lbls[pt] = 0;
+        } // if current voxel is non-zero
+    } // for each voxel in volume
+
+    return Py_BuildValue("L", 0);
+}
+
+
 /* #### Helper functions for EM data extensions #################################### */
 
-npy_intp get_misclass_points(const npy_bool *src, const npy_bool *tgt, const npy_bool *msk, npy_intp numel, 
+npy_intp get_misclass_points(const npy_bool *src, const npy_bool *tgt, const npy_bool *msk, npy_intp numel,
         npy_intp *pts, npy_intp *tmp_pts) {
     npy_intp i, diff = 0, hdiff, *cpts = (tmp_pts == NULL ? pts : tmp_pts);
-  
+
     for( i = 0; i < numel; i++ ) {
         // mask and xor(src,tgt)
         if( msk[i] && ((src[i] && !tgt[i]) || (!src[i] && tgt[i])) ) cpts[diff++] = i;
     }
-  
+
     if( tmp_pts != NULL ) {
         // re-order by interleaving points from beginning and end, helps give better warps in slow (perimeter) mode
         hdiff = diff/2;
@@ -459,11 +466,11 @@ npy_intp get_misclass_points(const npy_bool *src, const npy_bool *tgt, const npy
         }
         if( diff > 0 ) pts[diff-1] = tmp_pts[hdiff]; // last point if odd diff
     }
-    
+
     return diff;
 }
 
-int get_nbhd_patch(npy_bool *patch, const npy_bool *src, npy_int x, npy_int y, npy_int z, npy_int m, npy_int n, 
+int get_nbhd_patch(npy_bool *patch, const npy_bool *src, npy_int x, npy_int y, npy_int z, npy_int m, npy_int n,
         npy_int nz) {
     npy_intp ind;
     int xp,yp,zp;
@@ -473,13 +480,13 @@ int get_nbhd_patch(npy_bool *patch, const npy_bool *src, npy_int x, npy_int y, n
     //    printf("get_nbhd_patch: %d,%d,%d out of bounds %dx%dx%d\n",x,y,z,m,n,nz);
     //    return 0;
     //}
-  
+
     for( zp = -1; zp < 2; zp++ ) {
         for( yp = -1; yp < 2; yp++ ) {
             for( xp = -1; xp < 2; xp++ ) {
                 //ind = (z+(npy_intp)zp)*m*n + (y+(npy_intp)yp)*m + (x+(npy_intp)xp); // sub2ind for 3d, F-order
                 ind = (npy_intp)(x+xp)*n*nz + (npy_intp)(y+yp)*nz + (npy_intp)(z+zp);  // sub2ind for 3d, C-order
-        
+
                 patch[(zp+1)*9 + (yp+1)*3 + (xp+1)] = src[ind];     // patch lookup was created as F-order in matlab
             }
         }
