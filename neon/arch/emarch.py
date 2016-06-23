@@ -132,6 +132,76 @@ class DOG_nfergus(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+class mfergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(mfergus, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            Conv((9, 9, 64), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                    padding=4, strides=1)\
+                if self.bn_first_layer else\
+                Conv((9, 9, 64), init=GlorotUniform(), bias=Constant(0), activation=Explin(), 
+                    padding=4, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((7, 7, 96), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                 padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((5, 5, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                 padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Affine(nout=5120, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=5120, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=GlorotUniform(), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
+class DOGmfergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(DOGmfergus, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            DOG((5.0, 4.0, 3.0, 1.6), 1.8),
+            Conv((9, 9, 64), init=GlorotUniform(), activation=Explin(), batch_norm=bn,
+                    padding=4, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((7, 7, 96), init=GlorotUniform(), activation=Explin(), batch_norm=bn,
+                 padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((5, 5, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn,
+                 padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn,
+                 padding=1, strides=1),
+            Conv((3, 3, 384), init=GlorotUniform(), activation=Explin(), batch_norm=bn,
+                 padding=1, strides=1),
+            Conv((3, 3, 256), init=GlorotUniform(), activation=Explin(), batch_norm=bn,
+                 padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Affine(nout=5120, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=5120, init=GlorotUniform(), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=GlorotUniform(),
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class sfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
         super(sfergus, self).__init__(noutputs, use_softmax)
