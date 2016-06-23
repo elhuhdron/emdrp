@@ -234,7 +234,7 @@ class EMDataParser():
         assert( (self.image_size % 2) == (self.image_out_size % 2) )
         assert( self.independent_labels or self.image_out_size == 1 ) # need independent labels for multiple pixels out
         assert( not self.no_labels or self.no_label_lookup )    # must have no_label_lookup in no_labels mode
-        assert( not self.chunk_list_all or self.no_label_lookup )   # must have no_label_lookup for all chunks loaded
+        #assert( not self.chunk_list_all or self.no_label_lookup )   # must have no_label_lookup for all chunks loaded
         assert( not self.chunk_list_all or not self.write_outputs ) # write_outputs not supported for all chunks loaded
 
         # number of cases per batch should be kept lower than number of rand streams in convnet (128*128 = 16384)
@@ -336,6 +336,9 @@ class EMDataParser():
         self.data_cube = [None]*n
         self.segmented_labels_cube = [None]*n
         self.labels_cube = [None]*n
+
+        self.inds_label_lookup = [self.nlabels*[None] for i in range(n)]
+        self.label_lookup_lens = [self.nlabels*[0] for i in range(n)]
             
         # print out all initialized variables in verbose mode
         if self.verbose: 
@@ -343,7 +346,6 @@ class EMDataParser():
             print 'EMDataParser, vars after init:\n'; print tmp
         
         # other inits
-        self.label_lookup_lens = self.nlabels*[0]
         self.rand_priors = self.nlabels * [0.0]; self.tiled_priors = self.nlabels * [0.0]
 
         # the prior to use to reweight exported probabilities.
@@ -370,10 +372,11 @@ class EMDataParser():
                 self.setChunkList(c, cl)
                 self.readCubeToBuffers(cl[c])
                 self.setupAllLabels(cl[c])
+                if not self.no_label_lookup: self.makeRandLabelLookup(cl[c])
         else:
             self.readCubeToBuffers()
             self.setupAllLabels()
-        if not self.no_label_lookup: self.makeRandLabelLookup()
+            if not self.no_label_lookup: self.makeRandLabelLookup()
         if self.write_outputs: self.enumerateTiledLabels()
         # for chunklist or chunkrange modes, the tiled indices do not change, so no need to regenerate them
         # xxx - use hasattr for this in a number of spots, maybe change to a single boolean for readability?
@@ -384,15 +387,15 @@ class EMDataParser():
         
         self.silent = False
 
-    def makeRandLabelLookup(self):
+    def makeRandLabelLookup(self, chunkind=0):
         #assert( not self.chunk_list_all )  # random batches with lookup not intended for all chunks loaded mode
         if not self.silent: print 'EMDataParser: Creating rand label lookup for specified zslices'
         self.label_priors[:] = self.initial_label_priors     # incase prior was modified below in chunk mode
         max_total_voxels = self.size_rand.prod() # for heuristic below - xxx - rethink this, or add param?
         total_voxels = 0
-        self.inds_label_lookup = self.nlabels*[None]
+        #self.inds_label_lookup = self.nlabels*[None]
         for i in range(self.nlabels):
-            inds = np.transpose(np.nonzero(self.labels_cube[0][:,:,0:self.nrand_zslice] == i))
+            inds = np.transpose(np.nonzero(self.labels_cube[chunkind][:,:,0:self.nrand_zslice] == i))
             if inds.shape[0] > 0:
                 # don't select from end slots for multiple zslices per case
                 inds = inds[np.logical_and(inds[:,2] >= self.nzslices/2, 
@@ -411,8 +414,8 @@ class EMDataParser():
                 
                 inds += self.labels_offset
                 assert( np.logical_and(inds >= 0, inds < self.cubeSubLim).all() )
-                self.label_lookup_lens[i] = inds.shape[0]; total_voxels += inds.shape[0]
-                self.inds_label_lookup[i] = inds.astype(self.cubeSubType, order='C')
+                self.label_lookup_lens[chunkind][i] = inds.shape[0]; total_voxels += inds.shape[0]
+                self.inds_label_lookup[chunkind][i] = inds.astype(self.cubeSubType, order='C')
                 if self.write_outputs:
                     outfile = h5py.File(os.path.join(self.outpath, self.OUTPUT_H5_CVIN), 'a'); 
                     outfile.create_dataset('inds_label_lookup_%d' % i,data=inds,compression='gzip', 
@@ -425,13 +428,13 @@ class EMDataParser():
                 assert(self.label_priors[i] == 0) # prior must be zero if label is missing
 
         assert(total_voxels > 0);            
-        self.rand_priors = [float(x)/total_voxels for x in self.label_lookup_lens]
+        self.rand_priors = [float(x)/total_voxels for x in self.label_lookup_lens[chunkind]]
         if self.write_outputs:
             outfile = open(os.path.join(self.outpath, self.INFO_FILE), 'a')
             outfile.write('\nTotal voxels included for random batches %u\n' % (total_voxels,))
             for i in range(self.nlabels):
                 outfile.write('label %d %s percentage of voxels = %.8f , count = %d, use prior %.8f\n' %\
-                    (i,self.label_names[i],self.rand_priors[i],self.label_lookup_lens[i],self.label_priors[i]))
+                    (i,self.label_names[i],self.rand_priors[i],self.label_lookup_lens[0][i],self.label_priors[i]))
             outfile.write('Sum percentage of allowable rand voxels = %.3f\n' % sum(self.rand_priors))
             outfile.close(); 
 
@@ -624,14 +627,20 @@ class EMDataParser():
             #for i in range(self.nlabels): 
             #    inds_label_lookup[i] = np.transpose(np.nonzero(self.labels_cube[0][:,:,0:self.nrand_zslice] == i))
         else:
-            # generate any possible random choices for each label type, will not use all of these, for efficiency
-            inds_lbls = np.zeros((self.nlabels, self.num_cases_per_batch), dtype=np.uint64)
-            for i in range(self.nlabels): 
-                if self.label_lookup_lens[i]==0: continue   # do not attempt to select labels if there are none
-                inds_lbls[i,:] = nr.choice(self.label_lookup_lens[i], self.num_cases_per_batch)
-            inds_label_lookup = self.inds_label_lookup
-            # random batches with lookup table can not use chunk_list_all mode
-            chunks = np.zeros((self.num_cases_per_batch,), dtype=np.int64)
+            # randomize the chunks were are presented also if all chunks are loaded
+            if self.chunk_list_all:
+                cl = self.chunk_rand_list; ncl = self.chunk_range_rand
+                chunks = nr.choice(ncl, (self.num_cases_per_batch,))
+            else:
+                cl = [0]; ncl = 1
+                chunks = np.zeros((self.num_cases_per_batch,), dtype=np.int64)
+
+            # generate any possible random choices for each label type and chunk, will not use all, for efficiency
+            inds_lbls = np.zeros((self.nlabels, ncl, self.num_cases_per_batch), dtype=np.uint64)
+            for c, chunk in zip(range(ncl), cl):
+                for i in range(self.nlabels): 
+                    if self.label_lookup_lens[chunk][i]==0: continue # do not attempt to select labels if there are none
+                    inds_lbls[i,c,:] = nr.choice(self.label_lookup_lens[chunk][i], self.num_cases_per_batch)
 
         # generate a random offset from the selected location.
         # this prevents the center pixel from being the pixel that is used to select the image every time and
@@ -645,9 +654,10 @@ class EMDataParser():
             (self.image_out_offset, self.image_out_offset))], axis=1) - self.image_out_offset/2
 
         for imgi in range(self.num_cases_per_batch):
-            inds = inds_label_lookup[lbls[imgi]][inds_lbls[lbls[imgi], imgi],:] + offset[imgi,:]
-            self.getAllDataAtPoint(inds,data,aug_data,imgi,augs[imgi],chunk=chunks[imgi])
-            self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunks[imgi])
+            chunk = cl[chunks[imgi]]
+            inds = self.inds_label_lookup[chunk][lbls[imgi]][inds_lbls[lbls[imgi],chunks[imgi],imgi],:] + offset[imgi,:]
+            self.getAllDataAtPoint(inds,data,aug_data,imgi,augs[imgi],chunk=chunk)
+            self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunk)
         self.tallyTrainingPrior(labels)
 
     def generateRandNoLookupBatch(self,data,aug_data,labels,seglabels):
