@@ -42,6 +42,23 @@ from validate import Validator, ValidateError
 import random
 import pickle as myPickle
 import StringIO as myStringIO
+ 
+# http://stackoverflow.com/questions/15704010/write-data-to-hdf-file-using-multiprocessing
+import multiprocessing as mp
+import sharedmem
+def handle_hdf5_prob_output(start_queue, done_queue, probs_out, ind, label_names, outpath):
+    outfile = h5py.File(outpath, 'r+')
+    while True:
+        args = start_queue.get()
+        if args:
+            for n in range(len(label_names)):
+                d = probs_out[:,:,:,n].transpose((2,1,0)); dset = outfile[label_names[n]]
+                dset[ind[0]:ind[0]+d.shape[0],ind[1]:ind[1]+d.shape[1],ind[2]:ind[2]+d.shape[2]] = d
+            done_queue.put(1)
+        else:
+            done_queue.put(1)
+            break
+    outfile.close()
 
 # no exception for plotting so this can still work from command line only (plotting is only for standalone validation)
 try: 
@@ -72,14 +89,10 @@ class EMDataParser():
     FIRST_RAND_NOLOOKUP_BATCH = 100001
     FIRST_TILED_BATCH = 200001 
 
-    # for preprocessing
-    PDTYPE = np.double
-    NUM_FILTER_THREADS = 4
-
     # others    
     NAUGS = 16              # total number of simple augmentations (including reflections in z, 8 for xy augs only)
     HDF5_CLVL = 5           # compression level in hdf5
-    
+
     def __init__(self, cfg_file, write_outputs=False, init_load_path='', save_name=None, append_features=False,
             chunk_skip_list=[], dim_ordering='', image_in_size=None, isTest=False):
         self.cfg_file = cfg_file
@@ -1385,6 +1398,10 @@ class EMDataParser():
             self.makeOutputCubes(feature_path, chunk*self.batches_per_rand_cube + self.FIRST_TILED_BATCH)
             # prevents last chunk from being written twice (for isLastbatch, next chunk might not have loaded)
             self.last_chunk_rand = self.chunk_rand; self.last_offset_rand = self.offset_rand; 
+            
+            if isLastbatch: 
+                self.start_queue.put(None)
+                self.probs_output_proc.join()
 
     # the EM data "unpackager", recreate probablity cubes using exported output features from convnet
     def makeOutputCubes(self, feature_path='', batchnum=-1):
@@ -1545,20 +1562,40 @@ class EMDataParser():
                 
             print 'EMDataParser: Appending to global hdf5 output containing label probabilities "%s" at %d %d %d' % \
                 (self.outpath, self.last_chunk_rand[0], self.last_chunk_rand[1], self.last_chunk_rand[2])
-            outfile = h5py.File(self.outpath, 'r+'); 
-            for n in range(nlabels):
-                # always write outputs in F-order
-                ind = self.get_hdf_index_from_chunk_index(hdf[self.dataset], self.last_chunk_rand, 
-                    self.last_offset_rand)
-                ind = ind[self.zreslice_dim_ordering][::-1] # re-order for specified ordering, then to F-order
-                d = self.probs_out[:,:,:,n].transpose((2,1,0)); dset = outfile[label_names[n]]
-                #print ind, d.shape, dset.shape
-                dset[ind[0]:ind[0]+d.shape[0],ind[1]:ind[1]+d.shape[1],ind[2]:ind[2]+d.shape[2]] = d
+            # always write outputs in F-order
+            ind = self.get_hdf_index_from_chunk_index(hdf[self.dataset], self.last_chunk_rand, 
+                self.last_offset_rand)
+            ind = ind[self.zreslice_dim_ordering][::-1] # re-order for specified ordering, then to F-order
             hdf.close()
+
+            # parallel using multiprocessing, threading does not work
+            if not hasattr(self, 'done_queue'):
+                # initialize 
+                self.start_queue = mp.Queue()
+                self.done_queue = mp.Queue()
+                self.shared_probs_out = sharedmem.empty_like(self.probs_out)
+                self.shared_ind = sharedmem.empty_like(ind)
+                self.probs_output_proc = mp.Process(target=handle_hdf5_prob_output, 
+                                                    args=(self.start_queue, self.done_queue, self.shared_probs_out, 
+                                                          self.shared_ind, label_names, self.outpath))
+                self.probs_output_proc.start()
+            else:
+                self.done_queue.get()
+            self.shared_probs_out[:] = self.probs_out; self.shared_ind[:] = ind
+            self.start_queue.put(1)
+
+            ## non-parallel version
+            #outfile = h5py.File(self.outpath, 'r+'); 
+            #for n in range(nlabels):
+            #    d = self.probs_out[:,:,:,n].transpose((2,1,0)); dset = outfile[label_names[n]]
+            #    #print ind, d.shape, dset.shape
+            #    dset[ind[0]:ind[0]+d.shape[0],ind[1]:ind[1]+d.shape[1],ind[2]:ind[2]+d.shape[2]] = d
+            #outfile.close()
         
         # for both modes, write out the priors, if prior reweighting enabled
         # write a new dataset with the on-the-fly calculated training prior for each label type
         if 'prior_train_count' in self.batch_meta and (not self.append_features or createDataset):
+            outfile = h5py.File(self.outpath, 'r+'); 
             if not prior_export or self.prior_test.size == nlabels:
                 d = prior_train.reshape((size,size,nlabels))
             else:
@@ -1570,8 +1607,7 @@ class EMDataParser():
                 outfile[self.PRIOR_DATASET].attrs.create('prior_test',self.prior_test)
             else:
                 print 'EMDataParser: Exported training prior but output not reweighted'
-
-        outfile.close()
+            outfile.close()
             
 
 # for test
