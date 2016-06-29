@@ -27,8 +27,6 @@ import os
 import sys
 import shutil
 import tempfile
-#import cPickle as myPickle
-import pickle as myPickle
 #import signal
 
 from functools import reduce # Valid in Python 2.6+, required in Python 3
@@ -51,14 +49,18 @@ from callbacks.emcallbacks import EMEpochCallback
 #from optimizers.emoptimizers import DiscreteTauExpSchedule, TauExpSchedule
 from transforms.emcost import EMMetric
 
-# stole from cuda-convnets2 python_util/util.py
-def pickle(filename, data):
-    fo = filename
-    if type(filename) == str:
-        fo = open(filename, "w")
-    
-    myPickle.dump(data, fo, protocol=myPickle.HIGHEST_PROTOCOL)
-    fo.close()
+# xxx - this did not help, see comment in write_output block
+## http://softwareramblings.com/2008/06/running-functions-as-threads-in-python.html
+## for computations for writing outputs to happen in parallel
+#import threading
+#class FuncThread(threading.Thread):
+#    def __init__(self, target, *args):
+#        self._target = target
+#        self._args = args
+#        threading.Thread.__init__(self)
+# 
+#    def run(self):
+#        self._target(*self._args)
 
 # add custom command line arguments on top of standard neon arguments
 parser = NeonArgparser(__doc__)
@@ -275,20 +277,26 @@ try:
             
         print('Model output (forward prop) for %d testing batches, %d examples/batch' % (test.nmacrobatches,
             test.parser.num_cases_per_batch)); 
-        #feature_path = tempfile.mkdtemp()  # create temp dir
-        feature_path = ''
+        feature_path = ''; #out_thread = None
         for i in range(test.nmacrobatches):
             batchnum = test.batch_range[0]+i
+            last_batch = i==test.nmacrobatches-1
             sys.stdout.write('%d ... ' % (batchnum,)); t = time.time()
     
             outputs = model.get_outputs(test)
-            # xxx - for now just write pickled batches to a temp folder, just as feature writer in cuda-convnets2 does
-            #path_out = os.path.join(feature_path, 'data_batch_%d' % (batchnum,))
-            #pickle(path_out, {'data': outputs})
-            
-            test.parser.checkOutputCubes(feature_path, batchnum, i==test.nmacrobatches-1,outputs=outputs)
+
+            # serial version            
+            test.parser.checkOutputCubes(feature_path, batchnum, last_batch, outputs=outputs)
+
+            # xxx - could not get any improvment here, possibly overhead of the thread is longer than the
+            #   computations for formatting the outputs (the h5 write itself is parallelized in the parser)            
+            ## parallel version
+            #if out_thread: out_thread.join()
+            #out_thread = FuncThread(test.parser.checkOutputCubes, feature_path, batchnum, last_batch, outputs)
+            #out_thread.start()
+            #if last_batch: out_thread.join()
+
             sys.stdout.write('\tdone in %.2f s\n' % (time.time() - t,)); sys.stdout.flush()
-        #shutil.rmtree(feature_path)  # delete directory
             
         if args.data_config:
             print('Model output complete for %d test batches!' % (test.nmacrobatches,))
@@ -355,7 +363,6 @@ except KeyboardInterrupt:
     #   this would prevent the "multiple process" situation
     try:
         shutil.rmtree(be_args['cache_dir'])  # delete directory
-        shutil.rmtree(feature_path)  # delete directory
     except:
         pass
     
