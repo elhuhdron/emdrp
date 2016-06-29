@@ -93,9 +93,9 @@ class nfergus(EMModelArchitecture):
                  padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Pooling(3, strides=2, padding=1, op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Pooling(3, strides=2, padding=1),
+            Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=Kaiming(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
@@ -109,10 +109,10 @@ class mfergus(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+            Conv((7, 7, 80), init=Kaiming(), activation=Explin(), batch_norm=bn, 
                     padding=3, strides=1)\
                 if self.bn_first_layer else\
-                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), 
+                Conv((7, 7, 80), init=Kaiming(), bias=Constant(0), activation=Explin(), 
                     padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, 
@@ -127,9 +127,9 @@ class mfergus(EMModelArchitecture):
                  padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, 
                  padding=1, strides=1),
-            Pooling(3, strides=2, padding=1, op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Pooling(3, strides=2, padding=1),
+            Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=Kaiming(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
