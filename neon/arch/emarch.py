@@ -174,6 +174,60 @@ class halfvgg(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+class kaiming(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(kaiming, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            # input 128
+            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                    padding=3, strides=1)\
+                if self.bn_first_layer else\
+                Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), 
+                    padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 64
+            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            # 32
+            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=2),
+            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            # 16
+            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=2),
+            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            # 8
+            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=2),
+            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                 padding=1, strides=1),
+            # 1
+            Pooling('all', op='avg'),
+            Affine(nout=self.noutputs, init=Kaiming(), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(cifar10, self).__init__(noutputs, use_softmax)
