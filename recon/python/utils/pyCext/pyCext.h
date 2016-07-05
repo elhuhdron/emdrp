@@ -38,6 +38,7 @@ static PyObject *label_affinities(PyObject *self, PyObject *args);
 static PyObject *binary_warping(PyObject *self, PyObject *args);
 static PyObject *type_components(PyObject *self, PyObject *args);
 static PyObject *remove_adjacencies(PyObject *self, PyObject *args);
+static PyObject *label_overlap(PyObject *self, PyObject *args);
 
 // .... Helper functions for EM data extensions ..................
 npy_intp get_misclass_points(const npy_bool *src, const npy_bool *tgt, const npy_bool *msk, npy_intp numel,

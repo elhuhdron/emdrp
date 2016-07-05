@@ -1,17 +1,17 @@
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -45,18 +45,18 @@ def pix_fscore_metric( lbl_truth, lbl_proposed, calcAll=False ):
 
     # precision (also positive predictive value), set to 0 if undefined (no positives in proposed)
     PP = (tp + fp).astype(np.double); precision = tp/PP if PP > 0 else 0.0
-    
-    if calcAll: 
+
+    if calcAll:
         pixel_error = (fp + fn).astype(np.double) / n if n > 0 else 0.0
         # false positive rate, set to 0 if undefined (no negatives in truth)
-        N = (fp + tn).astype(np.double); fpr = fp/N if N > 0 else 1.0        
+        N = (fp + tn).astype(np.double); fpr = fp/N if N > 0 else 1.0
 
     # frontend refers to this as "accuracy" (not actually accuracy).
     # is actually F1 score which is harmonic mean of precision and recall.
     pr_sum = precision + tpr_recall; fScore = (2.0 * precision * tpr_recall / pr_sum) if (pr_sum > 0) else 0.0
 
-    if calcAll: 
-        return fScore, tpr_recall, precision, pixel_error, tp, tn, fp, fn
+    if calcAll:
+        return fScore, tpr_recall, precision, pixel_error, fpr, tp, tn, fp, fn
     else:
         return fScore, tpr_recall, precision, tp, fp, fn
 
@@ -75,19 +75,19 @@ def pixel_error_fscore( lbl_truth, lbl_proposed ):
 
 def warping_error( lbl_truth, lbl_proposed, doComps=True, simpleLUT=None, connectivity=1 ):
 
-    warped, classified, nonSimpleTypes, diff, simpleLUT = binary_warping( lbl_truth, lbl_proposed, 
+    warped, classified, nonSimpleTypes, diff, simpleLUT = binary_warping( lbl_truth, lbl_proposed,
         return_nonSimple=True, connectivity=connectivity, simpleLUT=simpleLUT )
 
     wrp_err = float(diff) / lbl_truth.size
-    
+
     if doComps:
-        lbls, nSplits = nd.measurements.label(classified == nonSimpleTypes['dic']['RESULT_SPLIT'], 
+        lbls, nSplits = nd.measurements.label(classified == nonSimpleTypes['dic']['RESULT_SPLIT'],
             structure=np.ones((3,3,3),dtype=np.bool))
         nonSimpleTypesOut = np.zeros(lbls.shape, dtype=lbls.dtype)
         nonSimpleTypesOut[lbls > 0] = nonSimpleTypes['dic']['RESULT_SPLIT']
-        lbls, nMerges = nd.measurements.label(classified == nonSimpleTypes['dic']['RESULT_MERGE'], 
+        lbls, nMerges = nd.measurements.label(classified == nonSimpleTypes['dic']['RESULT_MERGE'],
             structure=np.ones((3,3,3),dtype=np.bool))
-        nonSimpleTypesOut[lbls > 0] = nonSimpleTypes['dic']['RESULT_MERGE']            
+        nonSimpleTypesOut[lbls > 0] = nonSimpleTypes['dic']['RESULT_MERGE']
     else:
         nSplits = (classified == nonSimpleTypes['dic']['RESULT_SPLIT']).sum(dtype=np.int64)
         nMerges = (classified == nonSimpleTypes['dic']['RESULT_MERGE']).sum(dtype=np.int64)
@@ -187,9 +187,9 @@ class adapted_rand_error_resample_objects_points_thread(Thread):
     def __init__(self, n, samps_per_thread, ares, precs, recs, selObj, inds, selPts, lbl_proposed):
         Thread.__init__(self)
         self.n = n; self.samps_per_thread = samps_per_thread
-        self.ares = ares; self.precs = precs; self.recs = recs; 
+        self.ares = ares; self.precs = precs; self.recs = recs;
         self.selObj = selObj; self.inds = inds; self.selPts = selPts; self.lbl_proposed = lbl_proposed
-        
+
     def run(self):
         #print(self.n*self.samps_per_thread,(self.n+1)*self.samps_per_thread)
         samples = range(self.n*self.samps_per_thread,(self.n+1)*self.samps_per_thread)
@@ -199,10 +199,10 @@ class adapted_rand_error_resample_objects_points_thread(Thread):
             # combine object and point selects to create resampled ground truth
             objs = np.nonzero(self.selObj[:,s])[0]
             for o in objs: retruth[self.inds[o][self.selPts[o][:,s]]] = o+1
-            self.ares[s], self.precs[s], self.recs[s] = adapted_rand_error(retruth.reshape(self.lbl_proposed.shape), 
+            self.ares[s], self.precs[s], self.recs[s] = adapted_rand_error(retruth.reshape(self.lbl_proposed.shape),
                 self.lbl_proposed, nogtbg=True)
 
-def adapted_rand_error_resample_objects_points(lbl_truth, lbl_proposed, nObjects, nPoints, nSamples=100, pCI=0.05, 
+def adapted_rand_error_resample_objects_points(lbl_truth, lbl_proposed, nObjects, nPoints, nSamples=100, pCI=0.05,
         getDistros=False, nThreads=1):
     #import time
 
@@ -214,7 +214,7 @@ def adapted_rand_error_resample_objects_points(lbl_truth, lbl_proposed, nObjects
     # bernoulli resampling of the objects with mean rate set to get mean of nObjects
     selObj = (np.random.rand(ntObjs,nSamples) < (nObjects / float(ntObjs)))
     # pre-generate selects for points for all objects
-    inds = [None]*ntObjs; selPts = [None]*ntObjs; nPts = [None]*ntObjs;
+    inds = [None]*ntObjs; selPts = [None]*ntObjs; #nPts = [None]*ntObjs;
     for o in range(ntObjs):
         # bernoulli resampling of points within objects to get mean of nPoints per each object
         inds[o] = np.flatnonzero(lbl_truth == o+1)
@@ -232,16 +232,16 @@ def adapted_rand_error_resample_objects_points(lbl_truth, lbl_proposed, nObjects
         for o in objs: retruth[inds[o][selPts[o][:,s]]] = o+1
         ares[s], precs[s], recs[s] = adapted_rand_error(retruth.reshape(lbl_truth.shape), lbl_proposed, nogtbg=True)
     '''
-    
+
     threads = nThreads * [None]
     assert( nSamples % nThreads == 0 ) # xxx - currently not dealing with remainders
     samps_per_thread = nSamples / nThreads
     for i in range(nThreads):
-        threads[i] = adapted_rand_error_resample_objects_points_thread(i, samps_per_thread, ares, precs, recs, 
+        threads[i] = adapted_rand_error_resample_objects_points_thread(i, samps_per_thread, ares, precs, recs,
             selObj, inds, selPts, lbl_proposed)
         threads[i].start()
     for i in range(nThreads): threads[i].join()
-    
+
     #print('\tdone in %.4f s' % (time.time() - t))
     if getDistros:
         return ares, precs, recs
