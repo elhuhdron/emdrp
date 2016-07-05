@@ -41,6 +41,7 @@ static PyMethodDef _pyCextMethods[] = {
     {"binary_warping", binary_warping, METH_VARARGS},
     {"type_components", type_components, METH_VARARGS},
     {"remove_adjacencies", remove_adjacencies, METH_VARARGS},
+    {"label_overlap", label_overlap, METH_VARARGS},
 
     {NULL, NULL}     /* Sentinel - marks the end of this structure */
 };
@@ -196,7 +197,7 @@ static PyObject *label_affinities(PyObject *self, PyObject *args)
     //return PyArray_Return(labels);
     // return the current last label assigned in the label volume
     return Py_BuildValue("I", curlab-1);
-}
+} // label_affinities
 
 
 /* Perform 3d warping using fixed lookup table (LUT). Connectivity depends on supplied LUT.
@@ -332,7 +333,7 @@ static PyObject *binary_warping(PyObject *self, PyObject *args)
 
     // return the remaining diff only, warped is returned by reference in src
     return Py_BuildValue("L", diff);
-}
+} // binary_warping
 
 
 static PyObject *type_components(PyObject *self, PyObject *args)
@@ -397,7 +398,7 @@ static PyObject *type_components(PyObject *self, PyObject *args)
     free(counts);
 
     return Py_BuildValue("L", 0);
-}
+} // type_components
 
 
 static PyObject *remove_adjacencies(PyObject *self, PyObject *args)
@@ -444,7 +445,93 @@ static PyObject *remove_adjacencies(PyObject *self, PyObject *args)
     } // for each voxel in volume
 
     return Py_BuildValue("L", 0);
-}
+} // remove_adjacencies
+
+
+// xxx - not validated
+static PyObject *label_overlap(PyObject *self, PyObject *args)
+{
+    PyArrayObject *labelsA, *labelsB, *labelsA_ovlp, *labelsB_ovlp;
+    PyArrayObject *labelsA_perc_ovlp, *labelsB_perc_ovlp, *labelsA_bg_perc_ovlp, *labelsB_bg_perc_ovlp;
+    npy_uint32 *lblsA, *lblsB, *lblsA_ovlp, *lblsB_ovlp;
+    npy_float32 *lblsA_perc_ovlp, *lblsB_perc_ovlp, *lblsA_bg_perc_ovlp, *lblsB_bg_perc_ovlp;
+    npy_uint64 *lblsA_cnt, *lblsB_cnt, *ovlp_cnt, *lblsA_bg_cnt, *lblsB_bg_cnt;
+
+    npy_int m,n,nz; //, x,y,z, xp,yp,zp, ip;
+    npy_intp *dims, size, nalloc, cnt=0, nlblsA, nlblsB;
+    npy_intp pt, i;
+    npy_bool error=0;
+
+    // cnt = _pyCext.label_overlap(lblsA, lblsB, lblsA_ovlp, lblsB_ovlp, lblsA_perc_ovlp, lblsB_perc_povlp,
+    //                             lblsA_bg_perc_ovlp, lblsB_bg_perc_ovlp)
+    if (!PyArg_ParseTuple(args, "O!O!O!O!O!O!O!O!", &PyArray_Type, &labelsA, &PyArray_Type, &labelsB,
+            &PyArray_Type, &labelsA_ovlp, &PyArray_Type, &labelsB_ovlp,
+            &PyArray_Type, &labelsA_perc_ovlp, &PyArray_Type, &labelsB_perc_ovlp,
+            &PyArray_Type, &labelsA_bg_perc_ovlp, &PyArray_Type, &labelsB_bg_perc_ovlp))
+        return NULL;
+
+    /* Get the dimensions of the labels and the c pointer to the labels and allocated overlap arrays */
+    dims = PyArray_DIMS(labelsA); m = dims[0]; n = dims[1]; nz = dims[2]; size = m*n*nz;
+    lblsA = (npy_uint32 *) PyArray_DATA(labelsA); lblsB = (npy_uint32 *) PyArray_DATA(labelsB);
+
+    nalloc = PyArray_SIZE(labelsA_ovlp);
+    lblsA_ovlp = (npy_uint32 *) PyArray_DATA(labelsA_ovlp); lblsB_ovlp = (npy_uint32 *) PyArray_DATA(labelsB_ovlp);
+    lblsA_perc_ovlp = (npy_float32 *) PyArray_DATA(labelsA_perc_ovlp);
+    lblsB_perc_ovlp = (npy_float32 *) PyArray_DATA(labelsB_perc_ovlp);
+
+    nlblsA = PyArray_SIZE(labelsA_bg_perc_ovlp); nlblsB = PyArray_SIZE(labelsB_bg_perc_ovlp);
+    lblsA_bg_perc_ovlp = (npy_float32 *) PyArray_DATA(labelsA_bg_perc_ovlp);
+    lblsB_bg_perc_ovlp = (npy_float32 *) PyArray_DATA(labelsB_bg_perc_ovlp);
+
+    // allocate the counts
+    lblsA_cnt = (npy_uint64 *) calloc((size_t) nlblsA, sizeof(npy_uint64));
+    lblsB_cnt = (npy_uint64 *) calloc((size_t) nlblsB, sizeof(npy_uint64));
+    ovlp_cnt = (npy_uint64 *) calloc((size_t) nalloc, sizeof(npy_uint64));
+    lblsA_bg_cnt = (npy_uint64 *) calloc((size_t) nlblsA, sizeof(npy_uint64));
+    lblsB_bg_cnt = (npy_uint64 *) calloc((size_t) nlblsB, sizeof(npy_uint64));
+    if( lblsA_cnt == NULL || lblsA_cnt == NULL || ovlp_cnt == NULL ||
+            lblsA_bg_cnt == NULL ||  lblsB_bg_cnt == NULL ) {
+        printf("In label_overlap allocation of memory for counts failed."); exit(0);
+    }
+
+    for( pt = 0; pt < size; pt++ ) {
+        if( (lblsA[pt] > 0) && (lblsB[pt] > 0) ) {
+            // overlapping foreground objects
+            lblsA_cnt[lblsA[pt]-1]++; lblsB_cnt[lblsB[pt]-1]++;
+
+            // brute force search
+            for( i=0; i < cnt; i++ ) if( (lblsA_ovlp[i] == lblsA[pt]) && (lblsB_ovlp[i] == lblsB[pt]) ) break;
+            if( i == cnt ) {
+                lblsA_ovlp[cnt] = lblsA[pt]; lblsB_ovlp[cnt] = lblsB[pt]; cnt++;
+                if( cnt == nalloc ) { cnt--; error=1; break; }
+            }
+            ovlp_cnt[i]++;
+        } else if( lblsA[pt] > 0 ) {
+            // label in A overlaps with background in B
+            lblsA_cnt[lblsA[pt]-1]++; lblsA_bg_cnt[lblsA[pt]-1]++;
+        } else if( lblsB[pt] > 0 ) {
+            // label in B overlaps with background in A
+            lblsB_cnt[lblsB[pt]-1]++; lblsB_bg_cnt[lblsB[pt]-1]++;
+        } // xxx - don't care about both background, metric is for objects, don't see need to consider BG a true object
+
+    } // for each voxel in volume
+
+    // iterate over all overlapping labels and calculate overlapping percentages
+    for( i=0; i < cnt; i++ ) {
+        lblsA_perc_ovlp[i] = (npy_float32)ovlp_cnt[i]/lblsA_cnt[lblsA_ovlp[i]-1];
+        lblsB_perc_ovlp[i] = (npy_float32)ovlp_cnt[i]/lblsB_cnt[lblsB_ovlp[i]-1];
+    }
+
+    // calculate percentage overlapping with other background
+    for( i=0; i < nlblsA; i++ ) lblsA_bg_perc_ovlp[i] = (double)lblsA_bg_cnt[i]/lblsA_cnt[i];
+    for( i=0; i < nlblsB; i++ ) lblsB_bg_perc_ovlp[i] = (double)lblsB_bg_cnt[i]/lblsB_cnt[i];
+
+    // free memory and return the count of overlapping matrix (nonzero elements of sparse overlap matrix)
+    free(lblsA_cnt); free(lblsB_cnt); free(ovlp_cnt); free(lblsA_bg_cnt); free(lblsB_bg_cnt);
+    return Py_BuildValue("L", error ? -1.0:cnt);
+} // label_overlap
+
+
 
 
 /* #### Helper functions for EM data extensions #################################### */

@@ -296,5 +296,41 @@ def type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_typ
 
     return _pyCext.type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_types)
 
+# xxx - not validated
+# calculate percentage overlap "sparse matrices" as lists for comparing two different labels
+def label_overlap(lblsA, lblsB, nlblsA=None, nlblsB=None, nAlloc=None):
+    dtype = np.uint32; test=np.zeros((2,2),dtype=dtype)
+    if type(lblsA) != type(test):
+        raise Exception( 'In type_components, lblsA is not *NumPy* array')
+    if len(lblsA.shape) != 3:
+        raise Exception( 'In type_components, lblsA is not 3 dimensional')
+    if not lblsA.flags.contiguous or np.isfortran(lblsA):
+        raise Exception( 'In type_components, lblsA not C-order contiguous')
+    if lblsA.dtype != np.uint32:
+        raise Exception( 'In type_components, lblsA not uint32')
 
+    if type(lblsB) != type(test):
+        raise Exception( 'In type_components, lblsB is not *NumPy* array')
+    if len(lblsB.shape) != 3:
+        raise Exception( 'In type_components, lblsB is not 3 dimensional')
+    if not lblsB.flags.contiguous or np.isfortran(lblsB):
+        raise Exception( 'In type_components, lblsB not C-order contiguous')
+    if lblsB.dtype != np.uint32:
+        raise Exception( 'In type_components, lblsB not uint32')
 
+    if not nlblsA: nlblsA = lblsA.max()
+    if not nlblsB: nlblsB = lblsB.max()
+    if not nAlloc: nAlloc = 10*max([nlblsA, nlblsB])
+
+    lblsA_ovlp = np.zeros((nAlloc,), dtype=dtype); lblsB_ovlp = np.zeros((nAlloc,), dtype=dtype)
+
+    dtype_perc = np.float32
+    lblsA_perc_ovlp = np.zeros((nAlloc,), dtype=dtype_perc)
+    lblsB_perc_ovlp = np.zeros((nAlloc,), dtype=dtype_perc)
+    lblsA_bg_perc_ovlp = np.zeros((nlblsA,), dtype=dtype_perc)
+    lblsB_bg_perc_ovlp = np.zeros((nlblsB,), dtype=dtype_perc)
+
+    cnt = _pyCext.label_overlap(lblsA, lblsB, lblsA_ovlp, lblsB_ovlp, lblsA_perc_ovlp, lblsB_perc_ovlp,
+                                lblsA_bg_perc_ovlp, lblsB_bg_perc_ovlp)
+    return cnt, lblsA_ovlp[:cnt], lblsB_ovlp[:cnt], lblsA_perc_ovlp[:cnt], lblsB_perc_ovlp[:cnt],\
+        lblsA_bg_perc_ovlp, lblsB_bg_perc_ovlp
