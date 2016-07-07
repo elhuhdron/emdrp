@@ -26,7 +26,7 @@ import time
 import os
 import sys
 import shutil
-import tempfile
+#import tempfile
 #import signal
 
 from functools import reduce # Valid in Python 2.6+, required in Python 3
@@ -37,7 +37,8 @@ import numpy as np
 from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
 from neon.optimizers import GradientDescentMomentum, MultiOptimizer
-from neon.optimizers import Schedule
+#from neon.optimizers import Schedule
+from neon.optimizers import PowerSchedule
 from neon.transforms import CrossEntropyBinary, CrossEntropyMulti
 from neon.models import Model
 from neon.callbacks.callbacks import Callbacks
@@ -111,7 +112,7 @@ print('emneon / neon options:'); print(args)
 # setup backend
 be_args = extract_valid_args(args, gen_backend)
 # mutiple gpus accessing the cache dir for autotuning winograd was causing crashes / reboots
-be_args['cache_dir'] = tempfile.mkdtemp()  # create temp dir
+#be_args['cache_dir'] = tempfile.mkdtemp()  # create temp dir
 be_args['deterministic'] = None  # xxx - why was this set?
 be = gen_backend(**be_args)
 
@@ -233,7 +234,8 @@ try:
         #    weight_sched = Schedule()
 
         # simpler method directly from neon Schedule(), specify step and change on command line
-        weight_sched = Schedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
+        #weight_sched = Schedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
+        weight_sched = PowerSchedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
         
         opt_gdm = GradientDescentMomentum(args.rate_init[0], args.momentum[0], wdecay=args.weight_decay, 
                                           schedule=weight_sched, stochastic_round=args.rounding)
@@ -359,10 +361,10 @@ except KeyboardInterrupt:
     # xxx - this is not clean, how to fix?
     print('Killed with Ctrl-C, cleaning up')
 
-    # xxx - consider going back to normal threads instead of daemon threads in emdata?
-    #   this would prevent the "multiple process" situation
-    try:
-        shutil.rmtree(be_args['cache_dir'])  # delete directory
-    except:
-        pass
+    #    # xxx - consider going back to normal threads instead of daemon threads in emdata?
+    #    #   this would prevent the "multiple process" situation
+    #    try:
+    #        shutil.rmtree(be_args['cache_dir'])  # delete directory
+    #    except:
+    #        pass
     
