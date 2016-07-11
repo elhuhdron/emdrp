@@ -159,108 +159,108 @@ class kaiming(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-class dkaiming(EMModelArchitecture):
+class mkaiming(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
-        super(dkaiming, self).__init__(noutputs, use_softmax)
+        super(mkaiming, self).__init__(noutputs, use_softmax)
 
     @property
     def layers(self):
         bn = True
         return [
-            # input 224
-            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Rectlin(), padding=3, strides=2),
+            # input 128
+            Conv((9, 9, 88), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
             Pooling(3, strides=2, padding=1),
-            # 56
-            Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            # 28
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            # 14
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            # 7
-            Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=2),
-            Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-            Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-            Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
+            # 64
+            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            # 32
+            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=2),
+            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            # 16
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            # 8
+            Conv((1, 1, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=2),
+            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((1, 1, 3096), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
+            Conv((1, 1, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
+            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((1, 1, 3096), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
             # 1
             Pooling('all', op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-# xxx - in neon v1.5.2 requires way too much memory
-class dpkaiming(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(dpkaiming, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        return [
-            # input 224
-            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Rectlin(), padding=3, strides=2),
-            Pooling(3, strides=2, padding=1),
-            # 56
-            MergeSum([
-                SkipNode(), [
-                    BatchNorm(), Activation(Rectlin()),
-                    Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-                    Conv((3, 3, 64), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-                ] ]),
-            MergeSum([
-                SkipNode(), [
-                    BatchNorm(), Activation(Rectlin()),
-                    Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-                    Conv((3, 3, 64), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-                ] ]),
-            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            # 28
-            #BatchNorm(), Activation(Rectlin()),
-            #MergeSum([
-            #    Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-            #    [
-            #        Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
-            #        Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-            #    ] ]),
-            #MergeSum([
-            #    SkipNode(), [
-            #        BatchNorm(), Activation(Rectlin()),
-            #        Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            #        Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-            #    ] ]),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            # 14
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-            # 7
-            #Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=2),
-            #Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            #Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-            #Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-            #Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-            #Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-            # 1
-            Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
+## xxx - in neon v1.5.2 requires way too much memory
+#class dpkaiming(EMModelArchitecture):
+#    def __init__(self, noutputs, use_softmax=False):
+#        super(dpkaiming, self).__init__(noutputs, use_softmax)
+#
+#    @property
+#    def layers(self):
+#        return [
+#            # input 224
+#            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Rectlin(), padding=3, strides=2),
+#            Pooling(3, strides=2, padding=1),
+#            # 56
+#            MergeSum([
+#                SkipNode(), [
+#                    BatchNorm(), Activation(Rectlin()),
+#                    Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#                    Conv((3, 3, 64), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
+#                ] ]),
+#            MergeSum([
+#                SkipNode(), [
+#                    BatchNorm(), Activation(Rectlin()),
+#                    Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#                    Conv((3, 3, 64), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
+#                ] ]),
+#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            # 28
+#            #BatchNorm(), Activation(Rectlin()),
+#            #MergeSum([
+#            #    Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
+#            #    [
+#            #        Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
+#            #        Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
+#            #    ] ]),
+#            #MergeSum([
+#            #    SkipNode(), [
+#            #        BatchNorm(), Activation(Rectlin()),
+#            #        Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            #        Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
+#            #    ] ]),
+#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
+#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            # 14
+#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
+#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
+#            # 7
+#            #Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=2),
+#            #Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
+#            #Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
+#            #Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
+#            #Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
+#            #Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
+#            # 1
+#            Pooling('all', op='avg'),
+#            Affine(nout=self.noutputs, init=Kaiming(), 
+#                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+#        ]
 
 class cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):

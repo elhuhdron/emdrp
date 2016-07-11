@@ -149,7 +149,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         if type(self.be) == NervanaGPU:
             import pycuda.driver as drv
             self.drv = drv
-            self.stream = None # xxx - what to do with this?
+            #self.stream = self.drv.Stream() # xxx - for other synchonize method??? see below
         else:
             self.drv = None
             
@@ -240,9 +240,11 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.iter_buf[self.lbuf].dbuf[i].set(self.pushdata[i])
 
         if self.drv is not None:
-            end = self.drv.Event()
-            end.record(self.stream)
-            end.synchronize()
+            # xxx - does it matter which synchronize method is used here???
+            #end = self.drv.Event()
+            #end.record(self.stream)
+            #end.synchronize()
+            self.ctx.synchronize()
             
     def _get_next_EMbatch(self):
         p = self.parser

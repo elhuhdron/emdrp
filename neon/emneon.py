@@ -355,7 +355,7 @@ try:
         else:
             pl.show()
     
-    shutil.rmtree(be_args['cache_dir'])  # delete directory
+    #shutil.rmtree(be_args['cache_dir'])  # delete directory
 
 except KeyboardInterrupt:
     # xxx - this is not clean, how to fix?
