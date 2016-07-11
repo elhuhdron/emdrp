@@ -188,10 +188,10 @@ class mkaiming(EMModelArchitecture):
             # 8
             Conv((1, 1, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=2),
             Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((1, 1, 3096), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
+            Conv((1, 1, 3072), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
             Conv((1, 1, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
             Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((1, 1, 3096), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
+            Conv((1, 1, 3072), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
             # 1
             Pooling('all', op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), 
