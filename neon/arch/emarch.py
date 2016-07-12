@@ -22,7 +22,7 @@
 
 from neon.initializers import Constant, Gaussian, Uniform, Kaiming
 from neon.layers import Conv, Dropout, Pooling, Affine, LRN
-from neon.layers import Activation, MergeSum, SkipNode, BatchNorm
+#from neon.layers import Activation, MergeSum, SkipNode, BatchNorm
 from neon.transforms import Rectlin, Logistic, Softmax, Identity, Explin
 from layers.emlayers import DOG
 
@@ -168,7 +168,8 @@ class mkaiming(EMModelArchitecture):
         bn = True
         return [
             # input 128
-            Conv((9, 9, 88), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
+            #Conv((9, 9, 88), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
+            Conv((9, 9, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
             Pooling(3, strides=2, padding=1),
             # 64
             Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
