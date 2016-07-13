@@ -50,7 +50,7 @@ class EMEpochCallback(Callback):
             sys.stdout.write('========= Begin epoch %d =========\n' % (macro_epoch+1,))
         batch = epoch % self.nmacrobatches
         if (epoch + 1) % self.epoch_freq == 0:
-            if (epoch + 1) % self.test_epoch_freq == 0:
+            if self.test_epoch_freq and (epoch + 1) % self.test_epoch_freq == 0:
                 sys.stdout.write('%d.%d (test)... ' % (macro_epoch+1,batch+1,))
             else:
                 sys.stdout.write('%d.%d ... ' % (macro_epoch+1,batch+1,))
@@ -68,7 +68,7 @@ class EMEpochCallback(Callback):
             progress_string = " [%s %.5f]" % (model.cost.costfunc.__class__.__name__, loss)
             sys.stdout.write(progress_string)
 
-            if (epoch + 1) % self.test_epoch_freq == 0:
+            if self.test_epoch_freq and (epoch + 1) % self.test_epoch_freq == 0:
                 assert( 'metrics' in callback_data )    # EM epoch callback requires metric callbacks
                 sys.stdout.write('\n\t')
                 for met in callback_data['metrics'].keys():

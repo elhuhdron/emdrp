@@ -125,7 +125,7 @@ class mfergus(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-# 980 train: 4.65 s / batch, 980 test: 1.6 s / batch
+# 980 train: 4.8 s / batch, 980 test: 1.65 s / batch
 class hvgg(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(hvgg, self).__init__(noutputs, use_softmax)
@@ -135,7 +135,7 @@ class hvgg(EMModelArchitecture):
         bn = True
         return [
             # input 128
-            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Conv((7, 7, 72), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             # 64
             Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),

@@ -25,7 +25,7 @@
 import time
 import os
 import sys
-import shutil
+#import shutil
 #import tempfile
 #import signal
 
@@ -196,7 +196,7 @@ try:
             test = EMDataIterator(args.data_config, chunk_skip_list=args.chunk_skip_list, 
                                   dim_ordering=args.dim_ordering, batch_range=args.test_range, name='test', 
                                   isTest=True, concatenate_batches=True, NBUF=args.nbebuf,
-                                  image_in_size=args.image_in_size)
+                                  image_in_size=args.image_in_size) if args.callback_args['eval_freq'] else None
         else:
             # make dummy random data just for testing model inits
             train = RandomEMDataIterator(name='train')
@@ -217,7 +217,8 @@ try:
         
         # print out epoch and batch as they were in cuda-convnets2, starting at 1
         print('Training from epoch %d to %d with %d/%d training/testing batches per epoch, %d examples/batch' \
-            % (macro_epoch, args.epochs, train.nmacrobatches, test.nmacrobatches, train.parser.num_cases_per_batch))
+            % (macro_epoch, args.epochs, train.nmacrobatches, test.nmacrobatches if test else 0, 
+               train.parser.num_cases_per_batch))
     
         # configure optimizers and weight update schedules
         num_epochs = args.epochs*train.nmacrobatches  # for emneon, an epoch is now a batch, train_range is an epoch
@@ -247,15 +248,14 @@ try:
         # configure cost and test metrics
         cost = GeneralizedCost(costfunc=(CrossEntropyBinary() \
             if train.parser.independent_labels else CrossEntropyMulti()))
-        metric = EMMetric(oshape=test.parser.oshape, use_softmax=not train.parser.independent_labels)
+        metric = EMMetric(oshape=test.parser.oshape, use_softmax=not train.parser.independent_labels) if test else None
     
         # configure callbacks
-        if not args.neon_progress: args.callback_args['progress_bar'] = False
-        if not args.callback_args['eval_freq']: args.callback_args['eval_freq'] = train.nmacrobatches
+        if not args.neon_progress: 
+            args.callback_args['progress_bar'] = False
         callbacks = Callbacks(model, eval_set=test, metric=metric, **args.callback_args)
         if not args.neon_progress: 
-            callbacks.add_callback(EMEpochCallback(args.callback_args['eval_freq'],train.nmacrobatches), 
-                                   insert_pos=None)
+            callbacks.add_callback(EMEpochCallback(args.callback_args['eval_freq'],train.nmacrobatches),insert_pos=None)
         # xxx - thought of making this an option but not clear that it slows anything down?
         #callbacks.add_hist_callback() # xxx - not clear what information this conveys
         if args.save_best_path:
