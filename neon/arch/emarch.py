@@ -196,7 +196,7 @@ class autofergus32(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Conv((9, 9, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
             Pooling(3, strides=2, padding=1),
             Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
@@ -206,9 +206,10 @@ class autofergus32(EMModelArchitecture):
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
-            Deconv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((4, 4, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Deconv((6, 6, 3), init=Kaiming(), padding=2, strides=2, bias=Constant(0), 
+            Deconv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Deconv((4, 4, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
+            Deconv((6, 6, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=2),
+            Deconv((7, 7, 3), init=Kaiming(), padding=3, strides=1, bias=Constant(0), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -220,7 +221,7 @@ class autofergus64(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Conv((9, 9, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
             Pooling(3, strides=2, padding=1),
             Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
@@ -230,12 +231,11 @@ class autofergus64(EMModelArchitecture):
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
-            Deconv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Deconv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Deconv((4, 4, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
             Deconv((6, 6, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=2),
-            Deconv((6, 6, 3), init=Kaiming(), padding=2, strides=2, bias=Constant(0), 
+            Deconv((8, 8, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=2),
+            Deconv((9, 9, 3), init=Kaiming(), padding=4, strides=1, bias=Constant(0), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
         

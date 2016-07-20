@@ -37,8 +37,7 @@ import numpy as np
 from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
 from neon.optimizers import GradientDescentMomentum, MultiOptimizer
-#from neon.optimizers import Schedule
-from neon.optimizers import PowerSchedule
+from neon.optimizers import StepSchedule, PowerSchedule
 from neon.transforms import CrossEntropyBinary, CrossEntropyMulti
 from neon.models import Model
 from neon.callbacks.callbacks import Callbacks
@@ -63,6 +62,13 @@ from transforms.emcost import EMMetric
 #    def run(self):
 #        self._target(*self._args)
 
+# http://stackoverflow.com/questions/9258602/elegant-pythonic-cumsum
+def cumsum(it):
+    total = 0
+    for x in it:
+        total += x
+        yield total
+        
 # add custom command line arguments on top of standard neon arguments
 parser = NeonArgparser(__doc__)
 # extra arguments controlling model and learning
@@ -72,7 +78,9 @@ parser.add_argument('--model_arch', type=str, default='fergus', help='Specify co
 #parser.add_argument('--rate_freq', type=int, default=0, 
 #                    help='Batch frequency to update rate decay (< 1 is once per EM epoch (training macrobatches))')
 parser.add_argument('--rate_step', type=float, default=1.0, help='Learning schedule rate step (in emneon epochs)')
-parser.add_argument('--rate_change', type=float, default=0.5, 
+parser.add_argument('--epoch_dstep', nargs='*', type=int, default=[], 
+                    help='Learning schedule neon delta epochs to adjust rate (use instead of rate_step)')
+parser.add_argument('--rate_change', nargs='+', type=float, default=[0.5], 
                     help='Learning schedule rate change (occurs each rate_step)')
 parser.add_argument('--weight_decay', type=float, default=0.01, help='Weight decay')
 parser.add_argument('--rate_init', nargs=2, type=float, default=[0.001, 0.002], 
@@ -235,8 +243,15 @@ try:
         #    weight_sched = Schedule()
 
         # simpler method directly from neon Schedule(), specify step and change on command line
-        #weight_sched = Schedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
-        weight_sched = PowerSchedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
+        if len(args.epoch_dstep) > 0:
+            epoch_step = list(cumsum(args.epoch_dstep))
+            print('Adjusting learning rate by %s at %s' % (','.join([str(x) for x in args.rate_change]), 
+                                                             ','.join([str(x) for x in epoch_step])))
+            # xxx - not sure why neon can't handle this???
+            if len(args.rate_change) == 1: args.rate_change = [args.rate_change[0]] * len(epoch_step)
+            weight_sched = StepSchedule(step_config=epoch_step, change=args.rate_change)
+        else:
+            weight_sched = PowerSchedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
         
         opt_gdm = GradientDescentMomentum(args.rate_init[0], args.momentum[0], wdecay=args.weight_decay, 
                                           schedule=weight_sched, stochastic_round=args.rounding)
