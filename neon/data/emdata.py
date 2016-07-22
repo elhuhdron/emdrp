@@ -256,10 +256,13 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         nextdata = [nextdata[i] for i in ([0] + range(2,p.naug_data+2) + [1])]
         # order from EM data parser is tranpose of neon data, so switch nexamples (num_cases_per_batch) to first dim
         for i in range(len(nextdata)-1):
-            # image dimensions and pixels / examples dimensions both need to be transposed relative to cc2 input
-            #self.nextdata[i] = nextdata[i].T.copy(order='C')
+            # image dimensions and pixels / examples dimensions are transposed relative to cc2 input
+            #self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
+            #    transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
+            # xxx - decided above was a poor choice, transpose should not matter as long as input/ouput are in same
+            #   orientation relative to each other. swap the image and samples dimensions only
             self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
-                transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
+                transpose((3,0,1,2)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
                 
         # convert labels that are not onehot (independent_labels) to int
         if self.make_onehot:
