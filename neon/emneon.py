@@ -37,7 +37,7 @@ import numpy as np
 from neon.backends import gen_backend
 from neon.layers import GeneralizedCost
 from neon.optimizers import GradientDescentMomentum, MultiOptimizer
-from neon.optimizers import StepSchedule, PowerSchedule
+from neon.optimizers import Schedule, PowerSchedule
 from neon.transforms import CrossEntropyBinary, CrossEntropyMulti
 from neon.models import Model
 from neon.callbacks.callbacks import Callbacks
@@ -80,7 +80,7 @@ parser.add_argument('--model_arch', type=str, default='fergus', help='Specify co
 parser.add_argument('--rate_step', type=float, default=1.0, help='Learning schedule rate step (in emneon epochs)')
 parser.add_argument('--epoch_dstep', nargs='*', type=int, default=[], 
                     help='Learning schedule neon delta epochs to adjust rate (use instead of rate_step)')
-parser.add_argument('--rate_change', nargs='+', type=float, default=[0.5], 
+parser.add_argument('--rate_change', type=float, default=0.5, 
                     help='Learning schedule rate change (occurs each rate_step)')
 parser.add_argument('--weight_decay', type=float, default=0.01, help='Weight decay')
 parser.add_argument('--rate_init', nargs=2, type=float, default=[0.001, 0.002], 
@@ -236,7 +236,7 @@ try:
         #if args.rate_freq < 1: args.rate_freq = train.nmacrobatches
         #if args.rate_decay > 0:
         #    if args.rate_freq > 1:
-        #        weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs, args.rate_freq)
+        #        weight_sched = DiscreteTauExpSchedule(args.rate_decay * train.nmacrobatches,num_epochs, args.rate_freq)
         #    else:
         #        weight_sched = TauExpSchedule(args.rate_decay * train.nmacrobatches, num_epochs)
         #else:
@@ -245,11 +245,8 @@ try:
         # simpler method directly from neon Schedule(), specify step and change on command line
         if len(args.epoch_dstep) > 0:
             epoch_step = list(cumsum(args.epoch_dstep))
-            print('Adjusting learning rate by %s at %s' % (','.join([str(x) for x in args.rate_change]), 
-                                                             ','.join([str(x) for x in epoch_step])))
-            # xxx - not sure why neon can't handle this???
-            if len(args.rate_change) == 1: args.rate_change = [args.rate_change[0]] * len(epoch_step)
-            weight_sched = StepSchedule(step_config=epoch_step, change=args.rate_change)
+            print('Adjusting learning rate by %.4f at %s' % (args.rate_change, ','.join([str(x) for x in epoch_step])))
+            weight_sched = Schedule(step_config=epoch_step, change=args.rate_change)
         else:
             weight_sched = PowerSchedule(step_config=int(args.rate_step*train.nmacrobatches), change=args.rate_change)
         

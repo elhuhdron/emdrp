@@ -261,8 +261,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             #    transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
             # xxx - decided above was a poor choice, transpose should not matter as long as input/ouput are in same
             #   orientation relative to each other. swap the image and samples dimensions only
-            self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
-                transpose((3,0,1,2)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
+            self.nextdata[i] = nextdata[i].T.copy(order='C')
                 
         # convert labels that are not onehot (independent_labels) to int
         if self.make_onehot:
