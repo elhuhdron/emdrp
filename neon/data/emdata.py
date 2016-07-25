@@ -178,8 +178,9 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
                 parser=self.parser)
 
         # cpu buffers for storing batches from EM parser before they are written to gpu.
-        # xxx - fix the parser.no_labels situation for autoencoders
-        self.num_data_labels = 2 + self.parser.naug_data
+        self.num_data = 1 + self.parser.naug_data
+        self.num_labels = 0 if self.parser.no_labels else 1
+        self.num_data_labels = self.num_data + self.num_labels
         self.nextdata = [None] * self.num_data_labels
         if self.concatenate_batches:
             # http://stackoverflow.com/questions/2397141/how-to-initialize-a-two-dimensional-array-in-python
@@ -251,11 +252,12 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         nextdata = p.getBatch(self.batchnum)
 
         # need to manipulate data and labels returned by EM parser to be congruent with neon
-        assert( len(nextdata) == self.num_data_labels)
+        assert( len(nextdata) == self.num_data_labels )
         # re-arrange so that labels are last
-        nextdata = [nextdata[i] for i in ([0] + range(2,p.naug_data+2) + [1])]
+        if self.num_labels > 0:
+            nextdata = [nextdata[i] for i in ([0] + range(2,p.naug_data+2) + [1])]
         # order from EM data parser is tranpose of neon data, so switch nexamples (num_cases_per_batch) to first dim
-        for i in range(len(nextdata)-1):
+        for i in range(self.num_data):
             # image dimensions and pixels / examples dimensions are transposed relative to cc2 input
             #self.nextdata[i] = nextdata[i].reshape((p.nzslices, p.image_size, p.image_size, p.num_cases_per_batch)).\
             #    transpose((3,0,2,1)).reshape((p.num_cases_per_batch, p.pixels_per_image)).copy(order='C')
@@ -263,11 +265,12 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             #   orientation relative to each other. swap the image and samples dimensions only
             self.nextdata[i] = nextdata[i].T.copy(order='C')
                 
-        # convert labels that are not onehot (independent_labels) to int
-        if self.make_onehot:
-            self.nextdata[-1] = nextdata[-1].T.astype(np.int32, order='C')
-        else:
-            self.nextdata[-1] = nextdata[-1].T.copy(order='C')
+        if self.num_labels > 0:
+            # convert labels that are not onehot (independent_labels) to int
+            if self.make_onehot:
+                self.nextdata[-1] = nextdata[-1].T.astype(np.int32, order='C')
+            else:
+                self.nextdata[-1] = nextdata[-1].T.copy(order='C')
 
         # advance to next batch, roll around at end of batch range
         self.batchnum += 1

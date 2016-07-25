@@ -622,7 +622,7 @@ class EMDataParser():
 
         #time.sleep(5) # useful for "brute force" memory leak debug
         #return data, labels
-        return [data, labels] + aug_data
+        return ([data] if self.no_labels else [data, labels]) + aug_data
 
     def generateRandBatch(self,data,aug_data,labels,seglabels):
         assert( not self.no_labels )
@@ -733,7 +733,8 @@ class EMDataParser():
             #   it is possible to fix this for tiled, but doesn't seem necessary.
             #   if it's fixed need to decide what are the chunks... still easier to have them as actual Knossos-sized
             #     chunks and not as defined by size_rand, then have to change how chunk_range_index is incremented
-            assert( not self.use_chunk_range or (self.size_rand == self.chunksize).all() )
+            # xxx - dealt with this in a hacky way below in setChunkList for chunk_range mode
+            #assert( not self.use_chunk_range or (self.size_rand == self.chunksize).all() )
 
             # draw from the list of tiled chunks only, set in init depending on parameters.
             if setChunkList: self.setChunkList(chunk, self.chunk_tiled_list)
@@ -765,8 +766,17 @@ class EMDataParser():
         if self.use_chunk_range:
             self.chunk_list_index = np.nonzero(chunk >= self.chunk_range_cumsize)[0][-1]
             self.chunk_range_index = chunk - self.chunk_range_cumsize[self.chunk_list_index]
-            chunk_rand = np.unravel_index(self.chunk_range_index, self.chunk_range_rng[self.chunk_list_index,:]) \
-                + self.chunk_range_beg[self.chunk_list_index,:]
+
+            if (self.size_rand == self.chunksize).all():
+                # original mode
+                chunk_rand = np.unravel_index(self.chunk_range_index, self.chunk_range_rng[self.chunk_list_index,:]) \
+                    + self.chunk_range_beg[self.chunk_list_index,:]
+            else:
+                # this is something of a hack to allow for batches larger than chunksize
+                scale = self.size_rand // self.chunksize
+                chunk_rand = np.unravel_index(self.chunk_range_index, self.chunk_range_rng[self.chunk_list_index,:]) \
+                    * scale + self.chunk_range_beg[self.chunk_list_index,:]
+                
             offset_rand = self.offset_list[self.chunk_list_index,:]
         else:
             self.chunk_list_index = chunk
