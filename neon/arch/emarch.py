@@ -188,6 +188,38 @@ class h2vgg(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+# 980 train: 4.3 s / batch, 980 test: 1.5 s / batch
+class h3vgg(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False):
+        super(h3vgg, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            # input 128
+            Conv((7, 7, 80), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 64
+            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 32
+            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 16
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling(3, strides=2, padding=1, op='avg'),
+            # 8
+            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 class autofergus32(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(autofergus32, self).__init__(noutputs, use_softmax)
