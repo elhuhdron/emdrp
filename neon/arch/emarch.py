@@ -230,6 +230,7 @@ class vggpool(EMModelArchitecture):
         return [
             # input 128
             Conv((7, 7, 80), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            #Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             # 64
             Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
@@ -246,6 +247,7 @@ class vggpool(EMModelArchitecture):
             Pooling(3, strides=2, padding=1),
             # 8
             Conv((3, 3, 4096), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            #Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
