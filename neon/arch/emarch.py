@@ -305,7 +305,7 @@ class vgg3pool(EMModelArchitecture):
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            #Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             # 8
             Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
