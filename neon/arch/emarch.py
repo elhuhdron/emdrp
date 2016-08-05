@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 from neon.initializers import Constant, Gaussian, Uniform, Kaiming
-from neon.layers import Conv, Dropout, Pooling, Affine, LRN, Deconv
+from neon.layers import Conv, Dropout, Pooling, Affine, LRN #, Deconv
 #from neon.layers import Activation, MergeSum, SkipNode, BatchNorm
 from neon.transforms import Rectlin, Logistic, Softmax, Identity, Explin
 from layers.emlayers import DOG
@@ -125,69 +125,6 @@ class mfergus(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-# 980 train: 4.8 s / batch, 980 test: 1.65 s / batch
-class hvgg(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(hvgg, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            # input 128
-            Conv((7, 7, 72), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 64
-            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 32
-            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 16
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1, op='avg'),
-            # 8
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-# 980 train: 4.05 s / batch, 980 test: 1.5 s / batch
-class h2vgg(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(h2vgg, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            # input 128
-            Conv((9, 9, 80), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 64
-            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 32
-            Conv((3, 3, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 16
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1, op='avg'),
-            # 8
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
 # 980 train: 4.3 s / batch, 980 test: 1.5 s / batch
 class h3vgg(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
@@ -216,68 +153,6 @@ class h3vgg(EMModelArchitecture):
             # 8
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class vggpool(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(vggpool, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            # input 128
-            Conv((7, 7, 80), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 64
-            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 32
-            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 16
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 8
-            Conv((3, 3, 4096), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class vgg2pool(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(vgg2pool, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            # input 128
-            Conv((7, 7, 80), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 64
-            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 32
-            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 16
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 8
-            Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Pooling('all', op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
@@ -314,286 +189,34 @@ class vgg3pool(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-class autofergus32(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(autofergus32, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            Conv((9, 9, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Deconv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((4, 4, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Deconv((6, 6, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=2),
-            Deconv((7, 7, 3), init=Kaiming(), padding=3, strides=1, bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class autofergus64(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(autofergus64, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            Conv((9, 9, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Pooling(3, strides=2, padding=1),
-            Deconv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((4, 4, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Deconv((6, 6, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=2),
-            Deconv((8, 8, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=2),
-            Deconv((9, 9, 3), init=Kaiming(), padding=4, strides=1, bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-class autoh2vgg64(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(autoh2vgg64, self).__init__(noutputs, use_softmax)
+class pfergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(pfergus, self).__init__(noutputs, use_softmax)
 
     @property
     def layers(self):
         bn = True
         return [
             # input 128
-            #DOG((5.0, 4.0, 3.0, 1.6), 1.8),
-            Conv((9, 9, 72), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
+            Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             # 64
-            Conv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
             # 32
-            Conv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
             # 16
-            Conv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             # 8
-            Deconv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 16
-            Deconv((4, 4, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Deconv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 32
-            Deconv((4, 4, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Deconv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Deconv((3, 3, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 64
-            Deconv((4, 4, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Deconv((9, 9, 3), init=Kaiming(), padding=4, strides=1, bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]        
-
-#class autoh2vgg64(EMModelArchitecture):
-#    def __init__(self, noutputs, use_softmax=False):
-#        super(autoh2vgg64, self).__init__(noutputs, use_softmax)
-#
-#    @property
-#    def layers(self):
-#        bn = True
-#        return [
-#            # input 128
-#            Conv((9, 9, 72), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
-#            Pooling(3, strides=2, padding=1),
-#            # 64
-#            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Conv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            # 32
-#            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-#            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Conv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            # 16
-#            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-#            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Pooling(3, strides=2, padding=1),
-#            # 8
-#            Deconv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Deconv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Deconv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            # 16
-#            Deconv((4, 4, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-#            Deconv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Deconv((3, 3, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            # 32
-#            Deconv((4, 4, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-#            Deconv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            Deconv((3, 3, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-#            # 64
-#            Deconv((4, 4, 72), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-#            Deconv((9, 9, 3), init=Kaiming(), padding=4, strides=1, bias=Constant(0), 
-#                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-#        ]        
-
-class kaiming(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(kaiming, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            # input 128
-            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 64
-            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 32
-            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 16
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 8
-            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 1024), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 1
+            Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
-
-class mkaiming(EMModelArchitecture):
-    def __init__(self, noutputs, use_softmax=False):
-        super(mkaiming, self).__init__(noutputs, use_softmax)
-
-    @property
-    def layers(self):
-        bn = True
-        return [
-            # input 128
-            #Conv((9, 9, 88), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
-            Conv((9, 9, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
-            Pooling(3, strides=2, padding=1),
-            # 64
-            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
-            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
-            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
-            Conv((7, 7, 64), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
-            # 32
-            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=2),
-            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
-            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
-            Conv((5, 5, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
-            # 16
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=2),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            # 8
-            Conv((1, 1, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=2),
-            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((1, 1, 3072), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
-            Conv((1, 1, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
-            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((1, 1, 3072), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=0, strides=1),
-            # 1
-            Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
-                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-        ]
-
-## xxx - in neon v1.5.2 requires way too much memory
-#class dpkaiming(EMModelArchitecture):
-#    def __init__(self, noutputs, use_softmax=False):
-#        super(dpkaiming, self).__init__(noutputs, use_softmax)
-#
-#    @property
-#    def layers(self):
-#        return [
-#            # input 224
-#            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Rectlin(), padding=3, strides=2),
-#            Pooling(3, strides=2, padding=1),
-#            # 56
-#            MergeSum([
-#                SkipNode(), [
-#                    BatchNorm(), Activation(Rectlin()),
-#                    Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#                    Conv((3, 3, 64), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-#                ] ]),
-#            MergeSum([
-#                SkipNode(), [
-#                    BatchNorm(), Activation(Rectlin()),
-#                    Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#                    Conv((3, 3, 64), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-#                ] ]),
-#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            #Conv((3, 3, 64), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            # 28
-#            #BatchNorm(), Activation(Rectlin()),
-#            #MergeSum([
-#            #    Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-#            #    [
-#            #        Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
-#            #        Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-#            #    ] ]),
-#            #MergeSum([
-#            #    SkipNode(), [
-#            #        BatchNorm(), Activation(Rectlin()),
-#            #        Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            #        Conv((3, 3, 128), init=Kaiming(), activation=None, batch_norm=False, padding=1, strides=1),
-#            #    ] ]),
-#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
-#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            Conv((3, 3, 128), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            # 14
-#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=2),
-#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            Conv((3, 3, 256), init=Kaiming(), activation=Rectlin(), batch_norm=True, padding=1, strides=1),
-#            # 7
-#            #Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=2),
-#            #Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-#            #Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-#            #Conv((1, 1, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-#            #Conv((3, 3, 512), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=1, strides=1),
-#            #Conv((1, 1, 2048), init=Kaiming(), activation=Rectlin(), batch_norm=bn, padding=0, strides=1),
-#            # 1
-#            Pooling('all', op='avg'),
-#            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
-#                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
-#        ]
 
 class cifar10(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
