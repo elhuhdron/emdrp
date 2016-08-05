@@ -159,7 +159,6 @@ class dpMergeProbs(object):
                 self.datasize = loadh5.datasize[cz]; self.chunksize = loadh5.chunksize[cz]
                 self.attrs = loadh5.data_attrs
                 if self.minmaxmed.size > 0:
-                    print(cprobs.shape)
                     cprobs[:,:,:,i] = loadh5.data_cube.transpose(cz); del loadh5
                 else:
                     cprobs += loadh5.data_cube.transpose(cz)*self.weightings[i]; del loadh5

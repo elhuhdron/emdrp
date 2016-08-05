@@ -41,13 +41,14 @@ class dpLoadh5(object):
         'xzy' : [0,2,1],    # xzy, z is y after reslice
         'xyz' : [0,1,2],    # xyz, z is z after reslice
     }
+    LIST_ARGS = ['subgroups','subgroups_out']
 
     def __init__(self, args):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
             # do not override any values that are already set as a method of allowing inherited classes to specify
             if hasattr(self,k): continue
-            if type(v) is list and k not in ['subgroups','subgroups_out']:
+            if type(v) is list and k not in self.LIST_ARGS:
                 if len(v)==1:
                     setattr(self,k,v[0])  # save single element lists as first element
                 elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
