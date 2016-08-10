@@ -136,7 +136,9 @@ class dpCubeIter(object):
 
         for volume_info in self:
             size, cur_chunk, left_offset, suffix = volume_info
-            str_volume = ' --size ' + str(size) + ' --chunk ' + str(cur_chunk) + ' --offset ' + str(left_offset)
+            str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
+                (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
+                (' --offset %d %d %d ' % tuple(left_offset.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, suffix)
             print(cmd + str_volume + str_inputs)
 
