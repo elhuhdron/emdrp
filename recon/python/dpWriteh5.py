@@ -101,8 +101,7 @@ class dpWriteh5(dpLoadh5):
             print('\tdone in %.4f s' % (time.time() - t))
 
     def createh5(self, outfile):
-        of = os.path.realpath(outfile)
-        h5file = h5py.File(of, 'r+' if os.path.isfile(of) else 'w')
+        h5file = h5py.File(outfile, 'r+' if os.path.isfile(outfile) else 'w')
         dset, group, dsetpath = self.getDataset(h5file)
         if not dset:
             self.createh5dataset(h5file, dsetpath)
