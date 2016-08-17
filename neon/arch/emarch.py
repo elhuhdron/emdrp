@@ -189,6 +189,7 @@ class vgg3pool(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+# 980 train: xxx s / batch, 980 test: 0.65 s / batch
 class vgg4pool(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(vgg4pool, self).__init__(noutputs, use_softmax)
@@ -221,6 +222,7 @@ class vgg4pool(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+# 980 train: xxx s / batch, 980 test: 0.95 s / batch
 class pfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
         super(pfergus, self).__init__(noutputs, use_softmax)
@@ -245,6 +247,35 @@ class pfergus(EMModelArchitecture):
             Pooling(3, strides=2, padding=1),
             # 8
             Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling('all', op='avg'),
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
+class p2fergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(p2fergus, self).__init__(noutputs, use_softmax)
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            # input 128
+            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 64
+            Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 32
+            Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 16
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            # 8
+            Conv((3, 3, 10240), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
