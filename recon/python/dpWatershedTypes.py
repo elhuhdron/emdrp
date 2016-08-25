@@ -36,6 +36,7 @@
 import argparse
 import time
 import numpy as np
+import h5py
 from scipy import ndimage as nd
 from scipy import interpolate
 from skimage import morphology as morph
@@ -99,7 +100,7 @@ class dpWatershedTypes(object):
         #readVerbose = self.dpWatershedTypes_verbose
 
         # load the probability data, allocate as array of volumes instead of 4D ndarray to maintain C-order volumes
-        probs = [None]*self.ntypes; bwseeds = [None]*self.ntypes
+        probs = [None]*self.ntypes; bwseeds = [None]*self.nfg_types
         if self.srclabels:
             # this code path is typically not used in favor of the label checker for fully labeled 3d gt components.
             # but, some ground truth (for example, 2d ECS cases) was only labeled with voxel type,
@@ -128,12 +129,20 @@ class dpWatershedTypes(object):
                 # set background type as all areas that are not in foreground types after "cleaning"
                 probs[0][np.logical_not(fgbwlabels)] = 1
         else:
-            for i in range(self.ntypes):
+            # check if background is in the prob file
+            hdf = h5py.File(self.probfile,'r'); has_bg = self.bg_type in hdf; hdf.close()
+            for i in range(0 if has_bg else 1, self.ntypes):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.types[i], chunk=self.chunk.tolist(),
                     offset=self.offset.tolist(), size=self.size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
                     verbose=readVerbose)
                 self.datasize = loadh5.datasize; self.chunksize = loadh5.chunksize; self.attrs = loadh5.data_attrs
                 probs[i] = loadh5.data_cube; del loadh5
+            # if background was not in hdf5 then create it as 1-sum(fg type probs)
+            if not has_bg:
+                probs[0] = np.ones_like(probs[1])
+                for i in range(1,self.ntypes): probs[0] -= probs[i]
+                #assert( (probs[0] >= 0).all() ) # comment for speed
+                probs[0][probs[0] < 0] = 0 # rectify
 
         # save some of the parameters as attributes
         self.attrs['types'] = self.types; self.attrs['fg_types'] = self.fg_types
@@ -205,7 +214,7 @@ class dpWatershedTypes(object):
         # at last iteration keep all remaining components.
         # do this separately for foreground types.
         for k in range(self.nTmin):
-            for i in range(self.ntypes): bwseeds[i] = np.zeros(self.size, dtype=np.bool, order='C')
+            for i in range(self.nfg_types): bwseeds[i] = np.zeros(self.size, dtype=np.bool, order='C')
             for i in range(self.nthresh):
                 if self.dpWatershedTypes_verbose:
                     print('creating supervoxels at threshold = %.8f with Tmin = %d' % (self.Ts[i], self.Tmins[k]))
