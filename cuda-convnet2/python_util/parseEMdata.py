@@ -82,7 +82,7 @@ class EMDataParser():
     PRIOR_DATASET = 'prior_train'
     
     # Where a batch is within these ranges allows for different types of batches to be selected:
-    # 1 to FIRST_RAND_NOLOOKUP_BATCH-1 are randomized examples from all training cubes
+    # 1 to FIRST_RAND_NOLOOKUP_BATCH-1 are label lookup table randomized examples from all training cubes
     # FIRST_RAND_NOLOOKUP_BATCH - FIRST_TILED_BATCH-1 are randomized examples from all training cubes
     # FIRST_TILED_BATCH - (batch with max test chunk / zslice) are tiled examples from the rand then test cubes
     #   or all sequential cubes in chunk list or range mode
@@ -317,12 +317,9 @@ class EMDataParser():
         # default for label train prior probabilities is uniform for all label types
         if type(self.label_priors) is list: 
             assert( len(self.label_priors) == self.nlabels )
-            self.label_priors = np.array(self.label_priors,dtype=np.double)
+            self.initial_label_priors = np.array(self.label_priors,dtype=np.double)
         else: 
-            self.label_priors = 1.0/self.nlabels * np.ones((self.nlabels,),dtype=np.double)
-        # this is incase the prior has to be forced to zero because of missing labels after border is removed.
-        # reload the original during makeRandLabelLookup for chunk list or chunk range modes.
-        self.initial_label_priors = self.label_priors.copy()
+            self.initial_label_priors = 1.0/self.nlabels * np.ones((self.nlabels,),dtype=np.double)
 
         # these are used for making the output probability cubes
         # xxx - the tiling procedure is confusing, see comments on this in makeTiledIndices
@@ -350,6 +347,9 @@ class EMDataParser():
         self.segmented_labels_cube = [None]*n
         self.labels_cube = [None]*n
 
+        # need a copy of initial label priors, incase priors needs to be modified because of missing labels
+        #   when creating the rand label lookup (makeRandLabelLookup)
+        self.label_priors = [self.initial_label_priors.copy() for i in range(n)]
         self.inds_label_lookup = [self.nlabels*[None] for i in range(n)]
         self.label_lookup_lens = [self.nlabels*[0] for i in range(n)]
             
@@ -403,7 +403,7 @@ class EMDataParser():
     def makeRandLabelLookup(self, chunkind=0):
         #assert( not self.chunk_list_all )  # random batches with lookup not intended for all chunks loaded mode
         if not self.silent: print 'EMDataParser: Creating rand label lookup for specified zslices'
-        self.label_priors[:] = self.initial_label_priors     # incase prior was modified below in chunk mode
+        self.label_priors[chunkind][:] = self.initial_label_priors     # incase prior was modified below in chunk mode
         max_total_voxels = self.size_rand.prod() # for heuristic below - xxx - rethink this, or add param?
         total_voxels = 0
         #self.inds_label_lookup = self.nlabels*[None]
@@ -420,9 +420,9 @@ class EMDataParser():
                 if inds.shape[0] == 0 or float(inds.shape[0])/max_total_voxels < 3.0517578125e-05:
                     if not self.silent: print 'EMDataParser: no voxels with label %d forcing prior to zero' % i
                     # redistribute current prior amongst remaining nonzero priors
-                    prior = self.label_priors[i]; self.label_priors[i] = 0
-                    pinds = np.arange(self.nlabels)[self.label_priors > 0]
-                    self.label_priors[pinds] += prior/pinds.size
+                    prior = self.label_priors[chunkind][i]; self.label_priors[chunkind][i] = 0
+                    pinds = np.arange(self.nlabels)[self.label_priors[chunkind] > 0]
+                    self.label_priors[chunkind][pinds] += prior/pinds.size
                     #assert( self.label_priors.sum() - 1.0 < 1e-5 )
                 
                 inds += self.labels_offset
@@ -438,7 +438,7 @@ class EMDataParser():
                 # if a label is missing, must specify label priors on command line to handle this.
                 # xxx - maybe do the same as above for this, just remove and redistribute this prior?
                 if not self.silent: print 'EMDataParser: no voxels with label %d' % i
-                assert(self.label_priors[i] == 0) # prior must be zero if label is missing
+                assert(self.label_priors[chunkind][i] == 0) # prior must be zero if label is missing
 
         assert(total_voxels > 0);            
         self.rand_priors = [float(x)/total_voxels for x in self.label_lookup_lens[chunkind]]
@@ -447,7 +447,7 @@ class EMDataParser():
             outfile.write('\nTotal voxels included for random batches %u\n' % (total_voxels,))
             for i in range(self.nlabels):
                 outfile.write('label %d %s percentage of voxels = %.8f , count = %d, use prior %.8f\n' %\
-                    (i,self.label_names[i],self.rand_priors[i],self.label_lookup_lens[0][i],self.label_priors[i]))
+                    (i,self.label_names[i],self.rand_priors[i],self.label_lookup_lens[0][i],self.label_priors[0][i]))
             outfile.write('Sum percentage of allowable rand voxels = %.3f\n' % sum(self.rand_priors))
             outfile.close(); 
 
@@ -481,11 +481,11 @@ class EMDataParser():
             self.tiled_priors = [float(x)/total_voxels for x in tiled_count]
             for i in range(self.nlabels):
                 outfile.write('label %d %s percentage of voxels = %.8f , count = %d, use prior %.8f\n' \
-                    % (i,self.label_names[i],self.tiled_priors[i],tiled_count[i],self.label_priors[i]))
+                    % (i,self.label_names[i],self.tiled_priors[i],tiled_count[i],self.label_priors[0][i]))
             outfile.write('Sum percentage of allowable tiled voxels = %.3f\n\n' % sum(self.tiled_priors))
         
         # priors again for copy / paste convenience (if using in convnet param file)
-        outfile.write('Priors train:   %s\n' % ','.join('%.8f' % i for i in self.label_priors))
+        outfile.write('Priors train:   %s\n' % ','.join('%.8f' % i for i in self.label_priors[0]))
         if total_voxels > 0:
             outfile.write('Priors test:    %s\n' % ','.join('%.8f' % i for i in self.tiled_priors))
         if not self.no_label_lookup:
@@ -629,7 +629,7 @@ class EMDataParser():
         if self.use_chunk_list: self.randChunkList()    # load a new cube in chunklist or chunkrange modes
 
         # pick labels that will be used to select images to present
-        lbls = nr.choice(self.nlabels, self.num_cases_per_batch, p=self.label_priors)
+        #lbls = nr.choice(self.nlabels, (self.num_cases_per_batch,), p=self.label_priors)
         augs = np.bitwise_and(nr.choice(self.NAUGS, self.num_cases_per_batch), self.augs_mask)
 
         if self.no_label_lookup:
@@ -644,9 +644,17 @@ class EMDataParser():
             if self.chunk_list_all:
                 cl = self.chunk_rand_list; ncl = self.chunk_range_rand
                 chunks = nr.choice(ncl, (self.num_cases_per_batch,))
+                
+                # need special label creation here incase priors needed changing for a chunk because
+                #   one of the label types was missing (for example ECS in a low ECS dataset).
+                lbls = np.zeros((self.num_cases_per_batch,), dtype=np.int64)
+                for c, chunk in zip(range(ncl), cl):
+                    sel = (chunks == c); n = sel.sum(dtype=np.int64)
+                    lbls[chunks==c] = nr.choice(self.nlabels, (n,), p=self.label_priors[chunk])
             else:
                 cl = [0]; ncl = 1
                 chunks = np.zeros((self.num_cases_per_batch,), dtype=np.int64)
+                lbls = nr.choice(self.nlabels, (self.num_cases_per_batch,), p=self.label_priors[0])
 
             # generate any possible random choices for each label type and chunk, will not use all, for efficiency
             inds_lbls = np.zeros((self.nlabels, ncl, self.num_cases_per_batch), dtype=np.uint64)
