@@ -320,18 +320,18 @@ class p3fergus(EMModelArchitecture):
         bn = True
         return [
             # input 128
-            Conv((7, 7, 64), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             # 64
-            Conv((7, 7, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Conv((7, 7, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             # 32
-            Conv((5, 5, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
             Pooling(3, strides=2, padding=1),
             # 16
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
-            Conv((3, 3, 512), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             # 8
             Conv((3, 3, 8192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
