@@ -259,7 +259,9 @@ for prm=1:o.nparams
   
   if ~isempty(pdata.nlabels_attr)
     % get nlabels from attributes
-    o.types_nlabels(prm,:) = h5readatt(pdata.lblsh5,dset,pdata.nlabels_attr);
+    tmp = h5readatt(pdata.lblsh5,dset,pdata.nlabels_attr);
+    assert( ~p.remove_MEM_ECS_nodes || length(tmp) > 1 );   % need labels sorted by supervoxel type for this to work
+    o.types_nlabels(prm,1:length(tmp)) = tmp;
     nlabels = double(sum(o.types_nlabels(prm,:))); % do not remove ECS components
     %nlabels = double(nlabels(1)); Vlbls(Vlbls > nlabels) = 0;  % remove ECS components
   else

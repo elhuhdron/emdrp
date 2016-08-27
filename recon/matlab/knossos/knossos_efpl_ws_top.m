@@ -28,43 +28,101 @@ pdata = struct;  % input parameters depending on dataset
 % i = 1;
 % pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
 % pdata(i).chunk = [12 14 2];
-% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
 % pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_supervoxels.h5';
-% %pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_probs.h5';
+% pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_probs.h5';
 % pdata(i).name = 'none';
 % pdata(i).subgroups = {'with_background'};
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
+% pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
+% pdata(i).name = 'huge';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+
+
 
 % with ~20% ECS
 i = 1;
 pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
 pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
-pdata(i).name = 'huge';
+pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg5pool64all/huge_supervoxels.h5';
+pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/vgg5pool64all/huge_probs.h5';
+pdata(i).name = 'huge_p2f';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
-% with ~20% ECS
+% with almost no ECS
 i = 2;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_supervoxels.h5';
-pdata(i).name = 'huge_xyz';
+pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).chunk = [12 14 2];
+pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg5pool64all/none_supervoxels.h5';
+pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/vgg5pool64all/none_probs.h5';
+pdata(i).name = 'none_p2f';
+pdata(i).subgroups = {'with_background'};
+pdata(i).segparam_attr = 'thresholds';
+pdata(i).nlabels_attr = 'types_nlabels';
+
+% % with ~20% ECS
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/pfergus64all/huge_supervoxels.h5';
+% pdata(i).name = 'huge_pfergus';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with almost no ECS
+% i = 4;
+% pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+% pdata(i).chunk = [12 14 2];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/pfergus64all/none_supervoxels.h5';
+% pdata(i).name = 'none_pfergus';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+
+
+% with almost no ECS
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).probh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/none_probs.h5';
+pdata(i).chunk = [12 14 2];
+pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
+%pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_supervoxels.h5';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/none_supervoxels.h5';
+pdata(i).name = 'none xyz';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
 % with ~20% ECS
-i = 3;
+i = 1;
 pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+pdata(i).probh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_probs.h5';
 pdata(i).chunk = [16 17 0];
+%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
 pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/newestECSall_offset/huge_supervoxels.h5';
-pdata(i).name = 'huge_offset';
+%pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_supervoxels.h5';
+pdata(i).name = 'huge xyz';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
@@ -82,6 +140,7 @@ p.min_edges = 1;  % only include skeletons with at least this many edges
 p.load_data = false;
 p.load_probs = [];
 %p.load_probs = {'MEM', 'ICS', 'ECS'};
+%p.load_probs = {'MEM'};
 p.nalloc = 1e6; % for confusion matrix and for stacks
 p.tol = 1e-5; % for assert sanity checks
 
@@ -105,7 +164,8 @@ p.p_resample = 0;
 p.remove_MEM_ECS_nodes = true;
 
 p.nchunks = [8 8 4];
-p.offset = [0 0 32];
+%p.offset = [0 0 32];
+p.offset = [0 0 0];
 p.dataset_data = 'data_mag1';
 p.dataset_lbls = 'labels';
 
@@ -129,4 +189,4 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_huge_xyzonly_offset_interp_norandbg.mat','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_paper_vgg5.mat','p','pdata','o');

@@ -197,7 +197,7 @@ plot(squeeze(split_er_CI(2,:,2)),squeeze(merge_fracnodes_CI(2,:,2)),'--');
 set(gca,'plotboxaspectratio',[1 1 1]);
 set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
 xlabel('split edges'); ylabel('merged nodes');
-title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\nthr=%g %g',abs(diff(m)),m(1),...
+title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\nthr=%g %g',abs(m(2)-m(1)),m(1),...
   minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2))));
 legend(names)
 
@@ -220,7 +220,7 @@ else
 end
 [m,mi] = max(combined_eftpl,[],2);
 set(gca,'ylim',[-0.025 0.75]); box off
-title(sprintf('maxd=%g\n%g %g\nthr=%g %g',abs(diff(m)),m(1),m(2),...
+title(sprintf('maxd=%g\n%g %g\nthr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
   params{1}(mi(1)),params{2}(mi(2))));
 
 

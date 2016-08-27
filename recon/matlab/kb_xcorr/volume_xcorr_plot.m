@@ -14,7 +14,7 @@ Pout = cat(5,o{:}.Poutm);
 Pcout = cat(5,o{:}.Pcout);
 
 % remove stuff without much membrane
-Cout(squeeze(Pcout(:,:,:,1,:) < 0.2)) = NaN;
+Cout(squeeze(Pcout(:,:,:,1,:) < 0.1)) = NaN;
 
 nzrng = length(p.zrngs); 
 % % do averaging along the zdirection
@@ -35,7 +35,14 @@ if nzrng > 0
   sz = size(Cout); sz(3) = nzrng; Coutcnt = zeros(sz);
   for i = 1:nzrng
     zrng = p.zrngs{i};
-    Coutcnt(:,:,i,:) = sum((Cout(:,:,zrng,:) > 0.4) | ~isfinite(Cout(:,:,zrng,:)),3)/length(zrng);
+    % xxx - what do the nans actually mean???
+    % to get the bad matches
+    %Coutcnt(:,:,i,:) = sum((Cout(:,:,zrng,:) > 0.4) | ~isfinite(Cout(:,:,zrng,:)),3)/length(zrng);
+    % to get the good matches with training sets
+    %Coutcnt(:,:,i,:) = sum((Cout(:,:,zrng,:) > 0.999) & isfinite(Cout(:,:,zrng,:)),3)/length(zrng);
+    % to get the good matches without training sets
+    Coutcnt(:,:,i,:) = sum((Cout(:,:,zrng,:) < 0.999) & (Cout(:,:,zrng,:) > 0.55) & ...
+      isfinite(Cout(:,:,zrng,:)),3)/length(zrng);
   end
 end
 
@@ -104,12 +111,19 @@ c = hist(Poutd(:,1),xb); c = cumsum(c)/sum(c);
 plot(xb,c,'b'); hold on
 xlabel('mean mem prob'); ylabel('cdf'); legend('training','testing')
 
+sel = 1:48;
 %[C,i] = sort(Cout(:));
-%[x,y,z] = ind2sub(size(Cout),i(1:10));
-[C,i] = sort(Coutcnt(:));
-[x,y,z] = ind2sub(size(Coutcnt),i(1:10));
-C(1:10)
-[x,y,z]
+%[x,y,z] = ind2sub(size(Cout),i(sel));
+%[C,i] = sort(Coutcnt(:));
+[C,i] = sort(Coutcnt(:),1,'descend');
+[x,y,z] = ind2sub(size(Coutcnt),i(sel));
+display('correlations')
+C(sel)
+%[x,y,z]
+display('chunk')
 bsxfun( @plus, [fix((x-1)/2) fix((y-1)/2) fix((z-1)/2)], pdata(1).chunk )
+display('chunk modulo (offset)')
 [mod(x-1,2), mod(y-1,2), mod(z-1,2)]
+display('unique chunks')
+unique(bsxfun( @plus, [fix((x-1)/2) fix((y-1)/2) fix((z-1)/2)], pdata(1).chunk ),'rows')
 
