@@ -168,6 +168,11 @@ class emLabels(dpWriteh5):
     # xxx - not a great reason that these were written as static methdods, maybe make as normal methods?
     #   would either modify labels in place or return a modified set of labels.
 
+    # relabel sequential using thresholdSizes, just for a more clear name and if mappings are not needed
+    @staticmethod
+    def relabel_sequential(lbls):
+        return emLabels.thresholdSizes(lbls, minSize=1)
+
     # calculate sizes for a label volume and remove labels below specified threshold, returns sizes for labels only
     @staticmethod
     def thresholdSizes(lbls, minSize=1):

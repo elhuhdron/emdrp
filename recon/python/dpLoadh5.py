@@ -177,10 +177,12 @@ class dpLoadh5(object):
         # h5py requires that for read_direct data must be C order and contiguous. this means F-order must be dealt with
         #   "manually" here. for F-order the cube will be in C-order, but shaped like F-order, and then the view
         #   transposed back to C-order so that it's transparent in the rest of the code.
-        if self.hdf5_Corder:
-            self.data_cube = np.zeros(data_size, dtype=self.data_type, order='C')
+        # avoid re-allocating if possible if this object is being re-used with a different size.
+        sz = data_size if self.hdf5_Corder else data_size[::-1]
+        if hasattr(self,'data_cube') and all([x == y for x,y in zip(self.size,self.data_cube.shape)]):
+            self.data_cube = self.data_cube.reshape(sz)
         else:
-            self.data_cube = np.zeros(data_size[::-1], dtype=self.data_type, order='C')
+            self.data_cube = np.zeros(sz, dtype=self.data_type, order='C')
 
         # slice out the data hdf
         hdf = h5py.File(self.srcfile,'r'); self.dset, self.group, self.dsetpath = self.getDataset(hdf)

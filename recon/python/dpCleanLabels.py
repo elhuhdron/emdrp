@@ -205,7 +205,7 @@ class dpCleanLabels(emLabels):
             remap[np.argsort(supervoxel_type)+1] = np.arange(1,nlabels+1,dtype=self.data_cube.dtype)
             self.data_cube = remap[self.data_cube]
             types_nlabels = [(supervoxel_type==x).sum(dtype=np.int64) for x in range(1,ntypes)]
-            assert( sum(types_nlabels) == nlabels )
+            assert( sum(types_nlabels) == nlabels ) # indicates voxel type does not match supervoxels
             self.data_attrs['types_nlabels'] = types_nlabels
 
             if self.write_voxel_type:

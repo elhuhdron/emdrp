@@ -67,6 +67,7 @@ class dpCubeIter(object):
                 setattr(self,k,v)
 
         # other inits
+        self.chunksize = self.use_chunksize
         self.cube_size_voxels = self.cube_size * self.chunksize
         self.left_remainder = self.left_remainder_size > 0; self.right_remainder = self.right_remainder_size > 0
 
@@ -117,7 +118,7 @@ class dpCubeIter(object):
                 r = 'l' if is_left_remainder[i] else ('r' if is_right_remainder[i] else '')
                 suffix += ('_%s%04d' % (s + r, cur_chunk[i]))
 
-            yield size, cur_chunk, left_offset, suffix
+            yield size, cur_chunk, left_offset, suffix, is_left_border, is_right_border
 
     def flagsToString(self, flags, paths, prefixes, suffix):
         argstr = ''
@@ -135,14 +136,29 @@ class dpCubeIter(object):
             cmd = myfile.read().replace('\n', '')
 
         for volume_info in self:
-            size, cur_chunk, left_offset, suffix = volume_info
+            size, cur_chunk, left_offset, suffix, is_left_border, is_right_border = volume_info
             str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, suffix)
             print(cmd + str_volume + str_inputs)
 
-    # xxx - add a class method for creating the generator for use with cube stitcher
+    @classmethod
+    def cubeIterGen(cls, volume_range_beg, volume_range_end, overlap, cube_size,
+                    left_remainder_size=None, right_remainder_size=None, chunksize=None, leave_edge=None):
+        parser = argparse.ArgumentParser(description='cubeIterGen:dpCubeIter',
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        dpCubeIter.addArgs(parser); arg_str = ''
+        arg_str += ' --volume_range_beg %d %d %d ' % tuple(volume_range_beg)
+        arg_str += ' --volume_range_end %d %d %d ' % tuple(volume_range_end)
+        arg_str += ' --overlap %d %d %d ' % tuple(overlap)
+        arg_str += ' --cube_size %d %d %d ' % tuple(cube_size)
+        if left_remainder_size is not None: arg_str += ' --left_remainder_size %d %d %d ' % tuple(left_remainder_size)
+        if right_remainder_size is not None: arg_str += '--right_remainder_size %d %d %d ' % tuple(right_remainder_size)
+        if chunksize is not None: arg_str += ' --use-chunksize %d %d %d ' % tuple(chunksize)
+        if leave_edge: arg_str += ' --leave_edge '
+        args = parser.parse_args(arg_str.split())
+        return cls(args)
 
     @staticmethod
     def addArgs(p):
@@ -164,12 +180,10 @@ class dpCubeIter(object):
             help='Size in voxels of "left" remainder volumes')
         p.add_argument('--right_remainder_size', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Size in voxels of "right" remainder volumes')
-        p.add_argument('--chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
+        p.add_argument('--use-chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
                        help='Size of chunks in voxels')
         p.add_argument('--leave_edge', action='store_true', help='Whether to leave right-most overlap or not')
-        p.add_argument('--dpCubeIter-verbose', action='store_true', help='Debugging output for dpCubeIter')
 
-# testing
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate command lines for parallelized cube processing',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
