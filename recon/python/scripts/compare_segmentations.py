@@ -45,10 +45,21 @@ params = {
     'segpaths' : [
         #'/Data/datasets/labels/supervoxels/newestECSall_20151001',
         #'/Data/datasets/labels/supervoxels/sixfold_threed_20151006',
-        '/Data/watkinspv/full_datasets',
-        '/Data/watkinspv/full_datasets',
+        #'/Data/watkinspv/full_datasets',
         #'/home/watkinspv/Data/agglo',
-        #'/home/watkinspv/Data/agglo',
+        '/home/watkinspv/Data/convnet_out/sixfold_threed',
+        '/home/watkinspv/Data/convnet_out/sixfold_threed',
+        #'/home/watkinspv/Data/convnet_out/sixfold_threed',
+        #'/home/watkinspv/Data/convnet_out/neon_sixfold/case_orig_nooffset',
+        #'/home/watkinspv/Data/convnet_out/neon_sixfold/case_rand_fixed_fergus_explin_bn',
+        #'/home/watkinspv/Data/convnet_out/neon_sixfold/case0_offset',
+        #'/home/watkinspv/Data/convnet_out/neon_sixfold/case1_full_batchnorm',
+        #'/home/watkinspv/Data/convnet_out/neon_sixfold/case2_no_first_layer_batchnorm',
+        #'/home/watkinspv/Data/convnet_out/neon_sixfold/case3_exp_relu_full_batchnorm',
+        '/home/watkinspv/Data/convnet_out/neon_sixfold/case_rand_highrate_fergus_explin_bn',
+        '/home/watkinspv/Data/convnet_out/neon_sixfold/case_rand_highrate_fergus_explin_bn_32out',
+        '/home/watkinspv/Data/convnet_out/neon_sixfold/case_rand_highrate_sfergus_explin_bn_32out',
+        '/home/watkinspv/Data/convnet_out/neon_sixfold/case_rand_highrate_sfergus_explin_bn_32out',
         ],
     'segmentations' : [
         #'none_agglo_perfect_supervoxels.h5',
@@ -58,32 +69,41 @@ params = {
         #'huge_flatagglo_lda_23f_35iter_test_supervoxels.h5',
         #'huge_flatagglo_lda_24f_50iter_test_supervoxels.h5',
         #'huge_flatagglo_rf_81f_50iter_test_supervoxels.h5',
-        'huge_supervoxels_ws_fake6fold.h5',
-        'huge_supervoxels_wsovlp_fake6fold.h5',
-        #'huge_supervoxels_wswarp_fake6fold.h5',
-        #'huge_supervoxels_wswarpfb_fake6fold.h5',
-        #'huge_supervoxels_wswarpsf_fake6fold.h5',
+        #'huge_supervoxels_ws_96true6fold.h5',
+        #'huge_supervoxels_wsovlp_96true6fold.h5',
+        #'huge_supervoxels_ws_true6fold.h5',
+        'huge_xyz_0_supervoxels.h5',
+        'huge_xyz_1_supervoxels.h5',
+        #'huge_xyz_2_supervoxels.h5',
+        'huge_supervoxels.h5',
+        'huge_supervoxels.h5',
+        'huge_supervoxels.h5',
+        'huge_supervoxels_all.h5',
         ],
     'seglbls' : [
         #'perfect',
-        'watershed',
+        #'watershed',
         #'lda_23f',
         #'lda_24f',
         #'rf_81f',
-        'ovlp',
-        #'warp',
-        #'warpsf',
+        'cc2_lookup16_0',
+        'cc2_lookup16_1',
+        #'neon_rand16',
+        'neon_hrand16',
+        'neon_hrand32',
+        'neon_hsrand32',
+        'neon_ahsrand32',
         ],
     'subgroups' : [
         ['with_background',],
         ['with_background',],
-        #['agglomeration',],
-        #['agglomeration',],
+        ['with_background',],
+        ['with_background',],
+        ['with_background',],
+        ['with_background',],
         #['agglomeration',],
         ],
     'segparams' : [
-        #np.array([0.9999]),
-        #        np.array([0.9995]),
         #        np.array([0.3, 0.4, 0.5, 0.6, 0.61, 0.62, 0.63, 0.64,
         #            0.65, 0.66, 0.67, 0.68, 0.69, 0.7, 0.71, 0.72,
         #            0.73, 0.74, 0.75, 0.76, 0.77, 0.78, 0.79, 0.8,
@@ -96,26 +116,29 @@ params = {
             0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
         np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
             0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
-        #        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
-        #            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
-        #        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
-        #            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
+        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
+            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
+        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
+            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
+        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
+            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
+        np.array([0.30000000,0.40000000,0.50000000,0.60000000,0.70000000,0.80000000,0.90000000,0.95000000, 0.97500000,
+            0.99000000,0.99500000,0.99900000,0.99950000,0.99990000,0.99995000,0.99999000,0.99999500,0.99999900]),
         #np.arange(1,35,dtype=np.double),
         #np.arange(1,50,dtype=np.double),
         #np.arange(1,50,dtype=np.double),
         ],
     #
-    #'size' : [128, 128, 128], 'offset' : [0, 0, 0],
-    'size' : [96, 96, 128], 'offset' : [16, 16, 0],
+    'size' : [128, 128, 128], 'offset' : [0, 0, 0],
+    #'size' : [96, 96, 96], 'offset' : [16, 16, 16],
     'chunks' : [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
-    #'chunks' : [[17,19,2], [17,23,1], [22,23,1]],
     #'chunks' : [[17,23,1],],
     #'chunks' : [[16,17,4], [13,20,3], [13,15,3], [18,15,3], [18,20,3], [18,20,4]],
     #'chunks' : [[16,17,4],],
     'figno' : 5000,
-    'plot_only':False,
+    'plot_only':True,
     'outpath' : '.',
-    'save_file' : 'out.dill',
+    'save_file' : 'out_prev.dill',
     'do_plots':True,
     'save_plots':False,
     }
@@ -141,6 +164,7 @@ if not plot_only:
         # nsegparams repeated across chunks just for convenience
         'nsegparams' : ma.array(np.zeros((nsegs,nchunks,mparams),dtype=np.double),mask=True),
         #'voxel_sizes_skel' : [[None]*nchunks]*nsegs,
+        'cat_error' : ma.array(np.zeros((nsegs,nchunks),dtype=np.double),mask=True),
         }
     globals().update(metrics)
 
@@ -149,15 +173,24 @@ if not plot_only:
         # load ground truth and components from segmented labels file
         loadh5 = emLabels.readLabels(srcfile=gth5, chunk=chunk, offset=offset, size=size)
         gtComps = loadh5.data_cube; gtIsECS = (gtComps == gt_ECS_label);
+        gtLbls = np.zeros(gtComps.shape, dtype=np.uint8)
+        gtLbls[np.logical_and(gtComps > 0, np.logical_not(gtIsECS))] = 1; gtLbls[gtIsECS] = 2;
         gtComps[gtIsECS] = 0; n = gtComps.max(); gtComps[gtComps == n] = gt_ECS_label; gtnlabels = n-1
 
         for i,seg,segp in zip(range(nsegs), segmentations, segpaths):
             fps = os.path.join(segp, seg)
             print('calculating metrics for ' + seg + (' chunk %d %d %d' % tuple(chunk))); t = time.time()
 
+            # load network output max prob categories (voxelTypes, "labels")
+            loadh5 = emVoxelType.readVoxType(srcfile=fps, chunk=chunk, offset=offset, size=size)
+            outLbls = loadh5.data_cube
+
+            # calculate the categorization error
+            cat_error[i,j] = (gtLbls != outLbls).sum(dtype=np.int64) / float(outLbls.size)
+
             for k,prm in zip(range(nparams[i]),segparams[i]):
                 loadh5 = emLabels.readLabels(srcfile=fps, chunk=chunk, offset=offset, size=size,
-                    subgroups=subgroups[i] + ['%.8f' % (prm,)])
+                    subgroups=subgroups[i] + ['%.8f' % (prm,)], verbose=False)
                 segComps = loadh5.data_cube
 
                 # calculate the ISBI2013 rand error (gala, excludes gt background) using the full out components
@@ -248,18 +281,18 @@ if do_plots:
     import matplotlib as mpl
     from matplotlib import colors
 
-    # blue, green, yellow, red, brown
+    # blue, green, yellow, red, brown, pink
     clrs = np.array([[0.28235294, 0.23921569, 0.54509804], [0.33333333, 0.41960784, 0.18431373], [1, 0.54901961, 0],
-        [0.54509804, 0, 0], [0.5450980, 0.2705882, 0.0745098]]).T
+        [0.54509804, 0, 0], [0.5450980, 0.2705882, 0.0745098], [1, 0.4117647, 0.7058823]]).T
 
     baseno=figno
     pl.figure(figno);
 
-    errs = [min_are_gala, min_vi_gala]
-    strs = ['Min Adapted Rand Error', 'Min Variation of Information']
-    ylims = [[-0.01,0.12], [-0.1,1.4], ]
-    plsize = [1,2]
-    dostats = [False, False]
+    errs = [cat_error, min_are_gala, min_vi_gala]
+    strs = ['Categorization Error', 'Min Adapted Rand Error', 'Min Variation of Information']
+    ylims = [[-0.01,0.5], [-0.01,0.12], [-0.1,1.4], ]
+    plsize = [2,2]
+    dostats = [False, False, False]
     plot_setlims = False
 
     scatter_err_plots(errs, strs, ylims, plsize, dostats)
