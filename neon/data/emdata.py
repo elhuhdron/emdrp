@@ -184,8 +184,8 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         self.nextdata = [None] * self.num_data_labels
         if self.concatenate_batches:
             # http://stackoverflow.com/questions/2397141/how-to-initialize-a-two-dimensional-array-in-python
-            #self.allnextdata = [[None for i in range(self.nmacrobatches)] for j in range(2 + self.parser.naug_data)]
-            self.allnextdata = [x[:] for x in [[None]*self.nmacrobatches]*self.num_data_labels]
+            # http://stackoverflow.com/questions/10668341/create-3d-array-using-python
+            self.allnextdata = [[None for i in range(self.nmacrobatches)] for j in range(self.num_data_labels)]
 
         # run loop for loading data continues as long as process is running.
         self.init_event.set()  # initialization completed
