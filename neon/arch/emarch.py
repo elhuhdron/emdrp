@@ -98,6 +98,35 @@ class nfergus(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+class nbfergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(nbfergus, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+                    padding=3, strides=1)\
+                if self.bn_first_layer else\
+                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), 
+                    padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Dropout(keep=0.5),
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
 # 980 train: 9.1 s / batch, 980 test: 3 s / batch
 class mfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
