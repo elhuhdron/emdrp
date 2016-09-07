@@ -215,6 +215,14 @@ try:
             arch = EMModelArchitecture.init_model_arch(args.model_arch, train.parser.nclass, 
                                                        not train.parser.independent_labels)
             model = Model(layers=arch.layers)
+            
+            # allocate saving counts for training labels here so they can be saved with convnet checkpoints
+            model.batch_meta = {'prior_train_count':np.zeros((train.parser.nclass,),dtype=np.int64), 
+                                'prior_total_count':np.zeros((1,),dtype=np.int64)}
+
+        if hasattr(model,'batch_meta'):
+            train.parser.batch_meta['prior_train_count'] = model.batch_meta['prior_train_count']
+            train.parser.batch_meta['prior_total_count'] = model.batch_meta['prior_total_count']
     
         assert( train.nmacrobatches > 0 )    # no training batches specified and not in write_output mode
         macro_epoch = model.epoch_index//train.nmacrobatches+1
@@ -285,6 +293,12 @@ try:
                                   chunk_skip_list=args.chunk_skip_list, dim_ordering=args.dim_ordering,
                                   batch_range=args.test_range, name='test', isTest=True, concatenate_batches=False,
                                   NBUF=args.nbebuf, image_in_size=args.image_in_size)
+            if hasattr(model,'batch_meta'):
+                test.parser.batch_meta['prior_train_count'] = model.batch_meta['prior_train_count']
+                test.parser.batch_meta['prior_total_count'] = model.batch_meta['prior_total_count']
+            else:
+                # added small hack in model/model.py in neon so that batch_meta gets serialized
+                print('WARNING: No batch meta in saved model file!')
         else:
             # make dummy random data just for testing model inits
             test = RandomEMDataIterator(name='outputs')
