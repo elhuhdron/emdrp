@@ -69,18 +69,19 @@ class dpCubeStitcher(emLabels):
                     chunksize=self.chunksize, leave_edge=self.leave_edge)
 
         if self.two_pass:
+            assert( not self.concatenate_only ) # silly
             # implement a hacky save/load mostly for debugging purposes for two-pass
             if self.two_pass_load:
                 connections = np.fromfile(self.two_pass_load,dtype=np.int64).reshape((-1,2))
             else:
-                connections = self.stitch_first_pass(one_pass_only=False)
+                connections = self.stitch_first_pass(do_stitching=False)
             ncomps, total_ncomps = connections[-1,:]
             if self.two_pass_save:
                 connections.tofile(self.two_pass_save)
 
             self.stitch_second_pass(connections[:-1,:], total_ncomps)
         else:
-            self.stitch_first_pass()
+            self.stitch_first_pass(do_stitching=not self.concatenate_only)
 
     def __iter__(self):
         for self.volume_info,n in zip(self.cubeIter, range(self.cubeIter.volume_size)):
@@ -113,8 +114,8 @@ class dpCubeStitcher(emLabels):
     # the one pass stitch only merges each "next cube" supervoxel with the single largest overlapping previously written
     #   supervoxel, which prevents the need to run connected components. it also does not allow for a supervoxel to
     #   stitch together two supervoxels that come in on different cube faces, thus forcing splits in these cases.
-    def stitch_first_pass(self, one_pass_only=True):
-        nfaces = 1 if one_pass_only else 3; ncomps = 0; total_ncomps = 0;
+    def stitch_first_pass(self, do_stitching=True):
+        nfaces = 1 if do_stitching else 3; ncomps = 0; total_ncomps = 0;
         connections = [np.zeros((0,2),dtype=np.int64)]*(self.cubeIter.volume_size*nfaces + 1)
 
         self.first_pass = True
@@ -172,7 +173,7 @@ class dpCubeStitcher(emLabels):
                     # background overlaps should have been removed
                     assert( not (max_ovlp==0).any() and max_ovlp[0]==-1)
 
-                    if one_pass_only:
+                    if do_stitching:
                         # relabel any supervoxels that are to be merged based on the overlap.
                         # relabel any supervoxels that are not merged as new labels (starting at ncomps+1)
                         mapping = np.zeros((cur_ncomps+1,), dtype=self.data_type_out)
@@ -189,7 +190,7 @@ class dpCubeStitcher(emLabels):
                 # update current data for write
                 no_overlap = all(no_overlap);
                 if no_overlap: print('\tNO overlap detected')
-                if not one_pass_only or no_overlap: cur_data[cur_data > 0] += ncomps
+                if not do_stitching or no_overlap: cur_data[cur_data > 0] += ncomps
             ncomps += cur_ncomps
 
             # remove the left offset for the write, saves time since offsets cross chunking boundaries
@@ -257,6 +258,7 @@ class dpCubeStitcher(emLabels):
     def addArgs(p):
         dpWriteh5.addArgs(p)
         dpCubeIter.addArgs(p)
+        p.add_argument('--concatenate_only', action='store_true', help='Just concatenate volumes, no stitching')
         p.add_argument('--two_pass', action='store_true', help='Use two pass method')
         p.add_argument('--two_pass_load', nargs=1, type=str, default='', help='Raw file to load first pass')
         p.add_argument('--two_pass_save', nargs=1, type=str, default='', help='Raw file to export first pass')
