@@ -118,7 +118,7 @@ class dpCubeIter(object):
                 r = 'l' if is_left_remainder[i] else ('r' if is_right_remainder[i] else '')
                 suffix += ('_%s%04d' % (s + r, cur_chunk[i]))
 
-            yield size, cur_chunk, left_offset, suffix, is_left_border, is_right_border
+            yield cur_volume, size, cur_chunk, left_offset, suffix, is_left_border, is_right_border
 
     def flagsToString(self, flags, paths, prefixes, suffix):
         argstr = ''
@@ -136,7 +136,7 @@ class dpCubeIter(object):
             cmd = myfile.read().replace('\n', '')
 
         for volume_info in self:
-            size, cur_chunk, left_offset, suffix, is_left_border, is_right_border = volume_info
+            _, size, cur_chunk, left_offset, suffix, is_left_border, is_right_border = volume_info
             str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
