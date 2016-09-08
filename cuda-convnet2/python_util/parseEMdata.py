@@ -396,7 +396,6 @@ class EMDataParser():
         if not hasattr(self, 'inds_tiled'): self.makeTiledIndices()
         if self.write_outputs: self.writeH5Cubes()
         self.makeBatchMeta()
-        #self.initPreprocessData()   # this needs to be done last, init for per batch preprocessing
         
         self.silent = False
 
@@ -1518,9 +1517,10 @@ class EMDataParser():
                             if self.prior_test.size != nlabels:
                                 # need 1 - sum for last label type (encoded as all zeros)
                                 dshp = d.reshape((cpb,size,size,nlabels))
-                                dall = np.concatenate((dshp, 1-dshp.sum(axis=3,keepdims=True)),axis=3)
-                                d = (dshp*prior_test_to_train_labels / (dall*prior_test_to_train).sum(axis=3,
-                                    keepdims=True)).reshape((cpb,nout))
+                                # rectify incase existing probs sum over one
+                                other_dshp = 1-dshp.sum(axis=3,keepdims=True); other_dshp[other_dshp < 0] = 0
+                                d = (dshp*prior_test_to_train_labels / (np.concatenate((dshp, other_dshp),
+                                        axis=3)*prior_test_to_train).sum(axis=3, keepdims=True)).reshape((cpb,nout))
                             else:
                                 dshp = d.reshape((cpb,size,size,nlabels)); adjusted = dshp*prior_test_to_train;
                                 d = (adjusted / adjusted.sum(axis=3,keepdims=True)).reshape((cpb,nout))
