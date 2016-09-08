@@ -38,6 +38,7 @@ class EMEpochCallback(Callback):
         self.nmacrobatches = nmacrobatches
         #self.cur_minibatch_index = 0
         self.mini_batches_per_epoch = None
+        self.running_epoch = 0 
 
     def on_minibatch_begin(self, callback_data, model, epoch, minibatch):
         self.cur_minibatch_index = minibatch
@@ -58,6 +59,8 @@ class EMEpochCallback(Callback):
 
     def on_epoch_end(self, callback_data, model, epoch):
         t = time.time() - self.epoch_start
+        # this is because could not find where neon can load h5 data if training is continuing
+        epoch = self.running_epoch; self.running_epoch += 1
         if (epoch + 1) % self.epoch_freq == 0:
             sys.stdout.write('done in %.2f s ' % t)
 
