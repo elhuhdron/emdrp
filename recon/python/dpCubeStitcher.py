@@ -129,7 +129,8 @@ class dpCubeStitcher(emLabels):
                     print('\tfirst volume, first pass'); t = time.time()
 
                 # "left-most" volume is starting volume
-                self.data_attrs = cur_attrs; self.datasize = cur_attrs['datasize']
+                use_data_attrs = cur_attrs.copy()
+                self.datasize = use_data_attrs['datasize']; del use_data_attrs['datasize']
             else:
                 if self.dpCubeStitcher_verbose:
                     print('\tstitching first pass'); t = time.time()
@@ -203,6 +204,7 @@ class dpCubeStitcher(emLabels):
                 sel_novlp[:,:,:self.overlap[2]] = 0; self.offset[2] += self.overlap[2]; self.size[2] -= self.overlap[2]
             self.inith5(); self.data_cube = cur_data[sel_novlp].reshape(self.size)
 
+            self.data_attrs = use_data_attrs
             self.data_attrs['types_nlabels'] = [ncomps]
             self.data_attrs['no_overlap_nlabels'] = [total_ncomps]
             self.writeCube()
@@ -226,8 +228,11 @@ class dpCubeStitcher(emLabels):
 
         # any supervoxels that were not stitched are reassigned to values after stitched ones
         nsel = (mapping == 0); nsel[0] = False # first slot is background, don't remap
-        not_remapped = np.cumsum(nsel,dtype=np.int64)
+        not_remapped = np.cumsum(nsel,dtype=np.int64) + ncomps
         mapping[nsel] = not_remapped[nsel]; ncomps = not_remapped[-1]; del not_remapped, nsel
+
+        if self.dpCubeStitcher_verbose:
+            print('Second pass, stitching results in %d comps down from %d total' % (ncomps, total_ncomps))
 
         # turn the overlap off for faster iteration over the volumes
         # xxx - need to fix this if we're trying to keep the right border overlaps (for another round of stitching)
@@ -238,8 +243,6 @@ class dpCubeStitcher(emLabels):
 
         # second pass to reread supervoxels written on the first pass and write back with remapping
         self.first_pass = False
-        self.data_attrs['types_nlabels'] = [ncomps]
-        self.data_attrs['no_overlap_nlabels'] = [total_ncomps]
         for cur_cube_info in self:
             cur_data, cur_attrs, cur_ncomps, n = cur_cube_info
             _, _, _, _, _, is_left_border, is_right_border = self.volume_info
@@ -248,11 +251,16 @@ class dpCubeStitcher(emLabels):
                 print('\tremapping supervoxels, second pass'); t = time.time()
 
             self.data_cube = mapping[cur_data]
+            # do not move these outside loop because data_atrrs gets reset by inith5 call
+            self.data_attrs['types_nlabels'] = [ncomps]
+            self.data_attrs['no_overlap_nlabels'] = [total_ncomps]
             self.writeCube()
             if self.dpCubeStitcher_verbose:
                 #print('\tdone in %.4f s, ncomps = %d, total = %d' % (time.time() - t, ncomps, total_ncomps))
                 print('\tdone in %.4f s' % (time.time() - t, ))
 
+        if self.dpCubeStitcher_verbose:
+            print('Second pass, stitching results in %d comps down from %d total' % (ncomps, total_ncomps))
 
     @staticmethod
     def addArgs(p):

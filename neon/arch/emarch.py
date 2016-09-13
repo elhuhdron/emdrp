@@ -187,6 +187,7 @@ class h3vgg(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
+# winner for huge ECS of the 3x3 kernel archs
 class vgg3pool(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(vgg3pool, self).__init__(noutputs, use_softmax)

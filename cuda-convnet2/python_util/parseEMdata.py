@@ -1537,6 +1537,13 @@ class EMDataParser():
             self.probs_out = self.probs_out.reshape(self.output_size + [size, size, 
                 nlabels]).transpose((0,3,1,4,2,5)).reshape(self.labels_slice_size + (nlabels,))
 
+        # which prior counts will be written out
+        if 'prior_train_count' in self.batch_meta:
+            if not prior_export or self.prior_test.size == nlabels:
+                prior_write = prior_train.reshape((size,size,nlabels))
+            else:
+                prior_write = prior_train_labels.reshape((size,size,nlabels))
+
         if self.write_outputs:
             print 'EMDataParser: Creating hdf5 output containing label probabilities'
             if not os.path.exists(self.outpath): os.makedirs(self.outpath)
@@ -1550,14 +1557,15 @@ class EMDataParser():
                 # copy any attributes over
                 for name,value in self.data_attrs.items():
                     outfile[label_names[n]].attrs.create(name,value)
+            self.write_prior_hdf5(prior_export, prior_write)
+            outfile.close()
             
         if self.append_features:
             # write outputs probabilities to a big hdf5 that spans entire dataset, used for "large feature dumps".
             # always writes in F-order (inputs can be either order tho)
             assert( self.nz_tiled == 0 ) # use the rand cube only for "large feature dumps"
-            hdf = h5py.File(self.imagesrc,'r'); createDataset = False
+            hdf = h5py.File(self.imagesrc,'r')
             if not os.path.isfile(self.outpath):
-                createDataset = True
                 print 'EMDataParser: Creating global hdf5 output containing label probabilities "%s"' % self.outpath
                 # create an output prob hdf5 file (likely for a larger dataset, this is how outputs are "chunked")
                 outfile = h5py.File(self.outpath, 'w'); 
@@ -1576,6 +1584,7 @@ class EMDataParser():
                     # copy the attributes over
                     for name,value in self.data_attrs.items():
                         outfile[label_names[n]].attrs.create(name,value)
+                self.write_prior_hdf5(prior_export, prior_write, outfile)
                 outfile.close()
                 
             print 'EMDataParser: Appending to global hdf5 output containing label probabilities "%s" at %d %d %d' % \
@@ -1610,14 +1619,11 @@ class EMDataParser():
             #    dset[ind[0]:ind[0]+d.shape[0],ind[1]:ind[1]+d.shape[1],ind[2]:ind[2]+d.shape[2]] = d
             #outfile.close()
         
+    def write_prior_hdf5(self, prior_export, d, outfile):
         # for both modes, write out the priors, if prior reweighting enabled
         # write a new dataset with the on-the-fly calculated training prior for each label type
-        if 'prior_train_count' in self.batch_meta and (not self.append_features or createDataset):
-            outfile = h5py.File(self.outpath, 'r+'); 
-            if not prior_export or self.prior_test.size == nlabels:
-                d = prior_train.reshape((size,size,nlabels))
-            else:
-                d = prior_train_labels.reshape((size,size,nlabels))
+        if 'prior_train_count' in self.batch_meta:
+            #outfile = h5py.File(self.outpath, 'r+'); 
             outfile.create_dataset(self.PRIOR_DATASET, data=d.transpose((2,1,0)),
                 compression='gzip', compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
             if prior_export:
@@ -1625,7 +1631,7 @@ class EMDataParser():
                 outfile[self.PRIOR_DATASET].attrs.create('prior_test',self.prior_test)
             else:
                 print 'EMDataParser: Exported training prior but output not reweighted'
-            outfile.close()
+            #outfile.close()
             
 
 # for test

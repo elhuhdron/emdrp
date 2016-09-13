@@ -42,7 +42,7 @@ class dpMergeProbs(object):
         for k, v in vars(args).items():
             if type(v) is list:
                 # do not save items that are known to be lists (even if one element) as single elements
-                if len(v)==1 and k not in ['srcfiles', 'affins', 'types', 'weightings', 'dim_orderings', 'minmaxmed']:
+                if len(v)==1 and k not in ['srcfiles', 'affins', 'types', 'weightings', 'dim_orderings', 'ops']:
                     setattr(self,k,v[0])  # save single element lists as first element
                 elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
                     setattr(self,k,np.array(v,dtype=np.int32))
@@ -67,14 +67,11 @@ class dpMergeProbs(object):
         else:
             self.datasets = self.types
         assert( len(self.dim_orderings) == self.nsrcfiles )
-        if (self.minmaxmed < 0).any(): self.minmaxmed = np.zeros((0,), dtype=self.minmaxmed.dtype)
-        if self.minmaxmed.size > 0:
-            self.weightings = []
-            self.minmaxmed = self.minmaxmed.reshape((self.ntypes,-1))
-            assert( self.naffins == 0 ) # not implemented for affinities
-            assert( self.minmaxmed.shape[1] == 1 )
-            assert( (self.minmaxmed <= 2).all() )
-        elif (self.weightings < 0).all():
+
+        self.nops = len(self.ops)
+        for i in range(self.nops): self.ops[i] = self.ops[i].lower()
+
+        if (self.weightings < 0).all():
             # default all equal weightings
             if self.naffins > 0:
                 self.weightings = np.ones((self.nsrcfiles, self.naffins), dtype=np.double)
@@ -104,12 +101,13 @@ class dpMergeProbs(object):
                         data_type=emProbabilities.PROBS_STR_DTYPE, data=affins[:,:,:,i,j],
                         verbose=self.dpMergeProbs_verbose)
         else:
-            for j in range(self.ntypes):
-                print(self.types[j])
-                dpWriteh5.writeData(outfile=self.outprobs, dataset=self.types[j],
-                    chunk=self.chunk.tolist(), offset=self.offset.tolist(), size=self.size.tolist(),
-                    datasize=self.datasize.tolist(), chunksize=self.chunksize.tolist(), attrs=self.attrs,
-                    data_type=emProbabilities.PROBS_STR_DTYPE, data=probs[j], verbose=self.dpMergeProbs_verbose)
+            for k in range(self.nops):
+                for j in range(self.ntypes):
+                    dataset = self.types[j] + ('' if self.ops[k] == 'mean' else ('_'+self.ops[k]))
+                    dpWriteh5.writeData(outfile=self.outprobs, dataset=dataset, chunk=self.chunk.tolist(),
+                        offset=self.offset.tolist(), size=self.size.tolist(), datasize=self.datasize.tolist(),
+                        chunksize=self.chunksize.tolist(), attrs=self.attrs, data_type=emProbabilities.PROBS_STR_DTYPE,
+                        data=probs[k][j],verbose=self.dpMergeProbs_verbose)
 
 
     # this function takes the orthogonal reslice affinity outputs from trained convnets, also with multiple types
@@ -141,15 +139,11 @@ class dpMergeProbs(object):
 
     # this function merges outputs that are the probability of voxel id (given in types).
     def merge_probs_from_convnet_out(self):
-        #szprobs = np.append(self.size,self.ntypes)
-        #probs = np.zeros(szprobs, dtype=emProbabilities.PROBS_DTYPE, order='C')
-        probs = [None]*self.ntypes
-        if self.minmaxmed.size > 0:
-            cprobs = np.zeros(np.append(self.size, self.nsrcfiles), dtype=emProbabilities.PROBS_DTYPE, order='C')
+        probs = [[None for x in range(self.ntypes)] for y in range(self.nops)]
+        cprobs = np.zeros(np.append(self.size, self.nsrcfiles), dtype=emProbabilities.PROBS_DTYPE, order='C')
+        w = self.weightings.reshape(-1)
 
         for k in range(self.ntypes):
-            if self.minmaxmed.size == 0:
-                cprobs = np.zeros(self.size, dtype=emProbabilities.PROBS_DTYPE, order='C')
             for i in range(self.nsrcfiles):
                 cz = dpLoadh5.RESLICES[self.dim_orderings[i]];  # current zreslice_order
                 loadh5 = dpLoadh5.readData(srcfile=os.path.join(self.srcpath,self.srcfiles[i]),
@@ -158,21 +152,17 @@ class dpMergeProbs(object):
                     verbose=self.dpMergeProbs_verbose)
                 self.datasize = loadh5.datasize[cz]; self.chunksize = loadh5.chunksize[cz]
                 self.attrs = loadh5.data_attrs
-                if self.minmaxmed.size > 0:
-                    cprobs[:,:,:,i] = loadh5.data_cube.transpose(cz); del loadh5
+                cprobs[:,:,:,i] = loadh5.data_cube.transpose(cz); del loadh5
+            for i in range(self.nops):
+                strop = self.ops[i].lower()
+                if strop == 'mean':
+                    probs[i][k] = (cprobs*w).sum(axis=3) / self.weightings.sum()
+                elif strop == 'min':
+                    probs[i][k] = cprobs.min(axis=3)
+                elif strop == 'max':
+                    probs[i][k] = cprobs.max(axis=3)
                 else:
-                    cprobs += loadh5.data_cube.transpose(cz)*self.weightings[i]; del loadh5
-            if self.minmaxmed.size > 0:
-                if self.minmaxmed[k] == 0:
-                    probs[k] = cprobs.min(axis=3)
-                elif self.minmaxmed[k] == 1:
-                    probs[k] = cprobs.max(axis=3)
-                elif self.minmaxmed[k] == 2:
-                    probs[k] = np.median(cprobs, axis=3)
-                else:
-                    assert(False)
-            else:
-                probs[k] = cprobs / self.weightings.sum()
+                    assert(False) # bad op
         return probs
 
     @staticmethod
@@ -189,8 +179,7 @@ class dpMergeProbs(object):
             metavar='TYPE', help='Names of the voxel types (prefix for dataset for affinities, all combinations)')
         p.add_argument('--weightings', nargs='+', type=float, default=[-1.0,-1.0], metavar='W',
             help='Weightings for probabilities specified in each srcfile (un-reordered), default to equal weightings')
-        p.add_argument('--minmaxmed', nargs='*', type=int, default=[-1], metavar='W',
-            help='Specify to use min(0)/max(1)/med(2) for merging probs instead of weightings')
+        p.add_argument('--ops', nargs='*', type=str, default=['mean'], help='Specify which operations to be done')
         p.add_argument('--dim-orderings', nargs='+', type=str, default='xyz', choices=('xyz','xzy','zyx'),
             metavar='ORD', help='Specify the order to reslice the dimensions into (last one becomes new z)')
         p.add_argument('--chunk', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
