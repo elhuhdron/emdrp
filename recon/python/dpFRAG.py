@@ -42,7 +42,7 @@ from numpy import linalg as nla
 from scipy import ndimage as nd
 from scipy import linalg as sla
 #from skimage import morphology as morph
-from skimage.segmentation import relabel_sequential
+#from skimage.segmentation import relabel_sequential
 import networkx as nx
 from io import StringIO
 from collections import OrderedDict
@@ -82,8 +82,9 @@ class dpFRAG(emLabels):
     #   preserved, but some of the overlap calculations can still be preserved.
     svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out']
     sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
-    ovlp_attrs = ['mean_probs','mean_probs_aug','mean_grayscale','mean_grayscale_aug','aobnd','rad_std_ovlp','ang_std_ovlp',
-        'conv_overlap','labeled_ovlp']
+    ovlp_attrs = ['mean_probs','mean_probs_aug','mean_probs_static_aug',
+                  'mean_grayscale','mean_grayscale_aug','mean_grayscale_static_aug',
+                  'aobnd','rad_std_ovlp','ang_std_ovlp','conv_overlap','labeled_ovlp']
 
     @staticmethod
     def make_features(feature_set):
@@ -102,7 +103,7 @@ class dpFRAG(emLabels):
 
         # the variables returned as a dict by this method
         features_vars = ['log_size', 'npcaang', 'prob_types', 'nprob_types', 'augments', 'naugments',
-            'features_names', 'features', 'nfeatures']
+            'features_names', 'features', 'nfeatures', 'static_augments', 'nstatic_augments']
 
         ############ hyperparameters controlling features
 
@@ -134,6 +135,7 @@ class dpFRAG(emLabels):
                 'median', 'mean', 'min', 'max', 'var',
                 'grad_mag', 'grad_dir', 'large_hess', 'hess_ori',
                 ]
+            static_augments = []
         elif feature_set == 'standard':
             # 36 total features
             static_features = ['size_small', 'size_large', 'size_overlap',
@@ -143,6 +145,18 @@ class dpFRAG(emLabels):
             npcaang = 3
             prob_types = ['MEM','ICS']
             augments = ['kuwahara', 'blur30', 'blur40', 'max']
+            static_augments = []
+        elif feature_set == 'medium':
+            # 23 total features
+            static_features = ['size_small', 'size_large', 'size_overlap',
+                'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large',
+                'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
+                'conv_overlap', 'rad_std_ovlp', 'ang_std_ovlp']
+            npcaang = 0
+            prob_types = ['MEM','ICS','ECS']
+            augments = []
+            static_augments = ['MEM_max', 'ICS_min', 'ECS_max',
+                               '_kuwahara', '_blur30', '_blur40', '_max']
         elif feature_set == 'reduced':
             # 21 total features
             static_features = ['size_small', 'size_large', 'size_overlap',
@@ -152,6 +166,7 @@ class dpFRAG(emLabels):
             npcaang = 0
             prob_types = ['MEM','ICS']
             augments = ['blur30', 'max']
+            static_augments = []
         elif feature_set == 'small':
             # 15 total features, no augments
             static_features = ['size_small', 'size_large', 'size_overlap',
@@ -161,12 +176,14 @@ class dpFRAG(emLabels):
             npcaang = 0
             prob_types = ['MEM','ICS']
             augments = []
+            static_augments = []
         elif feature_set == 'minimal':
             # 6 total features
             static_features = ['size_small', 'size_large', 'size_overlap', 'mean_grayscale']
             npcaang = 0
             prob_types = ['MEM', 'ICS']
             augments = []
+            static_augments = []
         else:
             assert(False)   # bad feature set
 
@@ -175,6 +192,7 @@ class dpFRAG(emLabels):
         features_names = list(static_features)
         augments = ['_' + x for x in augments]
         naugments = len(augments); nprob_types = len(prob_types)
+        nstatic_augments = len(static_augments)
 
         for k in range(nprob_types):
             features_names += ['mean_prob_' + prob_types[k]]
@@ -183,6 +201,12 @@ class dpFRAG(emLabels):
             features_names += ['mean_grayscale' + augments[k]]
             for j in range(nprob_types):
                 features_names += ['mean_prob_' + prob_types[j] + augments[k]]
+
+        for k in range(nstatic_augments):
+            if static_augments[k][0] == '_':
+                features_names += ['mean_grayscale' + static_augments[k]]
+            else:
+                features_names += ['mean_prob_' + static_augments[k]]
 
         for k in range(npcaang):
             features_names += ['pca_angle' + str(k)]
@@ -229,8 +253,9 @@ class dpFRAG(emLabels):
         self.readCubeToBuffers()
         if self.remove_ECS:
             self.data_cube[self.data_cube > self.data_attrs['types_nlabels'][0]] = 0
-        relabel, fw, inv = relabel_sequential(self.data_cube)
-        self.nsupervox = inv.size - 1; self.data_cube = np.zeros((0,))
+        #relabel, fw, inv = relabel_sequential(self.data_cube); self.nsupervox = inv.size - 1
+        relabel, sizes = emLabels.relabel_sequential(self.data_cube); self.nsupervox = sizes.size
+        self.data_cube = np.zeros((0,))
         self.supervoxels_noperim = relabel
         self.supervoxels = np.lib.pad(relabel, self.spad, 'constant',
             constant_values=0).astype(self.data_type_out, copy=False)
@@ -244,6 +269,7 @@ class dpFRAG(emLabels):
 
             self.probs = [None]*self.nprob_types
             self.probs_aug = [[None]*self.nprob_types for x in range(self.naugments)]
+            self.probs_static_aug = [None]*self.nstatic_augments
             for i in range(self.nprob_types):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.prob_types[i], chunk=self.chunk.tolist(),
                     offset=offset.tolist(), size=size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
@@ -251,7 +277,7 @@ class dpFRAG(emLabels):
 
                 if not self.load_prob_perim:
                     # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
-                    self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=0)
+                    self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=0.5)
                 else:
                     self.probs[i] = data
 
@@ -264,11 +290,25 @@ class dpFRAG(emLabels):
 
                     if not self.load_prob_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
-                        self.probs_aug[j][i] = np.lib.pad(data, spad, 'constant',constant_values=0)
+                        self.probs_aug[j][i] = np.lib.pad(data, spad, 'constant',constant_values=0.5)
                     else:
                         self.probs_aug[j][i] = data
 
                     self.probs_aug[j][i][np.logical_not(np.isfinite(self.probs_aug[j][i]))] = 0     # no NaNs/Infs
+
+            for j in range(self.nstatic_augments):
+                if self.static_augments[j][0] != '_':
+                    loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.static_augments[j],
+                        chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
+                        verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+
+                    if not self.load_prob_perim:
+                        # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
+                        self.probs_static_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=0.5)
+                    else:
+                        self.probs_static_aug[j] = data
+
+                    self.probs_static_aug[j][np.logical_not(np.isfinite(self.probs_static_aug[j]))] = 0  # no NaNs/Infs
 
         # load the raw em data
         if self.rawfile:
@@ -280,7 +320,7 @@ class dpFRAG(emLabels):
 
             if self.pad_raw_perim:
                 # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
-                self.raw = np.lib.pad(data, spad, 'constant',constant_values=0)
+                self.raw = np.lib.pad(data, spad, 'constant',constant_values=128)
             else:
                 self.raw = data
 
@@ -294,11 +334,26 @@ class dpFRAG(emLabels):
 
                 if self.pad_raw_perim:
                     # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
-                    self.raw_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=0)
+                    self.raw_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=128)
                 else:
                     self.raw_aug[j] = data
 
                 self.raw_aug[j][np.logical_not(np.isfinite(self.raw_aug[j]))] = 0   # no NaNs/Infs
+
+            self.raw_static_aug = [None]*self.nstatic_augments
+            for j in range(self.nstatic_augments):
+                if self.static_augments[j][0] == '_':
+                    loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile,dataset=self.raw_dataset+self.static_augments[j],
+                        chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
+                        verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+
+                    if self.pad_raw_perim:
+                        # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
+                        self.raw_static_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=128)
+                    else:
+                        self.raw_static_aug[j] = data
+
+                    self.raw_static_aug[j][np.logical_not(np.isfinite(self.raw_static_aug[j]))] = 0   # no NaNs/Infs
 
         # load the ground truth data
         if self.gtfile:
@@ -309,7 +364,8 @@ class dpFRAG(emLabels):
                     loadh5.data_cube[loadh5.data_cube == self.gt_ECS_label] = 0
                 else:
                     loadh5.data_cube[loadh5.data_cube == loadh5.data_cube.max()] = 0
-            relabel, fw, inv = relabel_sequential(loadh5.data_cube); self.ngtlbl = inv.size - 1
+            #relabel, fw, inv = relabel_sequential(loadh5.data_cube); self.ngtlbl = inv.size - 1
+            relabel, sizes = emLabels.relabel_sequential(loadh5.data_cube); self.ngtlbl = sizes.size
             self.gt = np.lib.pad(relabel, spad, 'constant',constant_values=0)
         else:
             self.gt = None; self.ngtlbl = -1
@@ -337,7 +393,9 @@ class dpFRAG(emLabels):
         # other inits for the supervoxel iteration loop
         mean_probs = [None]*self.nprob_types
         mean_probs_aug = [[None]*self.nprob_types for x in range(self.naugments)]
+        mean_probs_static_aug = [None]*self.nstatic_augments
         mean_grayscale_aug = [None]*self.naugments
+        mean_grayscale_static_aug = [None]*self.nstatic_augments
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
@@ -480,6 +538,15 @@ class dpFRAG(emLabels):
                                 mean_probs_aug[k][x] = \
                                     self.probs_aug[k][x][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
 
+                        # static augmented raw data and probability mean boundary features
+                        for k in range(self.nstatic_augments):
+                            if self.static_augments[k][0] == '_':
+                                mean_grayscale_static_aug[k] = \
+                                    self.raw_static_aug[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+                            else:
+                                mean_probs_static_aug[k] = \
+                                    self.probs_static_aug[k][aobnd][ovlp_cur_dilate].mean(dtype=np.double)
+
                         # MORE COMPLEX FEATURES: object attributes within the overlap bounding box.
                         # xxx - missing some optimization here not doing ovlp pca for reduced set... punting
                         mo = self.getOvlpAttrs(ovlp_cur, self.sampling, return_Cpts=True)
@@ -576,6 +643,11 @@ class dpFRAG(emLabels):
                         f[F['mean_grayscale' + self.augments[k]]] = m['mean_grayscale_aug'][k]
                         for x in range(self.nprob_types):
                             f[F['mean_prob_' + self.prob_types[x] + self.augments[k]]] = m['mean_probs_aug'][k][x]
+                    for k in range(self.nstatic_augments):
+                        if self.static_augments[k][0] == '_':
+                            f[F['mean_grayscale' + self.static_augments[k]]] = m['mean_grayscale_static_aug'][k]
+                        else:
+                            f[F['mean_prob_' + self.static_augments[k]]] = m['mean_probs_static_aug'][k]
 
                     self.FRAG[i][j]['features'] = f; self.FRAG[i][j]['first_pass'] = True
                 else: # if edge already in graph
@@ -1152,7 +1224,7 @@ class dpFRAG(emLabels):
         p.add_argument('--pad-raw-perim', action='store_true', help='Pad perimeter of raw EM instead of loading')
         p.add_argument('--load-prob-perim', action='store_true', help='Load perimeter of probs instead of padding')
         p.add_argument('--feature-set', nargs=1, type=str, default='standard',
-            choices=['all','standard','reduced','small','minimal'],
+            choices=['all','standard','medium','reduced','small','minimal'],
             help='Option to control which features are calculated')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
 
