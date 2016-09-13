@@ -718,7 +718,7 @@ class dpSupervoxelClassifier():
         p.add_argument('--plot-features', action='store_true', help='If plotting, whether to include feature plots')
         p.add_argument('--outfile', nargs=1, type=str, default='', help='Override output file for agglomerations')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
-        p.add_argument('--feature-set', nargs=1, type=str, default='reduced', choices=['all','reduced','minimal'],
+        p.add_argument('--feature-set', nargs=1, type=str, default='', 
             help='Option to control which FRAG features are calculated (override from .ini)')
 
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
