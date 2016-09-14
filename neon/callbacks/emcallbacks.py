@@ -40,6 +40,10 @@ class EMEpochCallback(Callback):
         self.mini_batches_per_epoch = None
         self.running_epoch = 0 
 
+    # always print out the model for the log
+    def on_train_begin(self, callback_data, model, epochs):
+        print(model)
+    
     def on_minibatch_begin(self, callback_data, model, epoch, minibatch):
         self.cur_minibatch_index = minibatch
         

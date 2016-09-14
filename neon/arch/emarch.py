@@ -128,6 +128,7 @@ class nbfergus(EMModelArchitecture):
         ]
 
 # 980 train: 9.1 s / batch, 980 test: 3 s / batch
+# overall best architecture found for huge ECS, use 128in 3class 32 out
 class mfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
         super(mfergus, self).__init__(noutputs, use_softmax)
@@ -187,7 +188,7 @@ class h3vgg(EMModelArchitecture):
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
-# winner for huge ECS of the 3x3 kernel archs
+# winner for huge ECS of the 3x3 kernel archs for 64x64, use 128 in 3class 64 out
 class vgg3pool(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False):
         super(vgg3pool, self).__init__(noutputs, use_softmax)
@@ -211,6 +212,7 @@ class vgg3pool(EMModelArchitecture):
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            # this 4th deep layer may have been in for vgg3pool64all run? can not fit for 6fold so commented
             #Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             # 8
@@ -284,6 +286,8 @@ class vgg5pool(EMModelArchitecture):
         ]
 
 # 980 train: xxx s / batch, 980 test: 0.95 s / batch
+# second-up for huge ECS using normal kernel archs for 64x64, use 128 in 3class 64 out
+# same architecture as mfergus except uses global pooling instaed of fully connected layers
 class pfergus(EMModelArchitecture):
     def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
         super(pfergus, self).__init__(noutputs, use_softmax)
