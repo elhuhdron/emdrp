@@ -279,7 +279,7 @@ for prm=1:o.nparams
   [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, ~] = labelsPassEdges(o,p,Vlbls,nnodes,nlabels,1:o.nThings);
   
   fprintf(1,'\tgetting simple split/merger estimates from confusion matrix\n');
-  [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl); o.nSMs(prm,:) = [nsplits, nmergers]; 
+  [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl, p.remove_MEM_merged_nodes); o.nSMs(prm,:) = [nsplits, nmergers]; 
   [nsplits, nmergers] = getSplitMergerSegEM(m_ijl); o.nSMs_segEM(prm,:) = [nsplits, nmergers];
 
   % count number of nodes falling into background (membrane) and into ECS supervoxels
@@ -753,14 +753,16 @@ end % getOutThings
 
 
 
-function [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl)
+function [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl, remove_MEM_merged_nodes)
   % tally up splits as the number supervoxels that are assiciated with more than one thing
   %   but do not count background label nodes. this can range from [0,nnodes]
   tmp = full(sum(m_ijl(:,2:end),2)); nsplits = sum(tmp(tmp > 1));
 
   % sum the number of nodes that are associated with supervoxel labels that contain nodes from more than one thing.
-  % count multiple nodes in the background supervoxel label as mergers.
-  nmergers = full(sum(sum(m_ij(:,full(sum(m_ijl,1) > 1)),2),1));
+  % count multiple nodes in the background supervoxel label as mergers unless remove_MEM_merged_nodes specified.
+  tmp = full(sum(m_ijl,1) > 1);
+  if remove_MEM_merged_nodes, tmp(1) = false; end
+  nmergers = full(sum(sum(m_ij(:,tmp),2),1));
 end % getSplitMerger
 
 % very similar to above method, see paper "SegEM: Efficient Image Analysis..."

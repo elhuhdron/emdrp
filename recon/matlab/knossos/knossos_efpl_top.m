@@ -132,8 +132,11 @@ p.p_resample = 0;
 % p.n_resample = 1000; 
 % p.p_resample = 0.01;
 
+% usually set these two to true for interpolation, but false for normal
 % set this to true to remove non-ICS nodes from polluting the rand error
 p.remove_MEM_ECS_nodes = true;
+% set this to true to remove nodes falling into MEM areas from counting as merged nodes
+p.remove_MEM_merged_nodes = true;
 
 p.nchunks = [8 8 4];
 p.offset = [0 0 32];
