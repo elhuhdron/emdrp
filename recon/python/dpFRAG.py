@@ -156,6 +156,7 @@ class dpFRAG(emLabels):
             prob_types = ['MEM','ICS','ECS']
             augments = []
             static_augments = ['MEM_max', 'ICS_min', 'ECS_max',
+            #static_augments = [\
                                '_kuwahara', '_blur30', '_blur40', '_max']
         elif feature_set == 'reduced':
             # 21 total features
@@ -1027,14 +1028,19 @@ class dpFRAG(emLabels):
         # get the centroid and center points
         C = np.mean(pts, axis=0); Cpts = pts-C
 
-        # get the principal axes.
-        V = dpFRAG.getOrthoAxes(Cpts, sampling)
+        # xxx - this is hacky, but prevent pca from being called on svox areas in bounding box when
+        #   the pca angles are not being calculated at all for the feature set.
+        if Vother is None or self.npcaang > 0:
+            V = dpFRAG.getOrthoAxes(Cpts, sampling) # get the principal axes.
+        else:
+            V = None
 
         # only return points if needed
         if not return_Cpts: Cpts = None
 
         # calculate angles between corresponding eigenvectors
-        if Vother is None:
+        #if Vother is None:
+        if Vother is None or self.npcaang == 0:
             angles = None
         else:
             angles = np.zeros((self.npcaang,),np.double)
