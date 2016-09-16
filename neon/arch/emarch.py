@@ -47,7 +47,7 @@ class fergus(EMModelArchitecture):
     @property
     def layers(self):
         return [
-            Conv((7, 7, 96), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((7, 7, 96), init=Gaussian(scale=0.0001), bias=Constant(0), activation=Rectlin(), 
                  padding=3, strides=1),
             LRN(31, ascale=0.001, bpower=0.75),
             Pooling(3, strides=2, padding=1),
@@ -55,11 +55,11 @@ class fergus(EMModelArchitecture):
                  padding=2, strides=1),
             LRN(31, ascale=0.001, bpower=0.75),
             Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.03), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
                  padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.03), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
                  padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Identity()),
