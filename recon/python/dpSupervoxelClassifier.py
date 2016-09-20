@@ -115,6 +115,13 @@ class dpSupervoxelClassifier():
 
         # Options / Inits
 
+        # these are so standard cubeIter inputs can be used from command line to override from .ini
+        if (self.chunk > 0).all():
+            self.chunk_range_beg = self.chunk
+            self.chunk_range_end = []
+            self.offset_list = self.offset
+            self.size_list = self.size
+
         self.doplots = (self.show_plots or self.export_plots)
 
         # default is to have sklearn calculate the priors
@@ -568,7 +575,7 @@ class dpSupervoxelClassifier():
                 clf_preds = np.logical_and(clf_preds,(clf_probs[:,1] > thr))
         yesmerge = (target==1); notmerge = (target==0);
         nyes = yesmerge.sum(dtype=np.int64); nnot = notmerge.sum(dtype=np.int64)
-        fScore, tpr_recall, precision, pixel_error, tp,tn,fp,fn = pixel_error_fscore( target.astype(np.bool),
+        fScore, tpr_recall, precision, pixel_error, fpr, tp, tn, fp, fn = pixel_error_fscore( target.astype(np.bool),
             clf_preds.astype(np.bool) )
         print('p=%d, n=%d, tp=%d, tn=%d, fp=%d, fn=%d, rec=%.4f, prec=%.4f, fscore=%.4f' % (nyes,nnot,tp,tn,fp,fn,
             tpr_recall,precision,fScore))
@@ -721,6 +728,13 @@ class dpSupervoxelClassifier():
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
         p.add_argument('--feature-set', nargs=1, type=str, default='',
             help='Option to control which FRAG features are calculated (override from .ini)')
+        # these are so standard cubeIter inputs can be used from command line to override from .ini
+        p.add_argument('--chunk', nargs=3, type=int, default=[-1,-1,-1], metavar=('X', 'Y', 'Z'),
+            help='Corner chunk to parse out of hdf5')
+        p.add_argument('--offset', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+            help='Offset in chunk to read')
+        p.add_argument('--size', nargs=3, type=int, default=[256,256,128], metavar=('X', 'Y', 'Z'),
+            help='Size in voxels to read')
 
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
             help='Debugging output for dpSupervoxelClassifier')

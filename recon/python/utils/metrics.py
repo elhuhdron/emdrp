@@ -70,8 +70,7 @@ def make_consensus( votes, cnt, tie_include ):
         return (votes >= cnt/2)
 
 def pixel_error_fscore( lbl_truth, lbl_proposed ):
-    fScore, tpr_recall, precision, pixel_error, tp,tn,fp,fn = pix_fscore_metric(lbl_truth, lbl_proposed, calcAll=True)
-    return fScore, tpr_recall, precision, pixel_error, tp,tn,fp,fn
+    return pix_fscore_metric(lbl_truth, lbl_proposed, calcAll=True)
 
 def warping_error( lbl_truth, lbl_proposed, doComps=True, simpleLUT=None, connectivity=1 ):
 

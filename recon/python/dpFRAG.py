@@ -1024,16 +1024,16 @@ class dpFRAG(emLabels):
         # get the point coordinates within the overlap bounding box.
         # use the sampling resolution for the points if available.
         pts = np.transpose(np.nonzero(sel)).astype(np.double)*sampling
-
-        # get the centroid and center points
-        C = np.mean(pts, axis=0); Cpts = pts-C
+        C = np.mean(pts, axis=0) # centroid
 
         # xxx - this is hacky, but prevent pca from being called on svox areas in bounding box when
         #   the pca angles are not being calculated at all for the feature set.
+        # xxx - maybe clean this up by just a single input bool that is "for overlap" or "for svox"
         if Vother is None or self.npcaang > 0:
+            Cpts = pts-C # center points around centroid
             V = dpFRAG.getOrthoAxes(Cpts, sampling) # get the principal axes.
         else:
-            V = None
+            V = None; Cpts = None
 
         # only return points if needed
         if not return_Cpts: Cpts = None
