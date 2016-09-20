@@ -116,7 +116,7 @@ class dpSupervoxelClassifier():
         # Options / Inits
 
         # these are so standard cubeIter inputs can be used from command line to override from .ini
-        if (self.chunk > 0).all():
+        if (self.chunk >= 0).all():
             self.chunk_range_beg = self.chunk
             self.chunk_range_end = []
             self.offset_list = self.offset
