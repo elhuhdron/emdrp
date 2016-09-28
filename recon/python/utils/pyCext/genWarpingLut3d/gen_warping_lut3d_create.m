@@ -191,3 +191,10 @@ elseif conn==26
   nbhd = ones(3,3,3); nbhd(2,2,2) = 0;
 end
 
+% Very simple function for faster version of the horribly inefficient builtin matlab unique 
+%   to get unique nonzero elements.
+% Assume array input and asume non-negative integer elements.
+
+function u = labels_unique_nonzeros(x)
+x = nonzeros(x); u = zeros(1,max(x)); u(x) = 1; u = find(u);
+%x = nonzeros(x); u = sparse(x,ones(length(x),1),1,max(x),1); u = find(u); % slower for typical cases
