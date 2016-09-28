@@ -1,1 +1,1 @@
-python -u ./dpWatershedTypes.py --probfile /Data/watkinspv/full_datasets/neon/vgg3pool64all_2/huge_probs_9xyz.h5 --ThrRng 0.5 0.999 0.1 --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW 
+python -u $HOME/gits/emdrp/recon/python/dpWatershedTypes.py --probfile /data/watkinspv/full_datasets/neon/mbfergus32all/huge_probs.h5 --ThrRng 0.5 0.999 0.1 --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW 

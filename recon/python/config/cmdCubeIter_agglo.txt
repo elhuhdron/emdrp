@@ -1,0 +1,1 @@
+python -u $HOME/gits/emdrp/recon/python/dpSupervoxelClassifier.py --cfgfile $HOME/gits/emdrp/recon/python/config/svox_M0007_huge_iterate_export_parallel.ini --dpSupervoxelClassifier-verbose --classifierin /data/watkinspv/agglo/out_classifier_huge_mbfergus32_rf_75iter2p_medium_test_6fold_all.dill --classifier rf --classifierout '' --feature-set medium
