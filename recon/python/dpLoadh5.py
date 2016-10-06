@@ -51,7 +51,7 @@ class dpLoadh5(object):
             if type(v) is list and k not in self.LIST_ARGS:
                 if len(v)==1:
                     setattr(self,k,v[0])  # save single element lists as first element
-                elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
+                elif len(v) > 1 and type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
                     setattr(self,k,np.array(v,dtype=np.int32))
                 else:
                     setattr(self,k,v)   # store other list types as usual (floats)
@@ -76,6 +76,7 @@ class dpLoadh5(object):
 
         # read attributes from the hdf5 first, possibly need for inits
         self.isFile = False; self.isDataset = False; self.data_attrs = {}
+        self.lfillvalue = 0 # xxx - getting too many hacks
         if os.path.isfile(self.srcfile):
             hdf = h5py.File(self.srcfile,'r');
             self.isFile = True
@@ -88,6 +89,7 @@ class dpLoadh5(object):
                 if not self.hdf5_Corder:
                     self.datasize = self.datasize[::-1]; self.chunksize = self.chunksize[::-1]
                 if not self.data_type: self.data_type = self.dset.dtype
+                self.lfillvalue = self.dset.fillvalue
             elif not self.data_type:
                 self.data_type = self.default_data_type
 
@@ -253,23 +255,17 @@ class dpLoadh5(object):
             print('Writing raw output to "%s"' % self.outraw); t = time.time()
 
         # optional manipulations to write raw file
-        data = self.data_cube
+        data = self.data_cube.copy()
         islabels = (self.data_type == np.uint16 or self.data_type == np.uint32 or self.data_type == np.uint64)
-        doGray = bool(self.dtypeGray)
-        if doGray:
-            dtypeGray = eval('np.' + self.dtypeGray) if isinstance(self.dtypeGray, str) else self.dtypeGray
-        doZeropad = (self.zeropadraw > 0).any()
-        doLUTmod = self.nColorsLUTraw and islabels
-        doRelabel = self.relabel_seq and islabels
-        if doZeropad:
+        if (self.zeropadraw > 0).any():
             s = tuple(self.zeropadraw.reshape((3,-1)).tolist())
             data = np.lib.pad(data, s, 'constant',constant_values=tuple(np.zeros((3,2)).tolist()))
-        else:
-            if doGray or doLUTmod: data = np.copy(data)
-        if doGray:
+        if bool(self.dtypeGray):
+            dtypeGray = eval('np.' + self.dtypeGray) if isinstance(self.dtypeGray, str) else self.dtypeGray
             data -= data.min(); data /= data.max(); data = (data*np.iinfo(dtypeGray).max).astype(dtypeGray)
-        if doLUTmod: data = data % self.nColorsLUTraw
-        if doRelabel:
+        if self.nColorsLUTraw and islabels:
+            data = data % self.nColorsLUTraw
+        if self.relabel_seq and islabels:
             from skimage.segmentation import relabel_sequential
             data, fw, inv = relabel_sequential(data); data = data.astype(self.data_type)
             if self.dpLoadh5_verbose:
@@ -277,6 +273,10 @@ class dpLoadh5(object):
         if self.sigmaLOG > 0:
             from scipy import ndimage as nd
             data = nd.filters.gaussian_laplace(data, self.sigmaLOG/self.sampling_ratio)
+        if self.sel_eq:
+            data = (data == self.sel_eq).astype(np.uint8)
+        if self.sel_gt:
+            data = (np.logical_and(data > self.sel_gt, data != self.lfillvalue)).astype(np.uint8)
 
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
         shape = data.shape
@@ -438,22 +438,30 @@ class dpLoadh5(object):
             metavar='ORD', help='Specify the order to reslice the dimensions into (last one becomes new z)')
         p.add_argument('--hdf5-Corder', dest='hdf5_Corder', action='store_true',
             help='Specify hdf5 file is in C-order')
-        p.add_argument('--legacy-transpose', dest='legacy_transpose', action='store_true',
-            help='Specify transpose of x/y if writing raw')
+
+        # support some simple manipulations before writing raw file
         p.add_argument('--outraw', nargs=1, type=str, default='', metavar='FILE',
             help='Optional raw or nrrd output file')
+        p.add_argument('--legacy-transpose', dest='legacy_transpose', action='store_true',
+            help='Specify transpose of x/y (raw output)')
         p.add_argument('--nColorsLUTraw', nargs=1, type=int, default=[0], metavar=('NCLRS'),
             help='Specify non-zero number of colors for uint data (apply modulo, raw output)')
         p.add_argument('--dtypeGray', nargs=1, type=str, default=[0], metavar=('DTYPE'),
             help='Specify data type for converting to grayscale (raw output)')
         p.add_argument('--sigmaLOG', nargs=1, type=float, default=[0], metavar=('DTYPE'),
-            help='Specify sigma for applying gaussian laplacian filter')
+            help='Specify sigma for applying gaussian laplacian filter (raw output)')
         p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0],
-            metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'), help='Size in voxels to zero pad (b=before, a=after)')
+            metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'),
+            help='Size in voxels to zero pad (b=before, a=after) (raw output)')
         p.add_argument('--relabel-seq', dest='relabel_seq', action='store_true',
-            help='Relabel sequentially (labels only)')
+            help='Relabel sequentially (labels only) (raw output)')
+        p.add_argument('--sel-eq', nargs=1, type=int, default=[], help='Specify logical == select (raw output)')
+        p.add_argument('--sel-gt', nargs=1, type=int, default=[], help='Specify logical > select (raw output)')
+
+        # mostly unused legacy ootions, probably delete
         p.add_argument('--size-in-chunks', action='store_true', help='Size is specified in chunks, not voxels')
         p.add_argument('--size-from-hdf5', action='store_true', help='Size is specified by attribute in hdf5')
+
         p.add_argument('--dpLoadh5-verbose', action='store_true', help='Debugging output for dpLoadh5')
 
 
