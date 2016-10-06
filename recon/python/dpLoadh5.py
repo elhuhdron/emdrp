@@ -41,7 +41,7 @@ class dpLoadh5(object):
         'xzy' : [0,2,1],    # xzy, z is y after reslice
         'xyz' : [0,1,2],    # xyz, z is z after reslice
     }
-    LIST_ARGS = ['subgroups','subgroups_out']
+    LIST_ARGS = ['subgroups','subgroups_out','sel_eq','sel_gt']
 
     def __init__(self, args):
         # save command line arguments from argparse, see definitions in main or run with --help
@@ -51,7 +51,7 @@ class dpLoadh5(object):
             if type(v) is list and k not in self.LIST_ARGS:
                 if len(v)==1:
                     setattr(self,k,v[0])  # save single element lists as first element
-                elif len(v) > 1 and type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
+                elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
                     setattr(self,k,np.array(v,dtype=np.int32))
                 else:
                     setattr(self,k,v)   # store other list types as usual (floats)
@@ -273,10 +273,11 @@ class dpLoadh5(object):
         if self.sigmaLOG > 0:
             from scipy import ndimage as nd
             data = nd.filters.gaussian_laplace(data, self.sigmaLOG/self.sampling_ratio)
-        if self.sel_eq:
-            data = (data == self.sel_eq).astype(np.uint8)
-        if self.sel_gt:
-            data = (np.logical_and(data > self.sel_gt, data != self.lfillvalue)).astype(np.uint8)
+        if len(self.sel_eq):
+            data = (data == self.sel_eq[0]).astype(np.uint8)
+        print(data.dtype)
+        if len(self.sel_gt):
+            data = (np.logical_and(data > self.sel_gt[0], data != self.lfillvalue)).astype(np.uint8)
 
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
         shape = data.shape
