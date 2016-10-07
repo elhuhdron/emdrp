@@ -41,7 +41,7 @@ class dpLoadh5(object):
         'xzy' : [0,2,1],    # xzy, z is y after reslice
         'xyz' : [0,1,2],    # xyz, z is z after reslice
     }
-    LIST_ARGS = ['subgroups','subgroups_out','sel_eq','sel_gt']
+    LIST_ARGS = ['subgroups','subgroups_out','sel_eq','sel_gt','labels_to_voxel_type']
 
     def __init__(self, args):
         # save command line arguments from argparse, see definitions in main or run with --help
@@ -275,9 +275,17 @@ class dpLoadh5(object):
             data = nd.filters.gaussian_laplace(data, self.sigmaLOG/self.sampling_ratio)
         if len(self.sel_eq):
             data = (data == self.sel_eq[0]).astype(np.uint8)
-        print(data.dtype)
         if len(self.sel_gt):
             data = (np.logical_and(data > self.sel_gt[0], data != self.lfillvalue)).astype(np.uint8)
+        if len(self.labels_to_voxel_type) and islabels:
+            # xxx - kindof kludgy way to convert labels to voxel_type where MEM==0, ICS==1, ECS==2
+            if self.labels_to_voxel_type[0] < 0:
+                ECS_label = data.max()
+            else:
+                ECS_label = self.labels_to_voxel_type[0]
+            isECS = (data == ECS_label)
+            data = (np.logical_and(data > 0, data != self.lfillvalue)).astype(np.uint8)
+            data[isECS] += 1
 
         # the transpose of the first two dims is to be consistent with Kevin's legacy matlab scripts that swap them
         shape = data.shape
@@ -458,6 +466,8 @@ class dpLoadh5(object):
             help='Relabel sequentially (labels only) (raw output)')
         p.add_argument('--sel-eq', nargs=1, type=int, default=[], help='Specify logical == select (raw output)')
         p.add_argument('--sel-gt', nargs=1, type=int, default=[], help='Specify logical > select (raw output)')
+        p.add_argument('--labels-to-voxel-type', nargs=1, type=int, default=[], 
+                       help='Convert labels to voxel type (value is ECS, -1 for last (raw output)')
 
         # mostly unused legacy ootions, probably delete
         p.add_argument('--size-in-chunks', action='store_true', help='Size is specified in chunks, not voxels')
