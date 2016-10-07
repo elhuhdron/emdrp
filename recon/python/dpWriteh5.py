@@ -139,7 +139,18 @@ class dpWriteh5(dpLoadh5):
         if isinstance(self.data_type_out, str): self.data_type_out = eval('np.' + self.data_type_out)
 
         ext = os.path.splitext(self.inraw)[1][1:]
-        if ext == 'nrrd':
+        if not ext:
+            # kludgy support writing constants (for use as a mask, etc)
+            try:
+                const = float(self.inraw)
+                use_const = True
+            except ValueError:
+                use_const = False
+
+        if use_const:
+            print('Initializing with constant value %d' % (const,))
+            data = const * np.ones(self.size, dtype=self.data_type_out)
+        elif ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
             # xxx - new version is available as of early 2016, try migrating to it
             with open(self.inraw,'rb') as nrrdfile:
