@@ -140,60 +140,163 @@ pdata = struct;  % input parameters depending on dataset
 
 
 
-% for kevin's talk 20160915
+% % for kevin's talk 20160915
+% % with ~20% ECS
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_supervoxels.h5';
+% %pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_probs.h5';
+% pdata(i).name = 'huge_mbf32';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS, agglomeration
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% % corner chunk
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% % supervoxels, all thresholds and watershed types
+% pdata(i).lblsh5 = '/Data/watkinspv/agglo/huge_vgg4pool64_aggloall_rf_75iter2p_small_supervoxels_fixed.h5';
+% pdata(i).name = 'huge_vgg4_agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 1:75;
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS
+% i = 3;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
+% %pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
+% pdata(i).name = 'huge';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS
+% i = 4;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).probh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_probs.h5';
+% pdata(i).chunk = [16 17 0];
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% %pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_supervoxels.h5';
+% pdata(i).name = 'huge xyz';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+
+% % with ~20% ECS
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_supervoxels.h5';
+% pdata(i).name = 'huge_mbf32';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+
 % with ~20% ECS
 i = 1;
 pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% corner chunk
 pdata(i).chunk = [16 17 0];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_supervoxels.h5';
-%pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_probs.h5';
-pdata(i).name = 'huge_mbf32';
+pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% supervoxels, all thresholds and watershed types
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all_train4/huge_supervoxels.h5';
+pdata(i).name = 'huge_mbf32_tr4';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
-% with ~20% ECS, agglomeration
+% with ~20% ECS
 i = 2;
 pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
 % corner chunk
 pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
 % supervoxels, all thresholds and watershed types
-pdata(i).lblsh5 = '/Data/watkinspv/agglo/huge_vgg4pool64_aggloall_rf_75iter2p_small_supervoxels_fixed.h5';
-pdata(i).name = 'huge_vgg4_agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 1:75;
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all_train5/huge_supervoxels.h5';
+pdata(i).name = 'huge_mbf32_tr5';
+pdata(i).subgroups = {'with_background'};
+pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
-% with ~20% ECS
+
+% % with almost no ECS
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+% pdata(i).chunk = [12 14 2];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/none_supervoxels.h5';
+% pdata(i).name = 'none_mbf32';
+% pdata(i).subgroups = {'with_background'};
+% %pdata(i).segparam_attr = 'thresholds';
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = [0.5 0.6 0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99999000];
+% pdata(i).nlabels_attr = 'types_nlabels';
+
+% with almost no ECS
 i = 3;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
-%pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
-pdata(i).name = 'huge';
+pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).chunk = [12 14 2];
+pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all_train4/none_supervoxels.h5';
+pdata(i).name = 'none_mbf32_tr4';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
-% with ~20% ECS
+% with almost no ECS
 i = 4;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).probh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_probs.h5';
-pdata(i).chunk = [16 17 0];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-%pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/newestECSall_xyzonly/huge_supervoxels.h5';
-pdata(i).name = 'huge xyz';
+pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).chunk = [12 14 2];
+pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all_train5/none_supervoxels.h5';
+pdata(i).name = 'none_mbf32_tr5';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
+
+
+
+% % with ~20% ECS, agglomeration
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% % corner chunk
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% % supervoxels, all thresholds and watershed types
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/ovlp8/agglo/huge_agglo_twopass_fixed.h5';
+% pdata(i).name = 'huge_mbf32_2pagg8';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 1:75;
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS, agglomeration
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% % corner chunk
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% % supervoxels, all thresholds and watershed types
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/ovlp8/agglo/huge_agglo_concat_fixed.h5';
+% pdata(i).name = 'huge_mbf32_catagg8';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 1:75;
+% pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -229,9 +332,9 @@ p.p_resample = 0;
 
 % usually set these two to true for interpolation, but false for normal
 % set this to true to remove non-ICS nodes from polluting the rand error
-p.remove_MEM_ECS_nodes = true;
+p.remove_MEM_ECS_nodes = false;
 % set this to true to remove nodes falling into MEM areas from counting as merged nodes
-p.remove_MEM_merged_nodes = true;
+p.remove_MEM_merged_nodes = false;
 
 p.nchunks = [8 8 4];
 %p.offset = [0 0 32];
@@ -259,4 +362,4 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_interp_kbtalk20160915.mat','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat','p','pdata','o');

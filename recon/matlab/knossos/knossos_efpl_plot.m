@@ -67,7 +67,8 @@ for k = 1:ndatasets
   split_fracnodes(k,ind) = o{k}.nSMs(ind,1)/nnodes(k);
   split_fracnodes_CI(k,ind,:) = o{k}.nSMs_CI(ind,1,:);
   are(k,ind) = o{k}.are(ind); are_CI(k,ind,:) =  o{k}.are_CI(ind,:);
-  are_precrec(k,ind,:) = o{k}.are_precrec(ind,:); are_precrec_CI(k,ind,:,:) = o{k}.are_precrec_CI(ind,:,:);
+  % just convert precision recall to 1- here (so min is better)
+  are_precrec(k,ind,:) = 1-o{k}.are_precrec(ind,:); are_precrec_CI(k,ind,:,:) = 1-o{k}.are_precrec_CI(ind,:,:);
   combined_eftpl(k,ind) = sum(o{k}.eftpl(ind,:,3),2)/sum(o{k}.path_length_use);
   combined_eftpl_CI(k,ind,:) = o{k}.eftpl_CI(ind,3,:);
   nlabels(k,ind) = sum(o{k}.types_nlabels(ind,:),2);
@@ -76,6 +77,11 @@ for k = 1:ndatasets
   else
     norm_params(k,1:nthr) = linspace(0,1,nthr);
   end
+end
+
+% optionally just use sum for rand-error, like other errors
+if p.are_sum
+  are = squeeze(sum(are_precrec, 3));
 end
 
 % get histograms 
@@ -246,11 +252,11 @@ title(sprintf('maxd=%g\n%g %g\n@split edges=%g %g',abs(m(2)-m(1)),m(1),m(2),...
 
 figure(baseno+figno); figno = figno+1; clf
 subplot(1,2,1);
-plot(1-squeeze(are_precrec(:,:,1))',1-squeeze(are_precrec(:,:,2))', '-o', 'markersize', 2);
+plot(squeeze(are_precrec(:,:,1))',squeeze(are_precrec(:,:,2))', '-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(1-squeeze(are_precrec_CI(:,:,1,1))',1-squeeze(are_precrec_CI(:,:,2,1))','--');
+plot(squeeze(are_precrec_CI(:,:,1,1))',squeeze(are_precrec_CI(:,:,2,1))','--');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(1-squeeze(are_precrec_CI(:,:,1,2))',1-squeeze(are_precrec_CI(:,:,2,2))','--');
+plot(squeeze(are_precrec_CI(:,:,1,2))',squeeze(are_precrec_CI(:,:,2,2))','--');
 set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
 xlabel('1-recall'); ylabel('1-precision');
 title('ARE precrec')
@@ -271,7 +277,7 @@ hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % end
 set(gca,'plotboxaspectratio',[1 1 1]);
 [m,mi] = min(are,[],2);
-title(sprintf('maxd=%g\n%g %g\nthr=%g %g',abs(diff(m)),m(1),m(2),...
+box off; title(sprintf('maxd=%g\n%g %g\nthr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
  params{1}(mi(1)),params{2}(mi(2))));
 if p.param_name
   set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
@@ -279,8 +285,13 @@ if p.param_name
 else
   xlabel('norm parameter')
 end
-set(gca,'ylim',[0.4 1.025]); box off;
-ylabel('ARE, [0,1], 1-Fscore');
+if p.are_sum 
+  set(gca,'ylim',[0.4 2.025]);
+  ylabel('ARE, [0,2], 1-sum prec/rec');
+else
+  set(gca,'ylim',[0.4 1.025]);
+  ylabel('ARE, [0,1], 1-Fscore');
+end
 
 
 
@@ -296,7 +307,7 @@ else
   lnlabels = nlabels; str = 'nsupervoxels'; lim = [0 600000];
 end
 subplot(2,2,1)
-plot(norm_params',lnlabels');
+plot(norm_params',lnlabels','-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
@@ -350,3 +361,74 @@ plot(lnlabels(1,mi(1)),combined_eftpl(1,mi(1)),'x');
 plot(lnlabels(2,mi(2)),combined_eftpl(2,mi(2)),'x');
 title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
   nlabels(1,mi(1)),nlabels(2,mi(2))));
+
+
+
+if isempty(p.meta_param), return; end
+
+% "meta-plots" of best metric values
+figure(baseno+figno); figno = figno+1; clf
+dolog = false;
+if dolog
+  lnlabels = log10(nlabels); str = 'log10 nsupervoxels'; lim = [4.25 6];
+else
+  lnlabels = nlabels; str = 'nsupervoxels'; lim = [0 600000];
+end
+dx = p.meta_param(2) - p.meta_param(1);
+
+subplot(2,2,1)
+[m,mi] = max(combined_eftpl,[],2);
+for k=1:length(p.meta_groups)
+  plot(p.meta_param,m(p.meta_groups{k})); hold on
+end
+set(gca,'plotboxaspectratio',[1 1 1]); box off
+set(gca, 'xlim', [p.meta_param(1)-0.25*dx p.meta_param(end)+0.25*dx], ...
+  'xtick', p.meta_param);
+if ~isempty(p.meta_labels)
+  set(gca, 'xticklabel', p.meta_labels);
+end
+if ~isempty(p.meta_labels)
+  set(gca, 'xticklabel', p.meta_labels);
+end
+ylabel('max eftpl'); xlabel(p.meta_param_label);
+legend(p.meta_groups_labels)
+
+subplot(2,2,2)
+[m,mi] = min(are,[],2);
+for k=1:length(p.meta_groups)
+  plot(p.meta_param,m(p.meta_groups{k})); hold on
+end
+set(gca,'plotboxaspectratio',[1 1 1]); box off
+set(gca, 'xlim', [p.meta_param(1)-0.25*dx p.meta_param(end)+0.25*dx], ...
+  'xtick', p.meta_param);
+if ~isempty(p.meta_labels)
+  set(gca, 'xticklabel', p.meta_labels);
+end
+if ~isempty(p.meta_labels)
+  set(gca, 'xticklabel', p.meta_labels);
+end
+xlabel(p.meta_param_label);
+if p.are_sum 
+  ylabel('min ARE, 1-sum prec/rec');
+else
+  ylabel('min ARE, 1-Fscore');
+end
+legend(p.meta_groups_labels)
+
+subplot(2,2,3)
+[m,mi] = max(combined_eftpl,[],2);
+for k=1:length(p.meta_groups)
+  inds = sub2ind(size(lnlabels),p.meta_groups{k},mi(p.meta_groups{k})');
+  plot(p.meta_param,lnlabels(inds)); hold on
+end
+set(gca,'plotboxaspectratio',[1 1 1]); box off
+set(gca, 'xlim', [p.meta_param(1)-0.25*dx p.meta_param(end)+0.25*dx], ...
+  'xtick', p.meta_param);
+if ~isempty(p.meta_labels)
+  set(gca, 'xticklabel', p.meta_labels);
+end
+if ~isempty(p.meta_labels)
+  set(gca, 'xticklabel', p.meta_labels);
+end
+ylabel([str ' @ max eftpl']); xlabel(p.meta_param_label);
+legend(p.meta_groups_labels)
