@@ -139,13 +139,14 @@ class dpWriteh5(dpLoadh5):
         if isinstance(self.data_type_out, str): self.data_type_out = eval('np.' + self.data_type_out)
 
         ext = os.path.splitext(self.inraw)[1][1:]
+        use_const = False
         if not ext:
             # kludgy support writing constants (for use as a mask, etc)
             try:
                 const = float(self.inraw)
                 use_const = True
             except ValueError:
-                use_const = False
+                pass
 
         if use_const:
             print('Initializing with constant value %d' % (const,))
@@ -175,6 +176,10 @@ class dpWriteh5(dpLoadh5):
                 self.data_attrs['scale'] = hdr['scales'][:3]
         else:
             data = np.fromfile(self.inraw,dtype=self.data_type_out)
+
+        # xxx - hacky command line over-ride for scale
+        if all([x > 0 for x in self.scale]):
+            self.data_attrs['scale'] = self.scale
 
         # xxx - this always assumes raw file is in F-order, add something here for C-order if we need it
         self.data_cube = data.astype(self.data_type_out).reshape(self.size[::-1]).transpose((2,1,0))
@@ -254,6 +259,8 @@ class dpWriteh5(dpLoadh5):
         p.add_argument('--fillvalue', nargs=1, type=str, default=[''], metavar=('FILL'),
             help='Fill value for empty (default 0)')
         p.add_argument('--inraw', nargs=1, type=str, default='', metavar='FILE', help='Raw input file')
+        p.add_argument('--scale', nargs=3, type=float, default=[0.0,0.0,0.0], metavar=('X', 'Y', 'Z'),
+            help='Override scale (use only with inraw and without srcfile')
         p.add_argument('--dataset-out', nargs=1, type=str, default='',
             help='Name of the dataset to write: default: dataset')
         p.add_argument('--subgroups-out', nargs='*', type=str, default=[None], metavar=('GRPS'),

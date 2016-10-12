@@ -129,10 +129,13 @@ class EMDataParser():
         if dim_ordering: self.dim_ordering = dim_ordering   # allow command line override
         if self.dim_ordering=='xyz':
             self.zreslice_dim_ordering = [0,1,2]
+            self.zreslice_dim_ordering_index = 0
         elif self.dim_ordering=='xzy':
             self.zreslice_dim_ordering = [0,2,1]
+            self.zreslice_dim_ordering_index = 1
         elif self.dim_ordering=='zyx':
             self.zreslice_dim_ordering = [2,1,0]
+            self.zreslice_dim_ordering_index = 2
         else:
             assert(False)   # bad dim_ordering parameter given
 
@@ -250,6 +253,11 @@ class EMDataParser():
         #assert( not self.chunk_list_all or self.no_label_lookup )   # must have no_label_lookup for all chunks loaded
         assert( not self.chunk_list_all or not self.write_outputs ) # write_outputs not supported for all chunks loaded
 
+        # optionally allow tile_size to specify size for all three orthogonal directions, pick the one we're using
+        if self.tile_size.size > 3:
+            self.tile_size_all = self.tile_size.reshape((3,-1))
+            self.tile_size = self.tile_size_all[self.zreslice_dim_ordering_index,:]
+        print('EMDataParser: tile_size %d %d %d' % tuple(self.tile_size.tolist()))
         # number of cases per batch should be kept lower than number of rand streams in convnet (128*128 = 16384)
         self.num_cases_per_batch = self.tile_size.prod()
         self.shape_per_batch = self.tile_size.copy(); self.shape_per_batch[0:2] *= self.image_out_size
