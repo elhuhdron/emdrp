@@ -787,6 +787,7 @@ class EMDataParser():
                 chunk_rand = np.unravel_index(self.chunk_range_index, self.chunk_range_rng[self.chunk_list_index,:]) \
                     + self.chunk_range_beg[self.chunk_list_index,:]
             else:
+                assert(False) # xxx - this hack is dangerous for debugging normal use, so comment this if needed
                 # this is something of a hack to allow for batches larger than chunksize
                 scale = self.size_rand // self.chunksize
                 chunk_rand = np.unravel_index(self.chunk_range_index, self.chunk_range_rng[self.chunk_list_index,:]) \
@@ -989,9 +990,11 @@ class EMDataParser():
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
         if not self.hdf5_Corder: 
             data_cube = data_cube.transpose(2,1,0)
+            chunksize = chunksize[::-1]; datasize = datasize[::-1]
 
         # zreslice re-ordering, so data is in re-sliced order view outside of this function           
         data_cube = data_cube.transpose(self.zreslice_dim_ordering)
+        chunksize = chunksize[self.zreslice_dim_ordering]; datasize = datasize[self.zreslice_dim_ordering]
         if self.verbose and not self.silent: 
             print 'After re-ordering ' + fname + ' ' + dataset + ' data cube shape ' + str(data_cube.shape)
             
@@ -1032,18 +1035,24 @@ class EMDataParser():
                 hdf[self.username].read_direct(segmented_labels_cube, slc, slcd)
         labels_attrs = {}
         for name,value in hdf[self.username].attrs.items(): labels_attrs[name] = value
-        assert( (self.chunksize == np.array(hdf[self.username].chunks, dtype=np.int64)).all() )
+        # these two only for validation that they are same as data cube
+        chunksize = np.array(hdf[self.username].chunks, dtype=np.int64)
+        datasize = np.array(hdf[self.username].shape, dtype=np.int64)
         hdf.close()
         
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
         if not self.hdf5_Corder: 
             segmented_labels_cube = segmented_labels_cube.transpose(2,1,0)
+            chunksize = chunksize[::-1]; datasize = datasize[::-1]
 
         # zreslice re-ordering, so data is in re-sliced order view outside of this function           
         segmented_labels_cube = segmented_labels_cube.transpose(self.zreslice_dim_ordering)
+        chunksize = chunksize[self.zreslice_dim_ordering]; datasize = datasize[self.zreslice_dim_ordering]
         if self.verbose and not self.silent: print 'After re-ordering segmented labels cube shape ' + \
             str(segmented_labels_cube.shape)
 
+        assert( (self.chunksize == chunksize).all() )
+        assert( (self.datasize == datasize).all() )
         return segmented_labels_cube, labels_attrs
 
     def get_hdf_index_from_chunk_index(self, hdf_dataset, chunk_index, offset):
