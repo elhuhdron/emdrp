@@ -26,6 +26,7 @@
 
 import h5py
 import numpy as np
+import re
 import argparse
 import time
 import os
@@ -154,8 +155,18 @@ class dpWriteh5(dpLoadh5):
         elif ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
             # xxx - new version is available as of early 2016, try migrating to it
+            _TYPEMAP_NRRD2NUMPY = {'signed char': 'i1', 'int8': 'i1', 'int8_t': 'i1', 'uchar': 'u1',
+                'unsigned char': 'u1', 'uint8': 'u1', 'uint8_t': 'u1', 'short': 'i2', 'short int': 'i2',
+                'signed short': 'i2', 'signed short int': 'i2', 'int16': 'i2', 'int16_t': 'i2', 'ushort': 'u2',
+                'unsigned short': 'u2', 'unsigned short int': 'u2', 'uint16': 'u2', 'uint16_t': 'u2', 'int': 'i4',
+                'signed int': 'i4', 'int32': 'i4', 'int32_t': 'i4', 'uint': 'u4', 'unsigned int': 'u4', 'uint32': 'u4',
+                'uint32_t': 'u4', 'longlong': 'i8', 'long long': 'i8', 'long long int': 'i8', 'signed long long': 'i8',
+                'signed long long int': 'i8', 'int64': 'i8', 'int64_t': 'i8', 'ulonglong': 'u8',
+                'unsigned long long': 'u8', 'unsigned long long int': 'u8', 'uint64': 'u8', 'uint64_t': 'u8',
+                'float': 'f4', 'double': 'f8', 'block': 'V'
+                }
             with open(self.inraw,'rb') as nrrdfile:
-                headerSize = 0
+                headerSize = 0; hdr = {'type':self.data_type_out, 'endian':'little'}
                 for raw_line in iter(nrrdfile):
                     headerSize += len(raw_line)
                     raw_line = raw_line.decode('ascii')
@@ -163,10 +174,24 @@ class dpWriteh5(dpLoadh5):
                     line = raw_line.rstrip()
                     # Single blank line separates the header from the data
                     if line == '': break
+
+                    # xxx - very basic header elements
+                    reline = line.lstrip()
+                    m = re.search(r'type\:\s+(\w+)', reline)
+                    if m is not None: hdr['type'] = _TYPEMAP_NRRD2NUMPY[m.group(1)]
+                    m = re.search(r'endian\:\s+(\w+)', reline)
+                    if m is not None:
+                        endian = m.group(1).lower()
+                        if endian in ['litle','big']:
+                            hdr['type'] = ('<' if endian == 'little' else '>') + hdr['type']
+
                 nrrdfile.seek(headerSize)
                 # xxx - fix this to get data type and endianess from the header, pynrrd still sucks too much
-                data = np.fromfile(nrrdfile,dtype=self.data_type_out)
+                #data = np.fromfile(nrrdfile,dtype=self.data_type_out)
                 #data = np.fromfile(nrrdfile,dtype=self.data_type_out).byteswap(True)    # meh, imagej
+                # addded very basic header elements above just to get the type and endianess correctly
+                print('nrrd data type for numpy: ' + hdr['type'])
+                data = np.fromfile(nrrdfile,dtype=np.dtype(hdr['type']))
             # pynrrd is super slow and does some kind of view changing for some reason
             #import nrrd
             #data, hdr = nrrd.read(self.inraw)
