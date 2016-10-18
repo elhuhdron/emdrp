@@ -81,22 +81,31 @@ class dpWriteh5(dpLoadh5):
         d = data.transpose((2,1,0));
         #print(ind, d.shape, dset.shape, d.max(), d.min(), dset.dtype, d.dtype)
         dset[ind[0]:ind[0]+d.shape[0],ind[1]:ind[1]+d.shape[1],ind[2]:ind[2]+d.shape[2]] = d
-        if hasattr(self, 'data_attrs'):
-            for name,value in self.data_attrs.items():
-                if name in dset.attrs: del dset.attrs[name]
-                newname = self.dataset + '_' + name
-                if newname in group: del group[newname]
-                # xxx - this is arbitrary, but don't want to exceed 64k hdf5 header limit
-                if isinstance(value, np.ndarray) and value.size > 100:
-                    group.create_dataset(newname, data=value, compression='gzip',
-                        compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
-                else:
-                    #http://stackoverflow.com/questions/23220513/storing-a-list-of-strings-to-a-hdf5-dataset-from-python
-                    if isinstance(value, str):
-                        value = value.encode("ascii", "ignore")
-                    elif type(value) is list and isinstance(value[0], str):
-                        value = [n.encode("ascii", "ignore") for n in value]
-                    dset.attrs.create(name,value)
+
+        # optionally add a list of chunk Regions of Interest specified in text file
+        if self.inroi:
+            rois=np.loadtxt('tmp_roi_k0725.txt',dtype=np.int64).reshape((-1,3,3))
+            self.data_attrs['roi_chunks'] = rois[:,0,:].reshape((-1,3))
+            self.data_attrs['roi_sizes'] = rois[:,1,:].reshape((-1,3))
+            self.data_attrs['roi_offsets'] = rois[:,2,:].reshape((-1,3))
+
+        # write attributes
+        for name,value in self.data_attrs.items():
+            if name in dset.attrs: del dset.attrs[name]
+            newname = self.dataset + '_' + name
+            if newname in group: del group[newname]
+            # xxx - this is arbitrary, but don't want to exceed 64k hdf5 header limit
+            if isinstance(value, np.ndarray) and value.size > 100:
+                group.create_dataset(newname, data=value, compression='gzip',
+                    compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True)
+            else:
+                #http://stackoverflow.com/questions/23220513/storing-a-list-of-strings-to-a-hdf5-dataset-from-python
+                if isinstance(value, str):
+                    value = value.encode("ascii", "ignore")
+                elif type(value) is list and isinstance(value[0], str):
+                    value = [n.encode("ascii", "ignore") for n in value]
+                dset.attrs.create(name,value)
+
         h5file.close()
         if self.dpWriteh5_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
@@ -131,6 +140,8 @@ class dpWriteh5(dpLoadh5):
     def writeFromRaw(self):
         self.loadFromRaw()
         if self.dpWriteh5_verbose: print(self.data_cube.min(), self.data_cube.max(), self.data_cube.shape)
+        # xxx - total hacks, keep commented
+        self.data_attrs['dimOrdering'] = [1,2,3]
         self.writeCube()
 
     def loadFromRaw(self):
@@ -277,15 +288,17 @@ class dpWriteh5(dpLoadh5):
         dpLoadh5.addArgs(p)
         p.add_argument('--outfile', nargs=1, type=str, default='',
             help='Output file (allows dataset copy), default: srcfile')
-        p.add_argument('--chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
+        p.add_argument('--chunksize', nargs=3, type=int, default=[-1,-1,-1], metavar=('X', 'Y', 'Z'),
             help='Chunk size to use for new hdf5')
-        p.add_argument('--datasize', nargs=3, type=int, default=[1024,1024,256], metavar=('X', 'Y', 'Z'),
+        p.add_argument('--datasize', nargs=3, type=int, default=[-1,-1,-1], metavar=('X', 'Y', 'Z'),
             help='Total size of the hdf5 dataset')
         p.add_argument('--fillvalue', nargs=1, type=str, default=[''], metavar=('FILL'),
             help='Fill value for empty (default 0)')
         p.add_argument('--inraw', nargs=1, type=str, default='', metavar='FILE', help='Raw input file')
         p.add_argument('--scale', nargs=3, type=float, default=[0.0,0.0,0.0], metavar=('X', 'Y', 'Z'),
             help='Override scale (use only with inraw and without srcfile')
+        p.add_argument('--inroi', nargs=1, type=str, default='',
+                       help='text file with list of ROIs as chunks, sizes, offsets (in that order)')
         p.add_argument('--dataset-out', nargs=1, type=str, default='',
             help='Name of the dataset to write: default: dataset')
         p.add_argument('--subgroups-out', nargs='*', type=str, default=[None], metavar=('GRPS'),

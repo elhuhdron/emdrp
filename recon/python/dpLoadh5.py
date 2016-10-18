@@ -74,6 +74,10 @@ class dpLoadh5(object):
         # use the string input to decide on the numpy data type to load into
         if self.data_type and isinstance(self.data_type, str): self.data_type = eval('np.' + self.data_type)
 
+        # xxx - another hacky way to override dataset size, rewrite is imminent
+        if not hasattr(self,'datasize'): self.datasize = -np.ones((3,))
+        if not hasattr(self,'chunksize'): self.chunksize = -np.ones((3,))
+
         # read attributes from the hdf5 first, possibly need for inits
         self.isFile = False; self.isDataset = False; self.data_attrs = {}
         self.lfillvalue = 0 # xxx - getting too many hacks
@@ -85,9 +89,12 @@ class dpLoadh5(object):
                 self.isDataset = True
                 for name,value in self.dset.attrs.items(): self.data_attrs[name] = value
                 self.data_attrs['chunks'] = self.dset.chunks    # xxx - where is this used again?
-                self.datasize = np.array(self.dset.shape); self.chunksize = np.array(self.dset.chunks)
-                if not self.hdf5_Corder:
-                    self.datasize = self.datasize[::-1]; self.chunksize = self.chunksize[::-1]
+                if (self.datasize < 0).any():
+                    self.datasize = np.array(self.dset.shape)
+                    if not self.hdf5_Corder: self.datasize = self.datasize[::-1]
+                if (self.chunksize < 0).any():
+                    self.chunksize = np.array(self.dset.chunks)
+                    if not self.hdf5_Corder: self.chunksize = self.chunksize[::-1]
                 if not self.data_type: self.data_type = self.dset.dtype
                 self.lfillvalue = self.dset.fillvalue
             elif not self.data_type:
@@ -466,7 +473,7 @@ class dpLoadh5(object):
             help='Relabel sequentially (labels only) (raw output)')
         p.add_argument('--sel-eq', nargs=1, type=int, default=[], help='Specify logical == select (raw output)')
         p.add_argument('--sel-gt', nargs=1, type=int, default=[], help='Specify logical > select (raw output)')
-        p.add_argument('--labels-to-voxel-type', nargs=1, type=int, default=[], 
+        p.add_argument('--labels-to-voxel-type', nargs=1, type=int, default=[],
                        help='Convert labels to voxel type (value is ECS, -1 for last (raw output)')
 
         # mostly unused legacy ootions, probably delete

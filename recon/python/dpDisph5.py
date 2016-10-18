@@ -17,7 +17,11 @@ def print_hdf5_item_structure(g, offset='    ', print_attrs=False) :
         print(g.file, '(File)', g.name)
 
     elif isinstance(g,h5py.Dataset) :
-        print('(Dataset)', g.name, '    len =', g.shape, ' dtype=', g.dtype, 'chunks=', g.chunks)
+        if print_attrs:
+            print('(Dataset)', g.name, '    len=', g.shape, ' dtype=', g.dtype, 'chunks=', g.chunks,
+                  'fillvalue=', g.fillvalue)
+        else:
+            print('(Dataset)', g.name)
 
     elif isinstance(g,h5py.Group) :
         print('(Group)', g.name)
