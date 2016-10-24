@@ -432,3 +432,43 @@ if ~isempty(p.meta_labels)
 end
 ylabel([str ' @ max eftpl']); xlabel(p.meta_param_label);
 legend(p.meta_groups_labels)
+
+
+
+
+% figure of type of edge errors for ordered edges
+[m1,mi1] = max(combined_eftpl,[],2);
+[m2,mi2] = min(are,[],2);
+metrics = {m1 m2};
+minds = {mi1 mi2}; 
+mstrs = {'max eftpl', 'min are'};
+
+for k=1:length(p.meta_groups)
+  figure(baseno+figno); figno = figno+1; clf
+  for x=1:length(metrics)
+    mi = minds{x};
+    clear error_edge_types
+    group_len = length(p.meta_groups{k});
+    for j=1:group_len
+      g = p.meta_groups{k}(j);
+      if j==1
+        tmp = [o{g}.error_free_edges{mi(g),1}{:}];
+        % not green is edge with split error, not red is edge with merger error
+        error_edge_types = ones(group_len, length(tmp), 3);
+      end
+      error_edge_types(j,:,2) = [o{g}.error_free_edges{mi(g),1}{:}];
+      error_edge_types(j,:,1) = [o{g}.error_free_edges{mi(g),2}{:}];
+    end
+    subplot(1,2,x)
+    image(~error_edge_types)
+    set(gca,'ytick', p.meta_param);
+    if ~isempty(p.meta_labels)
+      set(gca, 'yticklabel', p.meta_labels);
+    end
+    if ~isempty(p.meta_labels)
+      set(gca, 'yticklabel', p.meta_labels);
+    end
+    xlabel('ordered edges'); ylabel(p.meta_param_label);
+    title(sprintf('%s edges at %s\n(green split, red merger)', p.meta_groups_labels{k}, mstrs{x}))
+  end
+end

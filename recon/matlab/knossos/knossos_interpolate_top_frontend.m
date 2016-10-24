@@ -1,14 +1,12 @@
 
 
-%skelpath = '/home/watkinspv/Data/M0025/skel/';
-skelpath = '/Users/pwatkins/Downloads/';
-skelout = 'out.nml';
-giplout = 'out.gipl';
+skelout = '~/Downloads/out.nml';
+giplout = '~/Downloads/out.gipl';
 
 % skelin = 'M0025_02_skelseeds.023.nml';
 % chunk = [14 14 4];
 % dim_order = [2 1 3];
-skelin = 'M0007_33_MLseeds.024.nml';
+skelin = '/Data/datasets/skeletons/M0007_33_MLseeds.024.nml';
 chunk = [19 20 1];
 dim_order = [1 2 3];
 
@@ -25,11 +23,10 @@ p.interp_dim_rng = ([0 1]+chunk(p.interp_dim))*raw_size; p.interp_dim_rng(1) = p
 p.extrap_max = 2;
 p.extrap_do_line = true;
 
-%evalc('[info, meta] = KLEE_readKNOSSOS_v4(fullfile(skelpath,skelin))'); % suppresss output
-tic; [minnodes, rngnodes] = knossos_interpolate(fullfile(skelpath,skelin),fullfile(skelpath,skelout),p); toc
+%evalc('[info, meta] = KLEE_readKNOSSOS_v4(skelin)'); % suppresss output
+tic; [minnodes, rngnodes] = knossos_interpolate(skelin,skelout,p); toc
 
 p = struct;
-p.read_size = [256 256 128];
 p.raw_size = raw_size;
 p.offset_ind = chunk;
 p.ncubes_raw = [2 2 1];
@@ -38,6 +35,7 @@ p.isotopic_voxels = false;
 p.strel_offs = [0 0 0];
 %p.strel_offs = [0 0 0; -1 0 0; 1 0 0; 0 -1 0; 0 1 0; 1 1 0; 1 -1 0; -1 1 0; -1 -1 0];
 %p.strel_offs = [0 0 0; -1 0 0; 1 0 0; 0 -1 0; 0 1 0; 1 1 0; 1 -1 0; -1 1 0; -1 -1 0; -2 0 0; 2 0 0; 0 -2 0; 0 2 0];
+p.do_plots = true;
 
-tic; rngnodes = knossos_nodes_to_gipl(fullfile(skelpath,skelout), fullfile(skelpath,giplout), p); toc
+tic; rngnodes = knossos_nodes_to_gipl(skelout, giplout, p); toc
 

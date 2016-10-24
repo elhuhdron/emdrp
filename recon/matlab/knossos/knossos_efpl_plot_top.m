@@ -8,31 +8,12 @@
 % load_indices = [1 2 1 2]; 
 
 % load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_paper_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_agglo_rf_75iter2p_reduced_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_agglo_rf_75iter2p_reduced_norandbg.mat'
-% };
-% load_indices = [1 2 1 2]; 
-
-% load_files = {
 %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
 %   %'/home/watkinspv/Data/efpl/efpl_huge_xyzonly_offset_interp_norandbg.mat'
 %   '/home/watkinspv/Data/efpl/efpl_huge_xyzonly_offset_interp_norandbg.mat'
 %   '/home/watkinspv/Data/efpl/efpl_huge_xyzonly_offset_interp_norandbg.mat'
 % };
 % load_indices = [2 2 3]; 
-
-% load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_huge_xyzonly_offset_interp_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_huge_xyzonly_offset_interp_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_huge_interp_neon.mat'
-%   '/home/watkinspv/Data/efpl/efpl_huge_interp_neon.mat'
-%   '/home/watkinspv/Data/efpl/efpl_huge_interp_neon_mferg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_huge_interp_neon_mferg_ebal.mat'
-%   '/home/watkinspv/Data/efpl/efpl_huge_interp_neon_mferg_ebal.mat'
-% };
-% load_indices = [2 3 1 2 1 1 2]; 
 
 % % pre-new arch paper-like runs
 % load_files = {
@@ -59,20 +40,21 @@
 % load_indices = [2 1 2]; 
 
 % load_files = {
+% %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_xyz_norandbg.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_n3f16_oldthr.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_mnbf32.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_vgg3b64.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_mbf16_ds2.mat'  
 %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_xyz_norandbg.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_n3f16_oldthr.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_mnbf32.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_vgg3b64.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_xyz_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_n3f16_oldthr.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_mbf32.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_vgg3b64.mat'
+%   '/home/watkinspv/Data/efpl/efpl_interp_mbf16_ds2.mat'  
 % };
-% %load_indices = [2 2 1 1 1];
-% %load_indices = [1 1 2 2 2];
-% load_indices = [2 2 1 1 1 1 1 2 2 2];
+% %load_indices = [2 2 1 1 1 1];
+% load_indices = [1 1 2 2 2 2];
 
 % load_files = {
 %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
@@ -84,43 +66,6 @@
 %   '/home/watkinspv/Data/efpl/efpl_huge_interp_fergus_wsnew.mat'
 % };
 % load_indices = [2 2 1 1 1 1 1];
-
-% load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_paper_xyz_norandbg.mat'
-%   %'/home/watkinspv/Data/efpl/efpl_paper_vgg4_pferg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_n2f16.mat'
-%   %'/home/watkinspv/Data/efpl/efpl_paper_vgg5.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_xyz_norandbg.mat'
-%   %'/home/watkinspv/Data/efpl/efpl_paper_vgg4_pferg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_n2f16.mat'
-%   %'/home/watkinspv/Data/efpl/efpl_paper_vgg5.mat'
-% };
-% %load_indices = [2 1 1 3];  % xyz / vgg4
-% load_indices = [2 1 1 2];  % xyz / p3b / n2f16
-
-% load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_vgg4_pferg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_agglo_rf_75iter2p_reduced_interp_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_vgg4pool64_agglo_rf_75iter2p_small_interp.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_vgg4_pferg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_agglo_rf_75iter2p_reduced_interp_norandbg.mat'
-% };
-% load_indices = [2 1 2 1 1 3 1]; 
-
-% load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_paper_xyz_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_n3f16.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_norandbg.mat'
-%   '/home/watkinspv/Data/efpl/efpl_paper_f16.mat'
-% %   '/home/watkinspv/Data/efpl/efpl_paper_norandbg.mat'
-% %   '/home/watkinspv/Data/efpl/efpl_paper_xyz_norandbg.mat'
-% %   '/home/watkinspv/Data/efpl/efpl_paper_n3f16.mat'
-% %   '/home/watkinspv/Data/efpl/efpl_paper_f16.mat'
-% };
-% %load_indices = [1 1 2 2 2 2 1 1]; 
-% load_indices = [1 2 1 2]; 
 
 % % plot for kevin's talk
 % load_files = {
@@ -142,23 +87,44 @@
 % };
 % load_indices = [1 1 2 4 1 1]; 
 
-% compare increasing amounts of trainin data
+% % compare increasing amounts of training data
+% load_files = {
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
+% };
+% %load_indices = [2 3 4 1 2 1]; % huge
+% %load_indices = [2 3 4 3 4 1]; % none
+% load_indices = [2 3 4 1 2 1 2 3 4 3 4 1]; % all
+
+% metric sensitivity
 load_files = {
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_huge_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_none_comp_train.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_mbf32_comp_train45.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
 };
-%load_indices = [1 2 3 4]; 
-load_indices = [1 2 3 4 1 2 3 4 3 4 1 2]; 
+%load_indices = [1:12]; % all
+load_indices = 1:2;
+
+
 
 % load from different saved .mat files generated by knossos_efpl
 nload = length(load_indices); o = cell(1,nload); pdata = cell(1,nload);
@@ -198,21 +164,22 @@ pplot.dndx = 5; pplot.ndx = 0+pplot.dndx/2:pplot.dndx:2000-pplot.dndx/2; pplot.n
 pplot.param_name = '';
 pplot.dxticksel = 3;
 
-pplot.are_sum = true;
+% this parameter plots the are metric as the sum of 1 - prec/rec instead of typical 1 - f-score
+pplot.are_sum = false;
 
 pplot.baseno = 3000;
 
 % for "meta-plots"
-%pplot.meta_param = []; % set to disable meta-plots
 
 pplot.meta_param = 1:6;
 pplot.meta_labels = {};
 %pplot.meta_labels = {1 2 3 6};
 pplot.meta_param_label = 'num training cubes';
-pplot.meta_groups = {[2 3 4 9 10 1] [6 7 8 11 12 5]};
+pplot.meta_groups = {1:6 7:12};
 %pplot.meta_groups_labels = {};
 pplot.meta_groups_labels = {'huge', 'none'};
 
+pplot.meta_param = []; % set to disable meta-plots
 po = knossos_efpl_plot(pdata,o,pplot);
 
 

@@ -47,12 +47,20 @@ o.chunksize = inf.Datasets(ind).ChunkSize;
 o.datasize = inf.Datasets(ind).Dataspace(1).Size;
 o.scale = h5readatt(pdata.datah5,['/' p.dataset_data],'scale')';
 
+% allow for ndgrid parameter spaces, being used in combination with sensitivity analysis.
+% for that mode, this output needs to be set as a cell array of the ndgrid of parameter space.
+o.segparams = 1;
 % either load the parameter space from the attributes of voxel_type, or they are passed in as parameters.
 if ~isempty(pdata.segparam_attr)
   % get the parameter space from the labels h5 file
   o.thresholds = h5readatt(pdata.lblsh5,['/' 'voxel_type'],pdata.segparam_attr)';
 else
-  o.thresholds = pdata.segparams;
+  if iscell(pdata.segparams)
+    o.thresholds = 1:length(pdata.segparams{1}(:));
+    o.segparams = cellfun(@(x) x(:), pdata.segparams,'UniformOutput',false);
+  else
+    o.thresholds = pdata.segparams;
+  end
 end
 
 % % to select only a subset of available parameters to analyze
@@ -125,8 +133,14 @@ o.minnodes = [minx miny minz]; o.maxnodes = [maxx maxy maxz];
 %   within labeled supervoxel area (within volume and not empty label) and path lengths.
 % the labeled supervoxel area and skeleton path lengths are not a function of threshold.
 fprintf(1,'reading labels at thr %.8f\n', o.thresholds(1)); t = now;
-%dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(1),p.dataset_lbls);
-dset = sprintf('/%s/%.8f/%s',strrep(reshape(char(pdata.subgroups)',1,[]), ' ','/'),o.thresholds(1),p.dataset_lbls);
+if iscell(o.segparams)
+  dset = sprintf('/%s/%s%s',strjoin(pdata.subgroups,'/'),...
+    sprintf('%.8f/', cellfun(@(x) x(1), o.segparams)),p.dataset_lbls);
+else
+  dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(1),p.dataset_lbls);
+  % xxx - this was for older matlabs? probably remove
+  %dset = sprintf('/%s/%.8f/%s',strrep(reshape(char(pdata.subgroups)',1,[]), ' ','/'),o.thresholds(1),p.dataset_lbls);
+end
 Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
@@ -253,8 +267,12 @@ for prm=1:o.nparams
   
   thr = prm;
   fprintf(1,'\nreading labels at thr %.8f\n', o.thresholds(thr)); t = now;
-  %dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(thr),p.dataset_lbls);
-  dset = sprintf('/%s/%.8f/%s',strrep(reshape(char(pdata.subgroups)',1,[]), ' ','/'),o.thresholds(thr),p.dataset_lbls);
+  if iscell(o.segparams)
+    dset = sprintf('/%s/%s%s',strjoin(pdata.subgroups,'/'),...
+      sprintf('%.8f/', cellfun(@(x) x(thr), o.segparams)),p.dataset_lbls);
+  else
+    dset = sprintf('/%s/%.8f/%s',strjoin(pdata.subgroups,'/'),o.thresholds(thr),p.dataset_lbls);
+  end
   clear Vlbls; Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
   
   if ~isempty(pdata.nlabels_attr)

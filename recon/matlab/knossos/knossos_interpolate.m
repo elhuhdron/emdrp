@@ -43,6 +43,7 @@ node_meta.rad = 1.5;
 node_meta.inVp = 0;
 node_meta.inMag = 1;
 node_meta.time = fix(now*24); % ???
+useBGL = false;
 
 % read the nml file, script from Kevin
 evalc('[info, meta, ~] = KLEE_readKNOSSOS_v4(skelin)'); % suppresss output
@@ -197,7 +198,11 @@ for n=1:nThings
   edge_matrix = edge_matrix' | edge_matrix;
   
   % run graph connected components on the edge matrix to get the new things created from this skeleton
-  [ci, sizes] = components(edge_matrix);
+  if useBGL
+    [ci, sizes] = components(edge_matrix); % matlabBGL
+  else
+    ci = conncomp(graph(edge_matrix)); sizes=hist(ci,1:double(max(ci))); 
+  end
   assert(any(remove_edge) || length(sizes)==1);
   %if ~(any(remove_edge) || length(sizes)==1)
   %  fprintf(1,'thingID %d has %d components and no remove edges\n\t',n,length(sizes));
@@ -212,7 +217,11 @@ for n=1:nThings
     edge_matrix = full(edge_matrix);
     edge_matrix(remove_nodes,:) = []; edge_matrix(:,remove_nodes) = [];
     node_pts(remove_nodes,:) = [];
-    [ci, sizes] = components(sparse(edge_matrix));
+    if useBGL
+      [ci, sizes] = components(sparse(edge_matrix));
+    else
+      ci = conncomp(graph(edge_matrix)); sizes=hist(ci,1:double(max(ci))); 
+    end
     nsmallthings(n) = nsmallthings(n) + nremove;
   end
   edge_matrix = full(triu(edge_matrix));
