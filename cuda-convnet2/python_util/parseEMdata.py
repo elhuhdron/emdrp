@@ -120,7 +120,8 @@ class EMDataParser():
         #   depending on the data type.
         self.cubeLblType = eval('np.' + self.cubeLblTypeStr)
         self.EMPTY_LABEL = np.iinfo(self.cubeLblType).max
-        self.ECS_LABEL   = np.iinfo(self.cubeLblType).max-1   # xxx - likely not using this, but keep here for now
+        #self.ECS_LABEL   = np.iinfo(self.cubeLblType).max-1   # xxx - likely not using this, but keep here for now
+        self.ECS_LABEL   = self.EMPTY_LABEL # makes default for ECS not select any ECS no matter how it's labeled
         self.EMPTY_PROB  = -1.0
 
         # the manner in which the zreslice is defined, define sort from data -> re-order and from re-order -> data.
