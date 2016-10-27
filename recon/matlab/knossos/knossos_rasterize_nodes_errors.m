@@ -121,8 +121,8 @@ for prm = 1:ntparams
   merge_node = (rand(1,tnnodes) < merge_perc);
   split_node = (rand(1,tnnodes) < split_perc);
 
-  %node_order = 1:tnnodes;  
-  node_order = randperm(tnnodes);
+  node_order = 1:tnnodes;
+  %node_order = randperm(tnnodes);
   %   % iterate over nodes in order from the closest nodes to the merger_seeds to the furthest
   %   [~, node_order] = sort(min(merger_seeds_dist,[],1));
   for inode=node_order
