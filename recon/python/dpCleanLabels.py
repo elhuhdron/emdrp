@@ -141,6 +141,8 @@ class dpCleanLabels(emLabels):
             nlabels = sizes.size
             labels, nlabels = self.setECS(labels, sel_ECS, ECS_label, nlabels)
             self.data_cube = labels
+            # allow this to work before self.get_svox_type or self.write_voxel_type
+            self.data_attrs['types_nlabels'] = [nlabels]
 
             if self.dpCleanLabels_verbose:
                 print('\tnlabels = %d after re-label' % (nlabels,))

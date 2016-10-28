@@ -30,7 +30,7 @@ import numpy as np
 
 class dpCubeIter(object):
 
-    LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes']
+    LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes']
 
     #def __init__(self, inprefix, volume_range_beg, volume_range_end, overlap,
     #             cube_size=[1,1,1], left_remainder_size=[0,0,0], right_remainder_size=[0,0,0],
@@ -112,36 +112,42 @@ class dpCubeIter(object):
             left_offset[is_left_remainder] = \
                 self.cube_size_voxels[is_left_remainder] - self.left_remainder_size[is_left_remainder]
 
-            # create the name suffix
-            suffix = ''
+            # create the name suffix, path affix
+            suffix = ''; affix = ''
             for s,i in zip(['x','y','z'], range(3)):
                 r = 'l' if is_left_remainder[i] else ('r' if is_right_remainder[i] else '')
                 suffix += ('_%s%04d' % (s + r, cur_chunk[i]))
+                affix = os.path.join(affix, ('%s%04d' % (s, cur_chunk[i])))
+            affix += os.path.sep
 
-            yield cur_volume, size, cur_chunk, left_offset, suffix, is_left_border, is_right_border
+            yield cur_volume, size, cur_chunk, left_offset, suffix, affix, is_left_border, is_right_border
 
-    def flagsToString(self, flags, paths, prefixes, suffix):
-        argstr = ''
-        for flag,path,prefix in zip(flags, paths, prefixes):
-            argstr += ' --' + flag + ' '
-            name = prefix + suffix + '.h5' # xxx - need sth other than hdf5 in/out? add arg
+    def flagsToString(self, flags, paths, prefixes, postfixes, suffix, affix):
+        argstr = ' '
+        for flag,path,prefix,postfix in zip(flags, paths, prefixes, postfixes):
+            if flag != '0':
+                argstr += '--' + flag + ' '
+            name = affix + prefix + suffix + postfix
             if path != '0':
-                argstr += os.path.join(path,name)
-            else:
-                argstr += name
+                name = os.path.join(path,name)
+            argstr += name + ' '
         return argstr
 
     def printCmds(self):
-        with open(self.cmdfile, 'r') as myfile:
-            cmd = myfile.read().replace('\n', '')
+        if self.cmdfile:
+            with open(self.cmdfile, 'r') as myfile:
+                cmd = myfile.read().replace('\n', '')
+        else:
+            cmd = self.cmd
 
         for volume_info in self:
-            _, size, cur_chunk, left_offset, suffix, is_left_border, is_right_border = volume_info
+            _, size, cur_chunk, left_offset, suffix, affix, is_left_border, is_right_border = volume_info
             str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
-            str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, suffix)
-            print(cmd + str_volume + str_inputs)
+            str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
+                                            suffix, affix if self.affix_path else '')
+            print(cmd + (''if self.no_volume_flags else str_volume) + str_inputs)
 
     @classmethod
     def cubeIterGen(cls, volume_range_beg, volume_range_end, overlap, cube_size,
@@ -163,11 +169,14 @@ class dpCubeIter(object):
     @staticmethod
     def addArgs(p):
         # adds arguments required for this object to specified ArgumentParser object
-        p.add_argument('--cmdfile', nargs=1, type=str, default='cmd.txt',
+        p.add_argument('--cmdfile', nargs=1, type=str, default='',
                        help='Full name and path of text file containing command')
-        p.add_argument('--fileflags', nargs='*', type=str, default=[], help='in/out files command line switches')
+        p.add_argument('--cmd', nargs=1, type=str, default='', help='Specify command on command line as string')
+        p.add_argument('--fileflags', nargs='*', type=str, default=[],
+                       help='in/out files command line switches (0 for none)')
         p.add_argument('--filepaths', nargs='*', type=str, default=[], help='in/out files paths (0 for none)')
         p.add_argument('--fileprefixes', nargs='*', type=str, default=[], help='in/out files filename prefixes')
+        p.add_argument('--filepostfixes', nargs='*', type=str, default=[], help='in/out files filename postfixes')
         p.add_argument('--volume_range_beg', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Starting range in chunks for total volume')
         p.add_argument('--volume_range_end', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
@@ -183,6 +192,10 @@ class dpCubeIter(object):
         p.add_argument('--use-chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
                        help='Size of chunks in voxels')
         p.add_argument('--leave_edge', action='store_true', help='Whether to leave right-most overlap or not')
+        p.add_argument('--affix_path', action='store_true',
+                       help='Whether to add chunk suffix as path prefix (knossos-style)')
+        p.add_argument('--no_volume_flags', action='store_true',
+                       help='Do not include chunk, size and offset flags in output')
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate command lines for parallelized cube processing',

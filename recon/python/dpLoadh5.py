@@ -31,6 +31,8 @@ import numpy as np
 import argparse
 import time
 import os
+import snappy
+import zipfile
 
 class dpLoadh5(object):
 
@@ -204,6 +206,7 @@ class dpLoadh5(object):
         slc,slcd = self.get_data_slices_from_indices(ind, size, data_size)
         self.dset.read_direct(self.data_cube, slc, slcd)
         hdf.close()
+        self.dataset_index = ind # of use to any inherited classes that need context within entire dataset
 
         # the C/F order re-ordering needs to be done nested inside the reslice re-ordering
         if not self.hdf5_Corder:
@@ -325,7 +328,14 @@ class dpLoadh5(object):
         elif ext == 'gipl':
             dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
         else:
-            fh = open(self.outraw, 'wb'); data.tofile(fh); fh.close()
+            if self.raw_compression:
+                print('\traw compression enabled ' + self.outraw + '.sz.zip')
+                with open(self.outraw + '.sz', 'wb') as fh: fh.write(snappy.compress(data.tostring()))
+                zf = zipfile.ZipFile(self.outraw + '.sz.zip', mode='w')
+                zf.write(self.outraw + '.sz', compress_type=zipfile.ZIP_DEFLATED); zf.close()
+                if os.path.isfile(self.outraw + '.sz'): os.remove(self.outraw + '.sz')
+            else:
+                fh = open(self.outraw, 'wb'); data.tofile(fh); fh.close()
 
         if self.dpLoadh5_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
@@ -458,6 +468,8 @@ class dpLoadh5(object):
         # support some simple manipulations before writing raw file
         p.add_argument('--outraw', nargs=1, type=str, default='', metavar='FILE',
             help='Optional raw or nrrd output file')
+        p.add_argument('--raw-compression', dest='raw_compression', action='store_true',
+            help='Apply snappy + zip compression to raw file (not nrrd or gipl) knossos-style')
         p.add_argument('--legacy-transpose', dest='legacy_transpose', action='store_true',
             help='Specify transpose of x/y (raw output)')
         p.add_argument('--nColorsLUTraw', nargs=1, type=int, default=[0], metavar=('NCLRS'),
