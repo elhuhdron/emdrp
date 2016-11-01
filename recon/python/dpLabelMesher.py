@@ -55,11 +55,12 @@ class dpLabelMesher(emLabels):
     #DTYPE = np.uint16
     DTYPE_MAX = 65535
     RAD = 5  # for padding
-    doplots = False  # for debug
+    #doplots = False  # for debug, added as argument
 
     # moved seed_range back to command line
     #seed_range = [-1,-1]    # for normal use
     #seed_range = [-1,10]    # for debug
+    print_every = 500
 
     SEED_DTYPE = np.uint32
     #VERTEX_DTYPE = np.float32
@@ -129,10 +130,11 @@ class dpLabelMesher(emLabels):
         # get bounding boxes for each supervoxel
         svox_bnd = nd.measurements.find_objects(dataPad)
 
-        if self.dpLabelMesher_verbose: tloop = time.time()
+        if self.dpLabelMesher_verbose:
+            tloop = time.time(); t = time.time()
         for i in range(self.seed_range[0], self.seed_range[1]):
-            if self.dpLabelMesher_verbose:
-                print('seed : %d is %d / %d' % (self.seeds[i],i+1,self.seed_range[1])); t = time.time()
+            if self.dpLabelMesher_verbose and i % self.print_every == 0:
+                print('seed : %d is %d / %d' % (self.seeds[i],i+1,self.seed_range[1]))
 
             # old method
             #            # select the labels
@@ -156,7 +158,8 @@ class dpLabelMesher(emLabels):
             # crop out the bounding box plus the padding, then optionally smooth
             #crpdpls = bwdpls[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,pmin[2]:pmax[2]+1].astype(self.PDTYPE)
             # crop out the bounding box then binarize this seed within bounding box
-            crpdpls = (dataPad[cur_bnd] == self.seeds[i]).astype(self.PDTYPE)
+            crpdpls = (dataPad[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,
+                               pmin[2]:pmax[2]+1] == self.seeds[i]).astype(self.PDTYPE)
             if self.do_smooth:
                 crpdplsSm = filters.convolve(crpdpls, W, mode='reflect', cval=0.0, origin=0)
                 # if smoothing results in nothing above contour level, use original without smoothing
@@ -229,7 +232,8 @@ class dpLabelMesher(emLabels):
                 if self.flip_faces: self.faces[i] = self.faces[i][:,::-1]
                 self.nVertices[i] = self.vertices[i].shape[0]
                 self.nFaces[i] = self.faces[i].shape[0]
-                if self.dpLabelMesher_verbose: print('\t%d vertices, %d faces' % (self.nVertices[i], self.nFaces[i]))
+                if self.dpLabelMesher_verbose and i % self.print_every == 0:
+                    print('\t%d vertices, %d faces' % (self.nVertices[i], self.nFaces[i]))
                 if self.min_faces > 0:
                     if self.nFaces[i] >= self.min_faces: break
                     rf -= df; deci.SetTargetReduction(rf)
@@ -257,7 +261,8 @@ class dpLabelMesher(emLabels):
                 mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
                 dpLabelMesher.vtkShow(mapper)
 
-            if self.dpLabelMesher_verbose: print('\tdone in %.3f s' % (time.time() - t,))
+            if self.dpLabelMesher_verbose and i % self.print_every == 0:
+                print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
         if self.dpLabelMesher_verbose: print('Total ellapsed time meshing %.3f s' % (time.time() - tloop,))
 
     def writeMeshOutfile(self):
@@ -282,9 +287,16 @@ class dpLabelMesher(emLabels):
             dataset_root = 'meshes'
             for i in range(self.seed_range[0], self.seed_range[1]):
                 #self.nVoxels; self.faces; self.vertices; self.bounds_beg; self.bounds_end
-                dsetpath = dataset_root + '/' + str(self.seeds[i])
+                str_seed = ('%08d' % self.seeds[i])
+                dsetpath = dataset_root + '/' + str_seed
                 h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
                                       compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+                h5file.create_dataset(dsetpath + '/vertices', data=self.vertices[i], dtype=self.VERTEX_DTYPE,
+                                      compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+                dset = h5file[dataset_root][str_seed]['vertices']
+                dset.attrs.create('nVoxels',self.nVoxels[i])
+                dset.attrs.create('bounds_beg',self.bounds_beg[i])
+                dset.attrs.create('bounds_end',self.bounds_end[i])
             h5file.close()
 
     @classmethod
@@ -296,7 +308,6 @@ class dpLabelMesher(emLabels):
         arg_str += ' --chunk %d %d %d ' % tuple(chunk)
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
-        arg_str += ' --reduce-frac %f ' % reduce_frac
         arg_str += ' --reduce-frac %f ' % reduce_frac
         arg_str += ' --dataset ' + dataset
         if verbose: arg_str += ' --dpLabelMesher-verbose '
@@ -362,6 +373,7 @@ class dpLabelMesher(emLabels):
             help='Do not use decimate pro from vtk for meshing (use quadric clustering instead)')
         #p.add_argument('--decimatePro', action='store_true', dest='decimatePro',
         #    help='Use decimate pro from vtk for meshing (default quadric clustering)')
+        p.add_argument('--doplots', action='store_true', help='Debugging plotting enabled for each supervoxel')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
 if __name__ == '__main__':
