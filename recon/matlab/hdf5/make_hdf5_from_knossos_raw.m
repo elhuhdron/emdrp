@@ -47,11 +47,13 @@ for mag = mags
   % Options for only writing a subset of the Knossos raw chunks to the hdf5 file.
   % This will result in chunk indices into the hdf5 file that start at (0,0,0) for the offset defined here.
   % Use false for writing the entire hypercube to the hdf5 file.
-  do_chunk_select = false;
+  do_chunk_select = true;
   assert( ~do_chunk_select || length(mags)==1 ); % xxx - can't do select with multiple mags right now
   % original 27 frontend "cubes"
   chunk_sel_offset = [8 9 3];
   nchunks_sel = [6 6 3];
+  % if crop is on, dataset size is only the selected size, otherwise chunks written in context of whole dataset
+  do_chunk_select_crop = false;
   
   % to add "context" cubes if selecting subset (over-ridden below if not)
   chunk_sel_offset = chunk_sel_offset - 1; nchunks_sel = nchunks_sel + 2;
@@ -87,11 +89,16 @@ for mag = mags
   if ~do_chunk_select
     nchunks_sel = nchunks;
     chunk_sel_offset = [0 0 0];
+    do_chunk_select_crop = true;
   end
   
   chunksizer = chunksize; chunksize = chunksize(dim_order);
   nchunks_selr = nchunks_sel; nchunks_sel = nchunks_sel(dim_order);
-  totalsize = chunksize.*nchunks_sel; 
+  if do_chunk_select_crop
+    totalsize = chunksize.*nchunks_sel; 
+  else
+    totalsize = chunksize.*nchunks; 
+  end    
   bytes_per_chunk = prod(chunksize);
 
   % put anything to be written to the atributes section for the data into this struct.
@@ -112,7 +119,11 @@ for mag = mags
   %     hdffname = sprintf('%s_%dx%dx%dchunks_%s.h5',dataset,nchunks,str);
   %   end
   if do_chunk_select
-    hdffname = sprintf('%s_%dx%dx%dchunks_at_x%04d_y%04d_z%04d.h5',dataset,nchunks_selr,chunk_sel_offset);
+    if do_chunk_select_crop    
+      hdffname = sprintf('%s_%dx%dx%dchunks_at_x%04d_y%04d_z%04d_crop.h5',dataset,nchunks_selr,chunk_sel_offset);
+    else
+      hdffname = sprintf('%s_%dx%dx%dchunks_at_x%04d_y%04d_z%04d.h5',dataset,nchunks_selr,chunk_sel_offset);
+    end
   else
     hdffname = [dataset '.h5'];
   end
@@ -145,6 +156,9 @@ for mag = mags
               if length(V) == rawtotal
                 V = reshape(V,chunksizer);
                 if do_write
+                  if ~do_chunk_select_crop
+                    chunk_ind_write = chunk_ind_write + chunk_sel_offset;
+                  end
                   write_hd5_chunk(permute(V,dim_order),outfile, data_name, chunk_ind_write(dim_order), ...
                     do_Corder, false); 
                 end
