@@ -40,8 +40,8 @@ pdata = struct;  % input parameters depending on dataset
 
 % generate "realistic" split merger curves.
 p.params_meshed = true;
-%alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
-alphax=[0.0001 0.001];
+alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
+%alphax=[0.0001 0.001];
 splitx=[0 0.0001 0.001 0.01 0.03 0.06 0.1:0.1:0.2 0.4:0.2:1];
 % order in nodes_to_gipl: params = {p.merge_percs p.split_percs p.remove_percs};
 [alpha, split]=ndgrid(alphax,splitx); 

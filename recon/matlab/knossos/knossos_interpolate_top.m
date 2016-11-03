@@ -1,9 +1,10 @@
 
 
 %skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+%skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.nml';
 
-skelout = '/Users/pwatkins/Downloads/out.nml';
+skelout = '/home/watkinspv/Downloads/out.nml';
 
 p = struct;
 p.remove_branch_edges = false;

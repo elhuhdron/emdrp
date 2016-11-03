@@ -42,7 +42,12 @@ function [krk_output, meta, commentsString] = KLEE_readKNOSSOS_v4(krk_fname)
         for krk_pc=1:length(params)
             subparams = regexp(params{krk_pc}{2},'(\S*?)=\"(.*?)\"','tokens');
             for krk_sub=1:length(subparams)
-              str = str2num(subparams{krk_sub}{2});
+              str = '';
+              if length(subparams{krk_sub}{2}) < 64
+                str = str2num(subparams{krk_sub}{2});
+              end
+              % some knossos genius added '.' to the parameter names in the new xml format
+              subparams{krk_sub}{1} = strrep(subparams{krk_sub}{1}, '.', '_');
               if isempty(str)
                 meta.(params{krk_pc}{1}).(subparams{krk_sub}{1}) = subparams{krk_sub}{2};
               else
@@ -60,9 +65,11 @@ function [krk_output, meta, commentsString] = KLEE_readKNOSSOS_v4(krk_fname)
         
         for krk_tc=1:size(krk_things,2)
             %krk_output{krk_tc} = struct('nodes',[],'edges',[]);
-            temp = regexp(krk_things{krk_tc},'<thing id.*?>','match')
+            temp = regexp(krk_things{krk_tc},'<thing id.*?>','match');
             temp2 = regexp(temp{:},'"\.*"?','split');
-            krk_output{krk_tc}.comment = temp2{12};
+            if length(temp2) > 11
+              krk_output{krk_tc}.comment = temp2{12};
+            end
             krk_theseNodes = regexp(krk_things{krk_tc},'<node .*?/>','match');
             krk_output{krk_tc}.nodes = repmat(0,[size(krk_theseNodes,2),5]);
             for krk_nc=1:size(krk_theseNodes,2)

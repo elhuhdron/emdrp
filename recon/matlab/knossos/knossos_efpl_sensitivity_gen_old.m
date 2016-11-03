@@ -1,4 +1,5 @@
 
+% xxx - ONLY FOR REFERENCE, maybe remove, this was an old method that did not really work
 % generate label inputs for sensitivity test for skeleton based metrics.
 % this is done by only modifying labels at each node location 
 %   and writing to input h5 file for analysis with knossos_efpl.
@@ -25,8 +26,8 @@ p.dtype_str = 'uint16';
 
 % generate "realistic" split merger curves.
 p.params_meshed = true;
-alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
-%alphax=[0.0001 0.001];
+% alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
+alphax=[0.0001 0.001];
 splitx=[0 0.0001 0.001 0.01 0.03 0.06 0.1:0.1:0.2 0.4:0.2:1];
 % order in nodes_to_gipl: params = {p.merge_percs p.split_percs};
 [alpha, split]=ndgrid(alphax,splitx); 
@@ -38,7 +39,8 @@ split(sel) = nan; merge(sel) = nan;
 p.split_percs = split;
 p.merge_percs = merge;
 
+p.merge_radN = 20;
 p.hdf5out = '/home/watkinspv/Downloads/tmp.h5';
 p.hdf5lbls = '/Data/datasets/labels/gt/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5';
 
-tic; o = knossos_simulate_errors(p); toc
+tic; rngnodes = knossos_rasterize_nodes_errors(p); toc

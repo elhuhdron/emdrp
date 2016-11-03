@@ -135,7 +135,7 @@ for c = 1:length(skels)
   end
 end
 
-length(comments)
+%length(comments)
 fprintf(fid,'  <comments>\n');
 for n = 1:length(comments)
   fprintf(fid,'    <comment node="%d" content="%s"/>\n',comments{n}.node,comments{n}.content);
@@ -150,7 +150,7 @@ fprintf(fid,'  </branchpoints>\n');
 
 fprintf(fid,'</things>\n');
 
-fclose(fid)
+fclose(fid);
 
 end
 

@@ -39,22 +39,22 @@
 % };
 % load_indices = [2 1 2]; 
 
-load_files = {
+% load_files = {
 %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_xyz_norandbg.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_n3f16_oldthr.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_mnbf32.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_vgg3b64.mat'
 %   '/home/watkinspv/Data/efpl/efpl_interp_mbf16_ds2.mat'  
-  '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
-  '/home/watkinspv/Data/efpl/efpl_interp_xyz_norandbg.mat'
-  '/home/watkinspv/Data/efpl/efpl_interp_n3f16_oldthr.mat'
-  '/home/watkinspv/Data/efpl/efpl_interp_mnbf32.mat'
-  '/home/watkinspv/Data/efpl/efpl_interp_vgg3b64.mat'
-  '/home/watkinspv/Data/efpl/efpl_interp_mbf16_ds2.mat'  
-};
-%load_indices = [2 2 1 1 1 1];
-load_indices = [1 1 2 2 2 2];
+% %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_xyz_norandbg.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_n3f16_oldthr.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_mnbf32.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_vgg3b64.mat'
+% %   '/home/watkinspv/Data/efpl/efpl_interp_mbf16_ds2.mat'  
+% };
+% load_indices = [2 2 1 1 1 1];
+% %load_indices = [1 1 2 2 2 2];
 
 % load_files = {
 %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
@@ -106,23 +106,29 @@ load_indices = [1 1 2 2 2 2];
 % %load_indices = [2 3 4 3 4 1]; % none
 % load_indices = [2 3 4 1 2 1 2 3 4 3 4 1]; % all
 
-% % metric sensitivity
+% metric sensitivity
+load_files = {
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+  '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+};
+load_indices = [1:12]; % all
+%load_indices = 1:2;
+
 % load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
-%   '/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat'
+%   '/home/watkinspv/Data/efpl/efpl_nointerp_k0725.mat'
+%   '/home/watkinspv/Data/efpl/efpl_interp_k0725.mat'
 % };
-% %load_indices = [1:12]; % all
-% load_indices = 1:2;
+% load_indices = [1 1];
 
 
 

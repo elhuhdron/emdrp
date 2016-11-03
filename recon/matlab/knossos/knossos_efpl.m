@@ -104,7 +104,7 @@ end
 
 
 fprintf(1,'reading nml file\n'); t = now;
-evalc('[o.info, meta, ~] = KLEE_readKNOSSOS_v4(pdata.skelin)'); % suppresss output
+[o.info, meta, ~] = KLEE_readKNOSSOS_v4(pdata.skelin);
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
 % voxel scale from Knossos file (should match hdf5)
@@ -219,7 +219,7 @@ if p.nmlout
   jnk = struct; 
   [outThings, nOutNodes] = getOutThings(o);
   jnk.fn = fullfile(p.outpath, [o.skelname '_use.nml']);
-  evalc('KnossosM_exportNML(jnk.fn,outThings,meta,{});'); % suppress output
+  KnossosM_exportNML(jnk.fn,outThings,meta,{});
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 end 
 
@@ -344,7 +344,7 @@ for prm=1:o.nparams
     cnt = min([nskels p.n_resample]);   % for the normal jackknife
   else
     % bernoulli resampling
-    assert( p.bernoulli_n_resample > 1 && p.bernoulli_n_resample <= nskels );
+    assert( p.n_resample == 0 || p.bernoulli_n_resample > 1 && p.bernoulli_n_resample <= nskels );
     cnt = p.n_resample; bre = (rand([cnt nskels]) < p.bernoulli_n_resample/nskels);
   end
   % for mapping from sequential non-empty things back to things, random indices in non-empty things
@@ -446,7 +446,7 @@ for prm=1:o.nparams
     jnk.coutThings{nOutThings+1}.thingid = nOutThings+1;
     
     jnk.fn = fullfile(p.outpath, [o.skelname sprintf('_thr%.8f_use.nml',o.thresholds(thr))]);
-    evalc('KnossosM_exportNML(jnk.fn,jnk.coutThings,meta,{});'); % suppress output
+    KnossosM_exportNML(jnk.fn,jnk.coutThings,meta,{});
     display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   end
   

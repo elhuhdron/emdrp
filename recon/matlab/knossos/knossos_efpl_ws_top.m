@@ -50,6 +50,18 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
 
+% k0725
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/k0725.h5';
+pdata(i).chunk = [8 9 3];
+pdata(i).skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.interp.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool_k0725/k0725_supervoxels.h5';
+%pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
+pdata(i).name = 'k0725';
+pdata(i).subgroups = {'with_background'};
+pdata(i).segparam_attr = 'thresholds';
+pdata(i).nlabels_attr = 'types_nlabels';
+
 
 
 % % with ~20% ECS
@@ -223,18 +235,18 @@ pdata = struct;  % input parameters depending on dataset
 
 
 
-% with ~20% ECS
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '~/Downloads/tmp.h5';
-pdata(i).name = 'huge_merges';
-pdata(i).subgroups = {'perc_merge'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = [0 0.01 0.1];
-pdata(i).nlabels_attr = '';
+% % with ~20% ECS
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% pdata(i).lblsh5 = '~/Downloads/tmp.h5';
+% pdata(i).name = 'huge_merges';
+% pdata(i).subgroups = {'perc_merge'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = [0 0.01 0.1];
+% pdata(i).nlabels_attr = '';
 
 % % with almost no ECS
 % i = 2;
@@ -322,6 +334,7 @@ p.remove_MEM_merged_nodes = false;
 
 
 p.nchunks = [8 8 4];
+p.nchunks = [6 6 3];
 %p.offset = [0 0 32];
 p.offset = [0 0 0];
 p.dataset_data = 'data_mag1';
@@ -347,4 +360,4 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_sensitivity_merge','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_interp_k0725','p','pdata','o');

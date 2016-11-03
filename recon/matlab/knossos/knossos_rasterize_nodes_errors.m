@@ -22,7 +22,9 @@
 
 % xxx - this method did not work, replaced with iterating over skeletons
 %   to either remove or introduce edges and then re-running graph components.
-% simple conversion from nml skeleton to gipl labels.
+%   new methods is in knossos_simulate_errors.m
+% simple conversion from nml skeleton to gipl labels (modified knossos_nodes_to_gipl.m).
+% xxx - ONLY FOR REFERENCE, maybe remove
 % only fills in exact points gipl, plus a specified 2d structuring element.
 % expanded this to also introduce random split, merger and remove skeleton perturbations.
 function rngnodes = knossos_rasterize_nodes_errors(p)
@@ -41,7 +43,7 @@ if ~isfield(p, 'params_meshed'), p.params_meshed = false; end
 % p.merge_rad
 
 % read the nml file, script originally from Kevin
-evalc('[info, meta] = KLEE_readKNOSSOS_v4(p.nmlin)'); % suppresss output
+[info, meta] = KLEE_readKNOSSOS_v4(p.nmlin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % convert to struct array for indexing, reorder by thingID
