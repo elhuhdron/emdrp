@@ -212,7 +212,7 @@ class dpSupervoxelClassifier():
 
         # dpFRAG features are now selectable as sets
         #self.FEATURES, self.FEATURES_NAMES, self.nfeatures = dpFRAG.make_FEATURES()
-        d = dpFRAG.make_features(self.feature_set)
+        d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k in ['features','features_names','nfeatures']: setattr(self,k,d[k])
 
     def train(self):
@@ -248,7 +248,7 @@ class dpSupervoxelClassifier():
                         frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset,
                             [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                             self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, ['training','thr'],
-                            progressBar=self.progress_bar, feature_set=self.feature_set,
+                            progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
                             verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
@@ -257,6 +257,7 @@ class dpSupervoxelClassifier():
                     frag = dpFRAG.makeTrainingFRAG(self.labelfile, cchunk, size, offset,
                         [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                         self.raw_dataset, self.gtfile, self.label_subgroups, feature_set=self.feature_set,
+                        has_ECS=self.has_ECS,
                         progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
                 frag.createFRAG(update = self.iterative_mode)
                 #frag.createFRAG(update = False)
@@ -388,13 +389,13 @@ class dpSupervoxelClassifier():
                 frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset,
                     [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                     self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out,
-                    G=FRAG, progressBar=self.progress_bar, feature_set=self.feature_set,
+                    G=FRAG, progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
                     verbose=self.dpSupervoxelClassifier_verbose)
             else:
                 frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset,
                     [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                     self.raw_dataset, self.outfile, self.label_subgroups, subgroups_out, G=FRAG,
-                    progressBar=self.progress_bar, feature_set=self.feature_set,
+                    progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
                     verbose=self.dpSupervoxelClassifier_verbose)
 
         if self.iterative_mode and self.iterative_frag[ichunk] is None:

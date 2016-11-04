@@ -1111,7 +1111,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile,
-            subgroups=[], G=None, progressBar=False, feature_set=None, verbose=False):
+            subgroups=[], G=None, progressBar=False, feature_set=None, has_ECS=True, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1128,6 +1128,7 @@ class dpFRAG(emLabels):
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --gtfile ' + gtfile
         if feature_set: arg_str += ' --feature-set ' + feature_set
+        if not has_ECS: arg_str += ' --no-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1140,7 +1141,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile, subgroups=[],
-            subgroups_out=[], G=None, progressBar=False, feature_set=None, verbose=False):
+            subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1158,6 +1159,7 @@ class dpFRAG(emLabels):
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         if feature_set: arg_str += ' --feature-set ' + feature_set
+        if not has_ECS: arg_str += ' --no-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1170,7 +1172,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile,
-            subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, verbose=False):
+            subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1189,6 +1191,7 @@ class dpFRAG(emLabels):
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         if feature_set: arg_str += ' --feature-set ' + feature_set
+        if not has_ECS: arg_str += ' --no-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
