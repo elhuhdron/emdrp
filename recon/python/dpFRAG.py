@@ -87,7 +87,7 @@ class dpFRAG(emLabels):
                   'aobnd','rad_std_ovlp','ang_std_ovlp','conv_overlap','labeled_ovlp']
 
     @staticmethod
-    def make_features(feature_set):
+    def make_features(feature_set, has_ECS):
         # old static class properties:
         #FEATURES = {'size_small':0, 'size_large':1, 'size_overlap':2,
         #    'mean_grayscale':3, 'mean_prob_MEM':4, 'mean_prob_ICS':5,
@@ -147,17 +147,19 @@ class dpFRAG(emLabels):
             augments = ['kuwahara', 'blur30', 'blur40', 'max']
             static_augments = []
         elif feature_set == 'medium':
-            # 23 total features
+            # 23 total features (21 without ECS)
             static_features = ['size_small', 'size_large', 'size_overlap',
                 'mean_grayscale', 'ang_cntr', 'dist_cntr_small', 'dist_cntr_large',
                 'size_ovlp_small', 'size_ovlp_large', 'labeled_ovlp',
                 'conv_overlap', 'rad_std_ovlp', 'ang_std_ovlp']
             npcaang = 0
-            prob_types = ['MEM','ICS','ECS']
+            prob_types = ['MEM','ICS']
             augments = []
-            static_augments = ['MEM_max', 'ICS_min', 'ECS_max',
-            #static_augments = [\
+            static_augments = ['MEM_max', 'ICS_min',
                                '_kuwahara', '_blur30', '_blur40', '_max']
+            if has_ECS:
+                prob_types += ['ECS']
+                static_augments += ['ECS_max']
         elif feature_set == 'reduced':
             # 21 total features
             static_features = ['size_small', 'size_large', 'size_overlap',
@@ -229,7 +231,7 @@ class dpFRAG(emLabels):
         if not self.data_type_out: self.data_type_out = self.data_type
 
         # create features based on feature_set mode
-        d = dpFRAG.make_features(self.feature_set)
+        d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k,v in d.items(): setattr(self,k,v)
 
         self.bperim = 2*max([self.ovlp_dilate, dpFRAG.neighbor_perim])
@@ -1232,6 +1234,8 @@ class dpFRAG(emLabels):
         p.add_argument('--feature-set', nargs=1, type=str, default='standard',
             choices=['all','standard','medium','reduced','small','minimal'],
             help='Option to control which features are calculated')
+        p.add_argument('--no-ECS', dest='has_ECS', action='store_false',
+                       help='Specify when data does not contain ECS classified voxels')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
 
 if __name__ == '__main__':
