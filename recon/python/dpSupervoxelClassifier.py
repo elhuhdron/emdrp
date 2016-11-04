@@ -61,6 +61,7 @@ from matplotlib import pyplot as plt
 #from matplotlib import colors
 #from cycler import cycler
 
+from dpLoadh5 import dpLoadh5
 from dpFRAG import dpFRAG
 from metrics import pixel_error_fscore
 
@@ -137,19 +138,6 @@ class dpSupervoxelClassifier():
         self.nchunk_list = self.chunk_range_beg.shape[0]
         self.nchunks = self.nchunk_list
 
-        if len(self.chunk_range_end) > 0:
-            # "chunkrange" mode, chunks are selected based on defined beginning and end of ranges in X,Y,Z
-            # range is open ended (python-style, end is not included in range)
-            self.chunk_range_end = self.chunk_range_end.reshape(-1,3);
-            assert( self.chunk_range_end.shape[0] == self.nchunk_list )
-            self.chunk_range_rng = self.chunk_range_end - self.chunk_range_beg
-            assert( (self.chunk_range_rng >= 0).all() )     # some bad ranges
-            self.chunk_range_size = self.chunk_range_rng.prod(axis=1)
-            self.chunk_range_cumsize = np.concatenate((np.zeros((1,),dtype=self.chunk_range_size.dtype),
-                self.chunk_range_size.cumsum()))
-            self.chunk_range_nchunks = self.chunk_range_cumsize[-1]
-            self.use_chunk_range = True; self.nchunks = self.chunk_range_nchunks
-
         # offsets are either per chunk or per range, depending on above mode (whether chunk_range_end empty or not)
         self.offset_list = self.offset_list.reshape(-1,3)   # list must have multiple of 3 elements for volumes
         if self.offset_list.shape[0] > 1:
@@ -163,6 +151,33 @@ class dpSupervoxelClassifier():
             assert( self.size_list.shape[0] == self.nchunk_list )
         else:
             self.size_list = np.ones_like(self.chunk_range_beg)*self.size_list
+
+        if len(self.chunk_range_end) > 0:
+            # "chunkrange" mode, chunks are selected based on defined beginning and end of ranges in X,Y,Z
+            # range is open ended (python-style, end is not included in range)
+            self.chunk_range_end = self.chunk_range_end.reshape(-1,3);
+            assert( self.chunk_range_end.shape[0] == self.nchunk_list )
+            self.chunk_range_rng = self.chunk_range_end - self.chunk_range_beg
+            assert( (self.chunk_range_rng >= 0).all() )     # some bad ranges
+
+            # this allows for iterating in chunk_range mode with sizes greater than chunksize
+            # just read the h5info for the rawfile to get the chunksize
+            rawh5 = dpLoadh5.readInith5(self.rawfile, self.raw_dataset, [0,0,0], [0,0,0], [128,128,128], 'uint8')
+            self.chunksize = rawh5.chunksize
+            self.chunkscale = np.ones_like(self.size_list)
+            # only allow this if the sizes are a multiple of chunksize
+            if (self.size_list % self.chunksize == 0).all():
+                scale = self.size_list // self.chunksize
+                # only allow this if the ranges are a multiple of the sizes
+                if (self.chunk_range_rng % scale == 0).all():
+                    self.chunkscale = scale
+            self.chunk_range_rng //= self.chunkscale
+
+            self.chunk_range_size = self.chunk_range_rng.prod(axis=1)
+            self.chunk_range_cumsize = np.concatenate((np.zeros((1,),dtype=self.chunk_range_size.dtype),
+                self.chunk_range_size.cumsum()))
+            self.chunk_range_nchunks = self.chunk_range_cumsize[-1]
+            self.use_chunk_range = True; self.nchunks = self.chunk_range_nchunks
 
         # print out all initialized variables in verbose mode
         if self.dpSupervoxelClassifier_verbose:
@@ -514,7 +529,7 @@ class dpSupervoxelClassifier():
             chunk_list_index = np.nonzero(chunk >= self.chunk_range_cumsize)[0][-1]
             chunk_range_index = chunk - self.chunk_range_cumsize[chunk_list_index]
             cchunk = np.unravel_index(chunk_range_index, self.chunk_range_rng[chunk_list_index,:]) \
-                + self.chunk_range_beg[chunk_list_index,:]
+                *self.chunkscale[chunk_list_index,:] + self.chunk_range_beg[chunk_list_index,:]
         else:
             chunk_list_index = chunk; cchunk = self.chunk_range_beg[chunk,:]; chunk_range_index = None
         return cchunk, chunk_list_index, chunk_range_index
