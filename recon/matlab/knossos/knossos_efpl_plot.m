@@ -125,6 +125,18 @@ baseno = p.baseno; figno = 0;
 
 
 
+if p.save_plot_results
+  save_vars = {
+    'ndatasets' 'params' 'path_lengths' 'internode_lengths' 'nskels' 'split_mergers' 'split_mergers_segEM' ...
+    'nBGnodes' 'nECSnodes' 'nnodes' 'nnodes_skel' 'names' 'split_mergers_CI' 'split_mergers_segEM_CI' 'nparams' ...
+    'split_er' 'split_er_CI' 'merge_fracnodes' 'split_fracnodes' 'are' 'are_CI' 'combined_eftpl' 'norm_params' ...
+    'nlabels' ...
+  };
+  for i=1:length(save_vars)
+    po.(save_vars{i}) = eval(save_vars{i});
+  end
+end
+
 
 
 figure(baseno+figno); figno = figno+1; clf

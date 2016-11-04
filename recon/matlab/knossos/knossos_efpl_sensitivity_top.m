@@ -38,6 +38,8 @@ pdata = struct;  % input parameters depending on dataset
 % %pdata(i).segparams = [0.5 0.6 0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99999000];
 % pdata(i).nlabels_attr = 'types_nlabels';
 
+% xxx - probably just merge this back into knossos_efpl_ws_top.m
+
 % generate "realistic" split merger curves.
 p.params_meshed = true;
 alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
@@ -47,20 +49,23 @@ splitx=[0 0.0001 0.001 0.01 0.03 0.06 0.1:0.1:0.2 0.4:0.2:1];
 [alpha, split]=ndgrid(alphax,splitx); 
 merge=alpha.*(alpha+1)./(split+alpha)-alpha;
 
-strb = 'huge';
-for y = 1:length(alphax)
-  % with ~20% ECS
-  i = y;
-  pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-  pdata(i).chunk = [16 17 0];
-  pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-  %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-  pdata(i).lblsh5 = '~/Downloads/tmp.h5';
-  pdata(i).name = [strb sprintf(' %g',alphax(y))];
-  pdata(i).subgroups = {'perc_merge_split'};
-  pdata(i).segparam_attr = '';
-  pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
-  pdata(i).nlabels_attr = '';
+nruns = 11;
+for x = 1:nruns
+  strb = sprintf('huge%d',x);
+  for y = 1:length(alphax)
+    % with ~20% ECS
+    i = length(alphax)*(x-1) + y;
+    pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+    pdata(i).chunk = [16 17 0];
+    pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+    %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+    pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
+    pdata(i).name = [strb sprintf(' %g',alphax(y))];
+    pdata(i).subgroups = {'perc_merge_split'};
+    pdata(i).segparam_attr = '';
+    pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
+    pdata(i).nlabels_attr = '';
+  end
 end
 
 
@@ -130,4 +135,4 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_sensitivity_alpha.mat','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_sensitivity_alpha_big.mat','p','pdata','o');

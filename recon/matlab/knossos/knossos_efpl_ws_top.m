@@ -333,7 +333,7 @@ p.remove_MEM_merged_nodes = false;
 
 
 
-p.nchunks = [8 8 4];
+%p.nchunks = [8 8 4];
 p.nchunks = [6 6 3];
 %p.offset = [0 0 32];
 p.offset = [0 0 0];

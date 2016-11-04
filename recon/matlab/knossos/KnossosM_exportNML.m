@@ -153,12 +153,3 @@ fprintf(fid,'</things>\n');
 fclose(fid);
 
 end
-
-
-
-
-
-
-
-
-

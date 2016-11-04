@@ -106,17 +106,3 @@ function [krk_output, meta, commentsString] = KLEE_readKNOSSOS_v4(krk_fname)
             
         end
     end
-
-
-
-
-
-
-
-
-
-
-
-
-
-end
