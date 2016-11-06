@@ -46,24 +46,27 @@ cum_nnodes = [0 cumsum(nnodes)];
 if remove_unconnected_nodes
   % remove any unconnected nodes
   ci = conncomp(graph(edge_matrix)); sizes = hist(ci,1:double(max(ci)));
-  ind = find(sizes < 2); uc = find(ci == ind);
-  knossos_info_graph.unconnected_nodes = uc;
-
-  % iterate nodes to be removed and remove them from the info struct.
-  for i=1:length(uc)
-    % map back to the skeleton number (might not be same as component number from conncomp)
-    skel = find(uc(i) > cum_nnodes,1,'last'); uc_skel = uc - cum_nnodes(skel);
-    % remove the node from this skeleton, and decrement nodes for edges with nodes greater than removed node
-    sel = true(1,size(info(skel).nodes,1)); sel(uc_skel) = false;
-    info(skel).nodes = info(skel).nodes(sel,:);
-    sel = (info(skel).edges > uc_skel);
-    info(skel).edges(sel) = info(skel).edges(sel)-1;
-  end
-
-  % recalculate everything based on revised info struct array
-  nedges = cellfun('length',{info.edges}); nnodes = cellfun('size',{info.nodes},1);
-  cum_nnodes = [0 cumsum(nnodes)];
-  [edge_matrix, all_edges] = create_edge_matrix(info, cum_nnodes, nedges);
+  ind = find(sizes < 2); 
+  if ~isempty(ind)
+      uc = find(ci == ind);
+      knossos_info_graph.unconnected_nodes = uc;
+      
+      % iterate nodes to be removed and remove them from the info struct.
+      for i=1:length(uc)
+          % map back to the skeleton number (might not be same as component number from conncomp)
+          skel = find(uc(i) > cum_nnodes,1,'last'); uc_skel = uc - cum_nnodes(skel);
+          % remove the node from this skeleton, and decrement nodes for edges with nodes greater than removed node
+          sel = true(1,size(info(skel).nodes,1)); sel(uc_skel) = false;
+          info(skel).nodes = info(skel).nodes(sel,:);
+          sel = (info(skel).edges > uc_skel);
+          info(skel).edges(sel) = info(skel).edges(sel)-1;
+      end
+      
+      % recalculate everything based on revised info struct array
+      nedges = cellfun('length',{info.edges}); nnodes = cellfun('size',{info.nodes},1);
+      cum_nnodes = [0 cumsum(nnodes)];
+      [edge_matrix, all_edges] = create_edge_matrix(info, cum_nnodes, nedges);
+  end % if there are unconnected nodes
 end % remove_unconnected_nodes
 
 % populate output struct
