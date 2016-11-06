@@ -108,10 +108,10 @@ else
 end
 
 for prm = 1:ntparams
-  [x,y,z] = ind2sub(nparams, prm); inds = [x,y,z];
+  [x,y] = ind2sub(nparams, prm); inds = [x,y];
   if p.params_meshed
-    merge_perc = p.merge_percs(x,y,z);
-    split_perc = p.split_percs(x,y,z);
+    merge_perc = p.merge_percs(x,y);
+    split_perc = p.split_percs(x,y);
   else
     merge_perc = p.merge_percs(x);
     split_perc = p.split_percs(y);
@@ -169,7 +169,7 @@ for prm = 1:ntparams
     if nparams(si) > 1
       subgroup_str = [subgroup_str '_' params_str{si}];
       if p.params_meshed
-        subgroup_gstr = [subgroup_gstr sprintf('%.8f',params{si}(x,y,z))];
+        subgroup_gstr = [subgroup_gstr sprintf('%.8f',params{si}(x,y))];
       else
         subgroup_gstr = [subgroup_gstr sprintf('%.8f',params{si}(inds(si)))];
       end
