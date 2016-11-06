@@ -295,19 +295,53 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparams = 1:75;
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-% k0725 agglomeration
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/k0725.h5';
-pdata(i).chunk = [8 9 3];
-pdata(i).skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool_k0725/k0725_supervoxels.h5';
-% supervoxels, all thresholds and watershed types
-pdata(i).lblsh5 = '/Data/watkinspv/agglo/k0725_vgg3pool_aggloall_rf_75iter2p_medium_supervoxels_fixed.h5';
-pdata(i).name = 'k0725 agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 1:75;
-pdata(i).nlabels_attr = 'types_nlabels';
+% % k0725 agglomeration
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/k0725.h5';
+% pdata(i).chunk = [8 9 3];
+% pdata(i).skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool_k0725/k0725_supervoxels.h5';
+% % supervoxels, all thresholds and watershed types
+% pdata(i).lblsh5 = '/Data/watkinspv/agglo/k0725_vgg3pool_aggloall_rf_75iter2p_medium_supervoxels_fixed.h5';
+% pdata(i).name = 'k0725 agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 1:75;
+% pdata(i).nlabels_attr = 'types_nlabels';
+
+
+
+% % generate "realistic" split merger curves.
+% alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
+% %alphax=[0.0001 0.001];
+% splitx=[0 0.0001 0.001 0.01 0.03 0.06 0.1:0.1:0.2 0.4:0.2:1];
+% % order in nodes_to_gipl: params = {p.merge_percs p.split_percs p.remove_percs};
+% [alpha, split]=ndgrid(alphax,splitx); 
+% merge=alpha.*(alpha+1)./(split+alpha)-alpha;
+
+merge_percs = 0:0.02:0.2;
+split_percs = 0:0.08:0.8;
+[merge, split]=ndgrid(merge_percs,split_percs); 
+
+nruns = 11;
+for x = 1:nruns
+  strb = sprintf('huge%d',x);
+  for y = 1:length(alphax)
+    % with ~20% ECS
+    i = length(alphax)*(x-1) + y;
+    pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+    pdata(i).chunk = [16 17 0];
+    pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+    %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+    pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
+    pdata(i).name = [strb sprintf(' %g',alphax(y))];
+    pdata(i).subgroups = {'perc_merge_split'};
+    pdata(i).segparam_attr = '';
+    pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
+    pdata(i).nlabels_attr = '';
+  end
+end
+
 
 
 
@@ -351,8 +385,8 @@ p.remove_MEM_merged_nodes = false;
 
 
 
-%p.nchunks = [8 8 4];
-p.nchunks = [6 6 3];
+p.nchunks = [8 8 4];
+%p.nchunks = [6 6 3];
 %p.offset = [0 0 32];
 p.offset = [0 0 0];
 p.dataset_data = 'data_mag1';
@@ -378,4 +412,5 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');
+%save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_sensitivity_big.mat','p','pdata','o');
