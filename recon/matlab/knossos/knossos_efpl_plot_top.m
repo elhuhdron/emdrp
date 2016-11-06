@@ -107,14 +107,15 @@
 % load_indices = [2 3 4 1 2 1 2 3 4 3 4 1]; % all
 
 % metric sensitivity
-load_files = repmat({'/home/watkinspv/Data/efpl/efpl_sensitivity_alpha_big.mat'},[1 132]);
-load_indices = [1:132]; 
+load_files = repmat({'/home/watkinspv/Data/efpl/efpl_sensitivity_big.mat'},[1 121]);
+load_indices = 1:121; 
 
 % load_files = {
-%   '/home/watkinspv/Data/efpl/efpl_nointerp_k0725.mat'
-%   '/home/watkinspv/Data/efpl/efpl_interp_k0725.mat'
+%   '~/Documents/Data/em/efpl/efpl_nointerp_k0725.mat'
+%   '~/Documents/Data/em/efpl/efpl_interp_k0725.mat'
+%   '~/Documents/Data/em/efpl/efpl_interp_k0725_agglo.mat'
 % };
-% load_indices = [1 1];
+% load_indices = [1 1 1];
 
 
 
@@ -160,8 +161,8 @@ pplot.dxticksel = 3;
 % this parameter plots the are metric as the sum of 1 - prec/rec instead of typical 1 - f-score
 pplot.are_sum = false;
 
-% whether to return the intermediate variables used for plotting in output struct
-pplot.save_plot_results = true;
+% whether to return the intermediate variables used for plotting in output struct (empty for no)
+pplot.save_plot_results = '/home/watkinspv/Data/efpl/efpl_sensitivity_big_meta.mat';
 
 pplot.baseno = 3000;
 
@@ -178,6 +179,3 @@ pplot.meta_groups_labels = {'huge', 'none'};
 pplot.meta_param = []; % set to disable meta-plots
 po = knossos_efpl_plot(pdata,o,pplot);
 
-if pplot.save_plot_results
-  save('/home/watkinspv/Data/efpl/efpl_sensitivity_alpha_big_meta.mat','pplot','po');
-end

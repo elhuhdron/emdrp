@@ -125,7 +125,7 @@ baseno = p.baseno; figno = 0;
 
 
 
-if p.save_plot_results
+if ~isempty(p.save_plot_results)
   save_vars = {
     'ndatasets' 'params' 'path_lengths' 'internode_lengths' 'nskels' 'split_mergers' 'split_mergers_segEM' ...
     'nBGnodes' 'nECSnodes' 'nnodes' 'nnodes_skel' 'names' 'split_mergers_CI' 'split_mergers_segEM_CI' 'nparams' ...
@@ -135,6 +135,9 @@ if p.save_plot_results
   for i=1:length(save_vars)
     po.(save_vars{i}) = eval(save_vars{i});
   end
+  
+  save(p.save_plot_results,'p','po');
+  return % save plot meta only
 end
 
 

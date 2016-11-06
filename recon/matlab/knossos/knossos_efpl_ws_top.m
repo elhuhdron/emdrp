@@ -311,7 +311,7 @@ pdata = struct;  % input parameters depending on dataset
 
 
 
-% % generate "realistic" split merger curves.
+% % sensitivity generate "realistic" split merger curves.
 % alphax=logspace(-2,0,9); alphax=[0.0001 0.001 0.004 alphax];
 % %alphax=[0.0001 0.001];
 % splitx=[0 0.0001 0.001 0.01 0.03 0.06 0.1:0.1:0.2 0.4:0.2:1];
@@ -337,10 +337,10 @@ pdata = struct;  % input parameters depending on dataset
 %   end
 % end
 
+% sensitivity normal split merger tiling.
 merge_percs = 0:0.02:0.2;
 split_percs = 0:0.08:0.8;
 [merge, split]=ndgrid(merge_percs,split_percs); 
-
 nruns = 11;
 for x = 1:nruns
   strb = sprintf('huge%d',x);
