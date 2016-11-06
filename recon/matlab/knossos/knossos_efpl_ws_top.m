@@ -318,6 +318,24 @@ pdata = struct;  % input parameters depending on dataset
 % % order in nodes_to_gipl: params = {p.merge_percs p.split_percs p.remove_percs};
 % [alpha, split]=ndgrid(alphax,splitx); 
 % merge=alpha.*(alpha+1)./(split+alpha)-alpha;
+% nruns = 11;
+% for x = 1:nruns
+%   strb = sprintf('huge%d',x);
+%   for y = 1:length(alphax)
+%     % with ~20% ECS
+%     i = length(alphax)*(x-1) + y;
+%     pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+%     pdata(i).chunk = [16 17 0];
+%     pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+%     %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+%     pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
+%     pdata(i).name = [strb sprintf(' %g',alphax(y))];
+%     pdata(i).subgroups = {'perc_merge_split'};
+%     pdata(i).segparam_attr = '';
+%     pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
+%     pdata(i).nlabels_attr = '';
+%   end
+% end
 
 merge_percs = 0:0.02:0.2;
 split_percs = 0:0.08:0.8;
@@ -326,15 +344,15 @@ split_percs = 0:0.08:0.8;
 nruns = 11;
 for x = 1:nruns
   strb = sprintf('huge%d',x);
-  for y = 1:length(alphax)
+  for y = 1:length(merge_percs)
     % with ~20% ECS
-    i = length(alphax)*(x-1) + y;
+    i = length(merge_percs)*(x-1) + y;
     pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
     pdata(i).chunk = [16 17 0];
     pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
     %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
     pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
-    pdata(i).name = [strb sprintf(' %g',alphax(y))];
+    pdata(i).name = [strb sprintf(' %g',merge_percs(y))];
     pdata(i).subgroups = {'perc_merge_split'};
     pdata(i).segparam_attr = '';
     pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
