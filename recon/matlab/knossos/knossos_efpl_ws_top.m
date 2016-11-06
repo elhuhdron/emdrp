@@ -50,17 +50,19 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-% k0725
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/k0725.h5';
-pdata(i).chunk = [8 9 3];
-pdata(i).skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool_k0725/k0725_supervoxels.h5';
-%pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
-pdata(i).name = 'k0725';
-pdata(i).subgroups = {'with_background'};
-pdata(i).segparam_attr = 'thresholds';
-pdata(i).nlabels_attr = 'types_nlabels';
+% % k0725
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/k0725.h5';
+% pdata(i).chunk = [8 9 3];
+% pdata(i).skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool_k0725/k0725_supervoxels.h5';
+% %pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
+% pdata(i).name = 'k0725';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+
+
 
 
 
@@ -293,6 +295,22 @@ pdata(i).nlabels_attr = 'types_nlabels';
 % pdata(i).segparams = 1:75;
 % pdata(i).nlabels_attr = 'types_nlabels';
 
+% k0725 agglomeration
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/k0725.h5';
+pdata(i).chunk = [8 9 3];
+pdata(i).skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.interp.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool_k0725/k0725_supervoxels.h5';
+% supervoxels, all thresholds and watershed types
+pdata(i).lblsh5 = '/Data/watkinspv/agglo/k0725_vgg3pool_aggloall_rf_75iter2p_medium_supervoxels_fixed.h5';
+pdata(i).name = 'k0725 agglo';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = 1:75;
+pdata(i).nlabels_attr = 'types_nlabels';
+
+
+
 
 
 p = struct;  % input parameters independent of dataset
@@ -360,4 +378,4 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_interp_k0725','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');

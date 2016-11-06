@@ -18,6 +18,7 @@ p.isotopic_voxels = false;
 p.strel_offs = [0 0 0; -1 0 0; 1 0 0; 0 -1 0; 0 1 0; 1 1 0; 1 -1 0; -1 1 0; -1 -1 0; -2 0 0; 2 0 0; 0 -2 0; 0 2 0];
 p.dtype_str = 'uint16';
 
+p.params_meshed = false;
 p.merge_percs = 0:0.02:0.2;
 p.split_percs = 0:0.08:0.8;
 
