@@ -146,7 +146,7 @@ class dpCubeIter(object):
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
-                                            suffix, affix if self.affix_path else '')
+                                            suffix if self.use_suffix else '', affix if self.affix_path else '')
             print(cmd + (''if self.no_volume_flags else str_volume) + str_inputs)
 
     @classmethod
@@ -194,6 +194,8 @@ class dpCubeIter(object):
         p.add_argument('--leave_edge', action='store_true', help='Whether to leave right-most overlap or not')
         p.add_argument('--affix_path', action='store_true',
                        help='Whether to add chunk suffix as path prefix (knossos-style)')
+        p.add_argument('--no-suffix', action='store_false', dest='use_suffix',
+                       help='Do not append knossos suffix to file name (iterate single file)')
         p.add_argument('--no_volume_flags', action='store_true',
                        help='Do not include chunk, size and offset flags in output')
 
