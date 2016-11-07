@@ -38,9 +38,10 @@ p.split_percs = 0:0.08:0.8;
 % p.merge_percs = merge;
 
 p.hdf5lbls = '/Data/datasets/labels/gt/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5';
+%p.hdf5lbls = '/Data/datasets/labels/gt/M0027_11_labels_briggmankl_watkinspv_33x37x7chunks_Forder.h5';
 
 for i = 1:11
-  p.hdf5out = sprintf('/home/watkinspv/Downloads/tmp%d.h5', i);
+  p.hdf5out = sprintf('/Data/watkinspv/tmp%d.h5', i);
   display(p.hdf5out);
   tic; o = knossos_simulate_errors(p); toc
 end

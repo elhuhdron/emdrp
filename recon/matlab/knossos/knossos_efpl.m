@@ -104,7 +104,7 @@ end
 
 
 fprintf(1,'reading nml file\n'); t = now;
-[o.info, meta, ~] = KLEE_readKNOSSOS_v4(pdata.skelin);
+[o.info, meta, ~] = knossos_read_nml(pdata.skelin);
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
 % voxel scale from Knossos file (should match hdf5)
@@ -115,7 +115,7 @@ assert( all((o.scale - o.scaleK) < p.tol) );
 o.info = [o.info{:}]; [~,i] = sort([o.info.thingID]); o.info = o.info(i);
 
 % get number of edges and nodes and total skeleton count (nThings) from nml data
-o.nedges = cellfun('length',{o.info.edges}); o.nnodes = cellfun('size',{o.info.nodes},1);
+o.nedges = cellfun('size',{o.info.edges},1); o.nnodes = cellfun('size',{o.info.nodes},1);
 o.nThings = length(o.info); % total skeletons in nml file
 
 % these are purely informative checks to get the bounds for the skeleton nodes within the dataset.
@@ -219,7 +219,7 @@ if p.nmlout
   jnk = struct; 
   [outThings, nOutNodes] = getOutThings(o);
   jnk.fn = fullfile(p.outpath, [o.skelname '_use.nml']);
-  KnossosM_exportNML(jnk.fn,outThings,meta,{});
+  knossos_write_nml(jnk.fn,outThings,meta,{});
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 end 
 
@@ -446,7 +446,7 @@ for prm=1:o.nparams
     jnk.coutThings{nOutThings+1}.thingid = nOutThings+1;
     
     jnk.fn = fullfile(p.outpath, [o.skelname sprintf('_thr%.8f_use.nml',o.thresholds(thr))]);
-    KnossosM_exportNML(jnk.fn,jnk.coutThings,meta,{});
+    knossos_write_nml(jnk.fn,jnk.coutThings,meta,{});
     display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   end
   

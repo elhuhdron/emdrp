@@ -33,14 +33,14 @@ function rngnodes = knossos_nodes_to_gipl(nmlin, giplout, p)
 % p.strel_offs 
 
 % read the nml file, script originally from Kevin
-[info, meta] = KLEE_readKNOSSOS_v4(nmlin);
+[info, meta] = knossos_read_nml(nmlin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % convert to struct array for indexing, reorder by thingID
 info = [info{:}]; [~,i] = sort([info.thingID]); info = info(i);
 
 % get number of edges and nodes and total skeleton count from nml data
-nedges = cellfun('length',{info.edges}); nnodes = cellfun('size',{info.nodes},1);
+nedges = cellfun('size',{info.edges},1); nnodes = cellfun('size',{info.nodes},1);
 if any((nedges==0)&(nnodes>0)) || any((nedges>0)&(nnodes==0))
   error('thingID with nodes and no edges or vice versa'); 
 end

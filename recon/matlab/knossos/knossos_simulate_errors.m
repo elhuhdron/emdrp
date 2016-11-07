@@ -43,13 +43,13 @@ o = struct;
 % p.params_meshed
 
 % read the nml file, script originally from Kevin
-[info, meta] = KLEE_readKNOSSOS_v4(p.nmlin);
+[info, meta] = knossos_read_nml(p.nmlin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % function removes empty skeletons and unconnected nodes and create logical edge_matrix.
 % edge_matrix represents connections between all nodes (each skeleton is a component of this graph).
 remove_empty_skeletons = true;
-remove_unconnected_nodes = true; % xxx - how does this affect comparing against skeletons without them removed?
+remove_unconnected_nodes = true;
 knossos_info_graph = knossos_info_to_edges(info, remove_empty_skeletons, remove_unconnected_nodes);
 o.knossos_info_graph = knossos_info_graph;
 
@@ -141,8 +141,8 @@ for prm = 1:ntparams
   % run connected graph components on the edge matrix we added random split/merger errors to
   ci = conncomp(graph(error_edge_matrix)); %sizes = hist(ci,1:double(max(ci)));
 
-	% iterate over nodes and assign label just at node location
-	labels_skel_raw = zeros(total_size,p.dtype_str);
+  % iterate over nodes and assign label just at node location
+  labels_skel_raw = zeros(total_size,p.dtype_str);
   for i=1:tnnodes
     % one-based, this appears to be correct for nml data
     curnode = all_nodes(i,1:3) - minv;

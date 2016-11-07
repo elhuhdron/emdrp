@@ -36,9 +36,9 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).subgroups = {'with_background'};
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
-% 
+
 % % with ~20% ECS
-% i = 2;
+% i = 1;
 % pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
 % pdata(i).chunk = [16 17 0];
 % pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
@@ -62,35 +62,6 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-
-
-
-
-% % with ~20% ECS
-% i = 1;
-% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-% pdata(i).chunk = [16 17 0];
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/nmfergus32all/ovlp64/huge_supervoxels_concat_fixed.h5';
-% %pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/nbfergus16all/huge_probs.h5';
-% pdata(i).name = 'huge_concat';
-% pdata(i).subgroups = {'with_background'};
-% pdata(i).segparam_attr = 'thresholds';
-% pdata(i).nlabels_attr = 'types_nlabels';
-% 
-% % with ~20% ECS
-% i = 2;
-% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-% pdata(i).chunk = [16 17 0];
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/nmfergus32all/ovlp64/huge_supervoxels_twopass_fixed.h5';
-% %pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/nbfergus16all/huge_probs.h5';
-% pdata(i).name = 'huge_twopass';
-% pdata(i).subgroups = {'with_background'};
-% pdata(i).segparam_attr = 'thresholds';
-% pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -237,36 +208,6 @@ pdata = struct;  % input parameters depending on dataset
 
 
 
-% % with ~20% ECS
-% i = 1;
-% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-% pdata(i).chunk = [16 17 0];
-% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-% pdata(i).lblsh5 = '~/Downloads/tmp.h5';
-% pdata(i).name = 'huge_merges';
-% pdata(i).subgroups = {'perc_merge'};
-% pdata(i).segparam_attr = '';
-% pdata(i).segparams = [0 0.01 0.1];
-% pdata(i).nlabels_attr = '';
-
-% % with almost no ECS
-% i = 2;
-% pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
-% pdata(i).chunk = [12 14 2];
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
-% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus16all_ds2/none_supervoxels.h5';
-% pdata(i).name = 'none_mbf16ds';
-% pdata(i).subgroups = {'with_background'};
-% pdata(i).segparam_attr = 'thresholds';
-% %pdata(i).segparam_attr = '';
-% %pdata(i).segparams = [0.5 0.6 0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99999000];
-% pdata(i).nlabels_attr = 'types_nlabels';
-
-
-
-
 % % with ~20% ECS, agglomeration
 % i = 1;
 % pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
@@ -348,10 +289,15 @@ for x = 1:nruns
     % with ~20% ECS
     i = length(merge_percs)*(x-1) + y;
     pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+    % pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
     pdata(i).chunk = [16 17 0];
+    % pdata(i).chunk = [12 14 2];
     pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
     %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+    % %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+    % pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
     pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
+    %pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0027/tmp%d.h5',x);
     pdata(i).name = [strb sprintf(' %g',merge_percs(y))];
     pdata(i).subgroups = {'perc_merge_split'};
     pdata(i).segparam_attr = '';
@@ -405,8 +351,8 @@ p.remove_MEM_merged_nodes = false;
 
 p.nchunks = [8 8 4];
 %p.nchunks = [6 6 3];
-%p.offset = [0 0 32];
-p.offset = [0 0 0];
+p.offset = [0 0 32];
+%p.offset = [0 0 0];
 p.dataset_data = 'data_mag1';
 p.dataset_lbls = 'labels';
 

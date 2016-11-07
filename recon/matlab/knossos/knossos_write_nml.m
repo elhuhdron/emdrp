@@ -20,8 +20,8 @@
 % OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 % SOFTWARE.
 
-% modified version of KnossosM_exportNML_v342_forGapJunctionAnalysis
-function KnossosM_exportNML(nmlout,skels,pars,comments,node_meta)
+% modified version of KnossosM_exportNML_v342_forGapJunctionAnalysis from kb
+function knossos_write_nml(nmlout,skels,pars,comments,node_meta)
 
 % default_dir = get_userdata(gcf,'default_dir');
 
@@ -151,5 +151,3 @@ fprintf(fid,'  </branchpoints>\n');
 fprintf(fid,'</things>\n');
 
 fclose(fid);
-
-end

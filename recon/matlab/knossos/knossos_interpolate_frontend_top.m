@@ -23,7 +23,6 @@ p.interp_dim_rng = ([0 1]+chunk(p.interp_dim))*raw_size; p.interp_dim_rng(1) = p
 p.extrap_max = 2;
 p.extrap_do_line = true;
 
-%evalc('[info, meta] = KLEE_readKNOSSOS_v4(skelin)'); % suppresss output
 tic; [minnodes, rngnodes] = knossos_interpolate(skelin,skelout,p); toc
 
 p = struct;

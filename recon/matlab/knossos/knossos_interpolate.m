@@ -46,14 +46,14 @@ node_meta.time = fix(now*24); % ???
 useBGL = false;
 
 % read the nml file, script from Kevin
-[info, meta, ~] = KLEE_readKNOSSOS_v4(skelin);
+[info, meta, ~] = knossos_read_nml(skelin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % convert to struct array for indexing, reorder by thingID
 info = [info{:}]; [~,i] = sort([info.thingID]); info = info(i);
 
 % get number of edges and nodes and total skeleton count from nml data
-nedges = cellfun('length',{info.edges}); nnodes = cellfun('size',{info.nodes},1);
+nedges = cellfun('size',{info.edges},1); nnodes = cellfun('size',{info.nodes},1);
 % don't do this, reports wrong thingIDs for check and will happen automatically in creating new nml file
 % if any((nedges==0)&(nnodes>0)) || any((nedges>0)&(nnodes==0))
 %   error('thingID with nodes and no edges or vice versa');
@@ -252,5 +252,5 @@ fprintf(1,'\norig %d thingIDs, got %d new thingIDs, %d branches, %d inflections,
 fprintf(1,'extrapolated %d nodes\n',sum(nextrap));
 
 if p.write_new_nml
-  KnossosM_exportNML(skelout,newThings,meta,{},node_meta);
+  knossos_write_nml(skelout,newThings,meta,{},node_meta);
 end

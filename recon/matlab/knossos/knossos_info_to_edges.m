@@ -32,7 +32,7 @@ knossos_info_graph = struct;
 info = [info{:}]; [~,i] = sort([info.thingID]); info = info(i);
 
 % get number of edges and nodes and total skeleton count from nml data
-nedges = cellfun('length',{info.edges}); nnodes = cellfun('size',{info.nodes},1);
+nedges = cellfun('size',{info.edges},1); nnodes = cellfun('size',{info.nodes},1);
 
 if remove_empty_skeletons
   % remove empty skeletons
@@ -54,7 +54,7 @@ if remove_unconnected_nodes
       % iterate nodes to be removed and remove them from the info struct.
       for i=1:length(uc)
           % map back to the skeleton number (might not be same as component number from conncomp)
-          skel = find(uc(i) > cum_nnodes,1,'last'); uc_skel = uc - cum_nnodes(skel);
+          skel = find(uc(i) > cum_nnodes,1,'last'); uc_skel = uc(i) - cum_nnodes(skel);
           % remove the node from this skeleton, and decrement nodes for edges with nodes greater than removed node
           sel = true(1,size(info(skel).nodes,1)); sel(uc_skel) = false;
           info(skel).nodes = info(skel).nodes(sel,:);
@@ -63,7 +63,7 @@ if remove_unconnected_nodes
       end
       
       % recalculate everything based on revised info struct array
-      nedges = cellfun('length',{info.edges}); nnodes = cellfun('size',{info.nodes},1);
+      nedges = cellfun('size',{info.edges},1); nnodes = cellfun('size',{info.nodes},1);
       cum_nnodes = [0 cumsum(nnodes)];
       [edge_matrix, all_edges] = create_edge_matrix(info, cum_nnodes, nedges);
   end % if there are unconnected nodes
