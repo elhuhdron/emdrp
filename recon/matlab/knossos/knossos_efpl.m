@@ -32,12 +32,13 @@
 % second, edges split / nodes merged info from the first pass and traverse edges 
 %   of each tree along the connected paths. error free path length is calculated
 %   separately for splits and mergers as total path length along edges before an
-%   error occurs. optionally had halve path length to current and next efpls when
+%   error occurs. optionally add half path length to current and next efpls when
 %   an error is encountered at an edge.
 %
-% thing is knossos-speak for skeleton
+% thing is knossos-speak for a connected skeleton
 
 function o = knossos_efpl(p, pdata)
+% initializations
 o = struct;
 
 fprintf(1,'getting dataset info from h5 files\n');
@@ -99,9 +100,7 @@ if p.rawout
   gipl_write_volume(Vdata,fullfile(p.outpath,p.outdata),o.scale);
 end
 
-
-
-
+%% read nml skeleton inputs (this is ground truth for efpl metrics).
 
 fprintf(1,'reading nml file\n'); t = now;
 [o.info, meta, ~] = knossos_read_nml(pdata.skelin);
@@ -125,9 +124,7 @@ maxy = max(allnodes(:,2)); miny = min(allnodes(:,2));
 maxz = max(allnodes(:,3)); minz = min(allnodes(:,3));
 o.minnodes = [minx miny minz]; o.maxnodes = [maxx maxy maxz];
 
-
-
-
+%% first pass over all edges for all skeletons to get things/nodes/edges that will be used for metrics.
 
 % read out labels at some threshold, this first step is just to get nodes/edges
 %   within labeled supervoxel area (within volume and not empty label) and path lengths.
@@ -155,6 +152,19 @@ o.edges_use = cell(1,o.nThings); o.nodes_use = cell(1,o.nThings);
 o.path_length_use = zeros(1,o.nThings); o.edge_length_use = cell(1,o.nThings);
 fprintf(1,'total %d things, not including %d with < %d edges, total included %d\n',o.nThings,sum(o.empty_things),...
   p.min_edges,sum(~o.empty_things));
+
+% optionally subsample the skeletons. 
+% this is similar to the jackknife or bernoulli resampling, but only repeated once.
+% allows for systematic testing of the sensitivity of the metrics based on subsampling skeletons.
+if p.skel_subsample_perc < 1
+  use_things = randsample(find(~o.empty_things), round(sum(~o.empty_things)*p.skel_subsample_perc));
+  sel = false(1,o.nThings); sel(use_things) = true;
+  assert( ~any(o.empty_things & sel) ); % make sure not subsampling empty things
+  fprintf(1,'SUB-sampling %d / %d (non-empty) things\n', length(use_things), sum(~o.empty_things));
+  % consider non-sampled skeletons as empty things (done for implementation ease)
+  o.empty_things = ~sel;
+end
+
 for n=1:o.nThings
   if o.empty_things(n)
     %fprintf(1,'thingID %d has %d edges < %d min and %d nodes, not including\n',n,nedges(n),min_edges,nnodes(n));
@@ -205,12 +215,11 @@ o.nnodes_use = cellfun(@sum,o.nodes_use); nnodes = sum(o.nnodes_use);
 assert( all( (o.path_length - cellfun(@sum,o.edge_length)) < p.tol ) );
 assert( all( (o.path_length_use - cellfun(@sum,o.edge_length_use)) < p.tol ) );
 
-fprintf(1,'excluding %d/%d edges, %d/%d nodes and %d/%d things because no edges or outside of labeled volume\n',...
+fprintf(1,'excluding %d/%d edges, %d/%d nodes and %d/%d things ',...
   sum(o.nedges)-nedges,sum(o.nedges),sum(o.nnodes)-nnodes,sum(o.nnodes),...
   sum(~o.empty_things)-nskels,sum(~o.empty_things));
-
-
-
+fprintf(1,'because no edges or outside of labeled volume or subsampling\n');
+ 
 % optionally output the skeletons
 if p.nmlout
   fprintf(1,'\texporting non-empty skeleton within labeled volume\n'); t = now;
@@ -223,30 +232,24 @@ if p.nmlout
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 end 
 
-
-
-
-
-% second pass over all edges for all skeletons by walking along the paths
-%   to get best and worst case error free path length distributions.
+%% second pass over all edges for all skeletons by walking along the paths
+% get best and worst case error free path length distributions.
 % the worst case metric is the sum of half lengths on either side of each node.
 % use randomized error rate of 1 to get the worst-case distribution.
 % the best case should be exactly the path lengths except for any skeletons that have passed outside the labeled volume
 %   and then return back into the labeled volume and therefore have unconnected components. 
-%   xxx - ignore unconnected skeletons for now and compute best case with randomized error rate of 0.
-%     only a few skeletons where this happens, could deal with it more properly by running graph connected components.
+% this ignores unconnected skeletons and computes best case with randomized error rate of 0.
+% paper was published with this method. subsequently added knossos_clean_crop.m which runs graph connected components
+%   after removing nodes outside of the labeled volume. verified that this had < 1% effect on metrics for huge/none ECS.
+% going forward, used a cropped nml file output from knossos_clean_crop.m so that this is not an issue.
 fprintf(1,'\tcomputing best/worse case efpl (no errors / all errors)\n'); t = now;
 [efpl, ~] = labelsWalkEdges(o,p, [], [], [], [0 1]); 
 o.efpl_bestcase = efpl{1}; o.efpl_worstcase = efpl{2};
 display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 fprintf(1,'\t\tbest case count  = %d, worst case count = %d\n',length(efpl{1}),length(efpl{2}));
 
-
-
-
-
-
-% iterate over single dimension of specified segmentation parameters, typically threshold.
+%% main metric loop, iterate over single dimension of specified segmentation parameter, typically threshold.
+% calculate metrics for each proposed segmentation.
 
 % allocate outputs
 o.nSMs = zeros(o.nparams,2); o.nSMs_segEM = zeros(o.nparams,2); 
@@ -291,7 +294,7 @@ for prm=1:o.nparams
   end
   display(sprintf('\t\tdone in %.3f s, nlabels = %d',(now-t)*86400,nlabels));
   
-  % first pass over all edges for all skeletons to get confusion matrix
+  %% first pass over all edges for all skeletons to get confusion matrix
   % instead of pixels, each tally in the confusion matrix is a node count
   fprintf(1,'\titerating edges within labeled volume to get confusion matrix\n');
   [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, ~] = labelsPassEdges(o,p,Vlbls,nnodes,nlabels,1:o.nThings);
@@ -314,11 +317,8 @@ for prm=1:o.nparams
   fprintf(1,'\tcomputing rand error from confusion matrix\n');
   [are,prec,rec,ri,ari] = getRandErrors(m_ij, nnodes); 
   o.are_precrec(prm,:) = [rec prec]; o.are(prm) = are; o.ri(prm) = ri; o.ari(prm) = ari;
-    
-
   
-  % second pass over all edges for all skeletons along the actual skeleton paths
-  %   to get errror free path lengths.
+  %% second pass over all edges for all skeletons along the actual skeleton paths to get errror free path lengths.
   fprintf(1,'\tcomputing split/merger efpl by traversing trees\n'); t = now;
   [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p, edge_split, label_merged, nodes_to_labels, -1);
   o.efpls(prm,:) = efpl; o.efpl_thing_ptrs(prm,:,:) = efpl_thing_ptr; 
@@ -336,9 +336,7 @@ for prm=1:o.nparams
   display(sprintf('\t\tmean split/merger error rate %.4f %.4f',o.error_rates(prm,1),o.error_rates(prm,2)));
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   
-
-  
-  % optionally resample over the skeletons to get confidence intervals
+  %% optionally resample over the skeletons to get confidence intervals
   fprintf(1,'\tresample skeletons to get confidence intervals\n'); t = now;
   if p.jackknife_resample 
     cnt = min([nskels p.n_resample]);   % for the normal jackknife
@@ -412,10 +410,8 @@ for prm=1:o.nparams
   else
     fprintf(1,'\tNO resample stats for n=%d, p=%g\n',p.n_resample,p.p_resample);
   end
-
   
-  
-  % optionally write out nml that contains all error_free_edges in a single skeleton
+  %% optionally write out nml that contains all error_free_edges in a single skeleton
   %   in addition to skeleton that is in the labeled volume.
   if p.nmlout
     fprintf(1,'\texporting error free edges with non-empty skeleton\n'); t = now;
@@ -454,11 +450,7 @@ end % for each watershed parameter
 
 end % knossos_efpl
 
-
-
-
-
-% single pass over the edges to get split edges, merged supervoxel labels, node to label mapping and confusion matrix.
+%% single pass over the edges to get split edges, merged supervoxel labels, node to label mapping and confusion matrix.
 % turned this into a function for resampling techniques. 
 % thing_list / allThings was to specify resampling instead of iterating over all objects, not currently being used.
 function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, things_labels_cnt] = ...
@@ -546,11 +538,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, things_labels_
   label_merged = full(sum(m_ijl,1) > 1); label_merged = label_merged(2:end);
 end % labelsPassEdges
 
-
-
-
-
-% walk trees using stacks to calculate error free path lengths separately for splits and for mergers.
+%% walk trees using stacks to calculate error free path lengths separately for splits and for mergers.
 % this calculates the efpl along the actual skeletons, not just based on the confusion matrix.
 % turned this into a function for resampling techniques.
 function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_rate)
@@ -695,8 +683,7 @@ function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, 
   end % for each pass
 end % labelsWalkEdges
 
-
-
+%% iterate edges to check for different error types depending on pass number
 function error_free_edges = labelsPassEdgesErrors(o,p,edge_split, label_merged, nodes_to_labels)
   % keep track of the edges that do not contain errors.
   error_free_edges = repmat({o.edges_use}, [1 p.npasses_edges]);
@@ -717,10 +704,7 @@ function error_free_edges = labelsPassEdgesErrors(o,p,edge_split, label_merged, 
   end % for each pass
 end % labelsPassEdgesErrors
       
-
-
-
-% use information on merged labels and split edges from first pass through edges
+%% use information on merged labels and split edges from first pass through edges
 %   to decide if a split or merger error has occurred at this edge or these nodes.
 function error_occurred = checkErrorAtEdge(p,n,n1,n2,e,pass, edge_split, label_merged, nodes_to_labels)
   % a split error has occurred on this path if this edge is split
@@ -747,9 +731,7 @@ function error_occurred = checkErrorAtEdge(p,n,n1,n2,e,pass, edge_split, label_m
   end
 end
 
-
-
-
+%% create struct for writing nml file
 function [outThings, nOutNodes] = getOutThings(o)
   nskels = sum(~o.empty_things_use);
   outThings = cell(1,nskels); nOutThings = 0; nOutNodes = 0;
@@ -767,10 +749,7 @@ function [outThings, nOutNodes] = getOutThings(o)
   end % for each new thing
 end % getOutThings
 
-
-
-
-
+%% functions that compute the "simple" split merger metrics based on confusion matrix
 function [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl, remove_MEM_merged_nodes)
   % tally up splits as the number supervoxels that are assiciated with more than one thing
   %   but do not count background label nodes. this can range from [0,nnodes]
@@ -790,10 +769,7 @@ function [nsplits, nmergers] = getSplitMergerSegEM(m_ijl)
   tmp = full(sum(m_ijl(:,2:end),1)); nmergers = sum(tmp(tmp > 1) - 1);
 end 
 
-
-
-
-
+%% compute the rand error metrics based on confusion matrix
 function [are,prec,rec,ri,ari] = getRandErrors(m_ij, n)
 
   % sum over proposed labels in contingency matrix

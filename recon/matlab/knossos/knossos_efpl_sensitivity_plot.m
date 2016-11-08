@@ -1,18 +1,11 @@
 
-%   are(k,ind) = o{k}.are(ind); are_CI(k,ind,:) =  o{k}.are_CI(ind,:);
-%   % just convert precision recall to 1- here (so min is better)
-%   are_precrec(k,ind,:) = 1-o{k}.are_precrec(ind,:); are_precrec_CI(k,ind,:,:) = 1-o{k}.are_precrec_CI(ind,:,:);
-%   combined_eftpl(k,ind) = sum(o{k}.eftpl(ind,:,3),2)/sum(o{k}.path_length_use);
-
+% variables that are saved in knossos_efpl_plot output struct (plot meta)
 %   save_vars = {
 %     'ndatasets' 'params' 'path_lengths' 'internode_lengths' 'nskels' 'split_mergers' 'split_mergers_segEM'
 %     'nBGnodes' 'nECSnodes' 'nnodes' 'nnodes_skel' 'names' 'split_mergers_CI' 'split_mergers_segEM_CI' 'nparams'
 %     'split_er' 'split_er_CI' 'merge_fracnodes' 'split_fracnodes' 'are' 'are_CI' 'combined_eftpl' 'norm_params'
 %     'nlabels'
 %   };
-
-load('/home/watkinspv/Data/efpl/efpl_sensitivity_big_meta.mat');
-%load('~/Downloads/efpl_sensitivity_big_meta.mat');
 
 % % xxx - save these and drive them down from sensitivity_gen
 % % generate "realistic" split merger curves.
@@ -28,86 +21,107 @@ split_percs = 0:0.08:0.8;
 [merge, split]=ndgrid(merge_percs,split_percs); 
 
 
-baseno = 1; figno = 0;
+% plot two sensitivity tests and then compare them below
 
-dx = 0.05; sms = [0:dx:(1-dx)] + dx/2;
-[gx, gy] = ndgrid(sms, sms);
+% in_meta = {
+%   '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_meta.mat'
+%   '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_meta.mat'
+% };
+% names = {'none' 'huge'};
 
+% in_meta = {
+%   '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_meta.mat'
+%   '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p8_meta.mat'
+% };
+% names = {'none all' 'none 80%'};
+
+in_meta = {
+  '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_meta.mat'
+  '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p8_meta.mat'
+};
+names = {'huge all' 'huge 80%'};
+
+baseno = 11; figno = 0;
 nruns = 11;
-assert( po.nparams == length(split_percs) );
-nslices = length(merge_percs);
-
-figure(baseno+figno); figno = figno+1; clf
-pointsize=16;
 dolog = false;
-mergemax = 0.25; splitmax = 0.85;
+nslices = length(merge_percs);
+npoints = length(split_percs);
+ndata = length(in_meta);
+std_lim = 0.08;
 
-X = reshape(po.combined_eftpl, [nslices, nruns, po.nparams]);
-X_u = reshape(nanmean(X,2), [nslices, po.nparams]);
-X_s = reshape(nanstd(X,[],2), [nslices, po.nparams]);
-if dolog, X_u = log10(X_u); end
+eftpl_u = zeros(nslices, npoints, ndata); eftpl_s = zeros(nslices, npoints, ndata);
+are_u = zeros(nslices, npoints, ndata); are_s = zeros(nslices, npoints, ndata);
+for i=1:ndata
+  
+  load(in_meta{i});
+  assert( po.nparams == npoints );
+  
+  X = reshape(po.combined_eftpl, [nslices, nruns, po.nparams]);
+  eftpl_u(:,:,i) = reshape(nanmean(X,2), [nslices, po.nparams]);
+  eftpl_s(:,:,i) = reshape(nanstd(X,[],2), [nslices, po.nparams]);
+  if dolog, eftpl_u = log10(eftpl_u(:,:,i)); end
+  
+  X = reshape(po.are, [nslices, nruns, po.nparams]);
+  are_u(:,:,i) = reshape(nanmean(X,2), [nslices, po.nparams]);
+  are_s(:,:,i) = reshape(nanstd(X,[],2), [nslices, po.nparams]);
+  if dolog, are_u = log10(are_u(:,:,i)); end
 
-subplot(2,2,1);
-scatter(split(:),merge(:),pointsize,X_u(:));colorbar
-set(gca,'ylim',[-0.05 mergemax],'xlim',[-0.05 splitmax]);
-set(gca,'plotboxaspectratio',[1 1 1]);
-xlabel('% splits'); ylabel('% merges'); title('tefpl mean');
+  % scatter plot, for reference, only useful for non-grid data
+  % pointsize=16;
+  % mergemax = 0.25; splitmax = 0.85;
+  % subplot(2,2,1);
+  % scatter(split(:),merge(:),pointsize,eftpl_u(:));colorbar
+  % set(gca,'ylim',[-0.05 mergemax],'xlim',[-0.05 splitmax]);
+  % set(gca,'plotboxaspectratio',[1 1 1]);
 
-subplot(2,2,2);
-scatter(split(:),merge(:),pointsize,X_s(:));colorbar
-set(gca,'ylim',[-0.05 mergemax],'xlim',[-0.05 splitmax]);
-set(gca,'plotboxaspectratio',[1 1 1]);
-xlabel('% splits'); ylabel('% merges'); title('tefpl std');
+  figure(baseno+figno); figno = figno+1; clf
+  
+  subplot(2,2,1);
+  imagesc(split_percs,merge_percs,eftpl_u(:,:,i)); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[0 1]);
+  xlabel('% splits'); ylabel('% merges'); title(['tefpl mean ' names{i}]);
+  
+  subplot(2,2,2);
+  imagesc(split_percs,merge_percs,eftpl_s(:,:,i)); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[0 std_lim]);
+  xlabel('% splits'); ylabel('% merges'); title(['tefpl std ' names{i}]);
+  
+  subplot(2,2,3);
+  imagesc(split_percs,merge_percs,are_u(:,:,i)); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[0 1]);
+  xlabel('% splits'); ylabel('% merges'); title(['are mean ' names{i}]);
+  
+  subplot(2,2,4);
+  imagesc(split_percs,merge_percs,are_s(:,:,i)); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[0 std_lim]);
+  xlabel('% splits'); ylabel('% merges'); title(['are std ' names{i}]);
 
-X = reshape(po.are, [nslices, nruns, po.nparams]);
-X_u = reshape(nanmean(X,2), [nslices, po.nparams]);
-X_s = reshape(nanstd(X,[],2), [nslices, po.nparams]);
-if dolog, X_u = log10(X_u); end
-
-subplot(2,2,3);
-scatter(split(:),merge(:),pointsize,X_u(:));colorbar
-set(gca,'ylim',[-0.05 mergemax],'xlim',[-0.05 splitmax]);
-set(gca,'plotboxaspectratio',[1 1 1]);
-xlabel('% splits'); ylabel('% merges'); title('are mean');
-
-subplot(2,2,4);
-scatter(split(:),merge(:),pointsize,X_s(:));colorbar
-set(gca,'ylim',[-0.05 mergemax],'xlim',[-0.05 splitmax]);
-set(gca,'plotboxaspectratio',[1 1 1]);
-xlabel('% splits'); ylabel('% merges'); title('are std');
-
-
-
+end
 
 figure(baseno+figno); figno = figno+1; clf
-dolog = true;
-
-X = reshape(po.combined_eftpl, [nslices, nruns, po.nparams]);
-X_u = reshape(nanmean(X,2), [nslices, po.nparams]);
-X_s = reshape(nanstd(X,[],2), [nslices, po.nparams]);
-if dolog, X_u = log10(X_u); end
+colormap(gray);
 
 subplot(2,2,1);
-imagesc(split_percs,merge_percs,X_u); colorbar
-set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal');
-xlabel('% splits'); ylabel('% merges'); title('tefpl mean');
+d = eftpl_u(:,:,1)-eftpl_u(:,:,2); m = max(abs(d(:)));
+imagesc(split_percs,merge_percs,d); colorbar
+set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[-m m]);
+xlabel('% splits'); ylabel('% merges'); title(['tefpl mean ' names{1} '-' names{2}]);
 
 subplot(2,2,2);
-imagesc(split_percs,merge_percs,X_s); colorbar
-set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal');
-xlabel('% splits'); ylabel('% merges'); title('tefpl std');
-
-X = reshape(po.are, [nslices, nruns, po.nparams]);
-X_u = reshape(nanmean(X,2), [nslices, po.nparams]);
-X_s = reshape(nanstd(X,[],2), [nslices, po.nparams]);
-if dolog, X_u = log10(X_u); end
+d = eftpl_s(:,:,1)-eftpl_s(:,:,2); m = max(abs(d(:)));
+imagesc(split_percs,merge_percs,d); colorbar
+set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[-m m]);
+xlabel('% splits'); ylabel('% merges'); title(['tefpl std ' names{1} '-' names{2}]);
 
 subplot(2,2,3);
-imagesc(split_percs,merge_percs,X_u); colorbar
-set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal');
-xlabel('% splits'); ylabel('% merges'); title('are mean');
+d = are_u(:,:,1)-are_u(:,:,2); m = max(abs(d(:)));
+imagesc(split_percs,merge_percs,d); colorbar
+set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[-m m]);
+xlabel('% splits'); ylabel('% merges'); title(['are mean ' names{1} '-' names{2}]);
 
 subplot(2,2,4);
-imagesc(split_percs,merge_percs,X_s); colorbar
-set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal');
-xlabel('% splits'); ylabel('% merges'); title('are std');
+d = are_s(:,:,1)-are_s(:,:,2); m = max(abs(d(:)));
+imagesc(split_percs,merge_percs,d); colorbar
+set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[-m m]);
+xlabel('% splits'); ylabel('% merges'); title(['are std ' names{1} '-' names{2}]);
+
