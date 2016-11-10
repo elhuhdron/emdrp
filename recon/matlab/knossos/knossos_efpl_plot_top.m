@@ -1,11 +1,11 @@
 
-load_files = {
-  '/home/watkinspv/Data/efpl/efpl_paper.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_and_xyz_crop.mat'
-  '/home/watkinspv/Data/efpl/efpl_paper_and_xyz_crop.mat'
-};
-load_indices = [1 2 1 2]; 
+% load_files = {
+%   '/home/watkinspv/Data/efpl/efpl_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_and_xyz_crop.mat'
+%   '/home/watkinspv/Data/efpl/efpl_paper_and_xyz_crop.mat'
+% };
+% load_indices = [1 2 1 2]; 
 
 % load_files = {
 %   '/home/watkinspv/Data/efpl/efpl_paper_interp_norandbg.mat'
@@ -114,9 +114,9 @@ load_indices = [1 2 1 2];
 % %load_indices = [2 3 4 3 4 1]; % none
 % load_indices = [2 3 4 1 2 1 2 3 4 3 4 1]; % all
 
-% % metric sensitivity
-% load_files = repmat({'/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p8.mat'},[1 121]);
-% load_indices = 1:121; 
+% metric sensitivity
+load_files = repmat({'/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat'},[1 121]);
+load_indices = 1:121; 
 
 % load_files = {
 %   '~/Documents/Data/em/efpl/efpl_nointerp_k0725.mat'
@@ -170,8 +170,8 @@ pplot.dxticksel = 3;
 pplot.are_sum = false;
 
 % whether to return the intermediate variables used for plotting in output struct (empty for no)
-pplot.save_plot_results = '';
-%pplot.save_plot_results = '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p8_meta.mat';
+%pplot.save_plot_results = '';
+pplot.save_plot_results = '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2_meta.mat';
 
 pplot.baseno = 3000;
 

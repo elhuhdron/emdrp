@@ -379,7 +379,7 @@ p.p_resample = 0;
 
 % set to < 1 for subsampling sensitivity tests
 %p.skel_subsample_perc = 1;
-p.skel_subsample_perc = 0.6;
+p.skel_subsample_perc = 0.2;
 
 % usually set these two to true for interpolation, but false for normal
 % set this to true to remove non-ICS nodes from polluting the rand error
@@ -417,5 +417,5 @@ end
 
 % save the results
 %save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');
-save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p6.mat','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_paper_and_xyz_crop.mat','p','pdata','o');

@@ -35,11 +35,23 @@ split_percs = 0:0.08:0.8;
 % };
 % names = {'none all' 'none 80%'};
 
+% in_meta = {
+%   '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_meta.mat'
+%   '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p8_meta.mat'
+%   '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p6_meta.mat'
+%   '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p4_meta.mat'
+%   '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2_meta.mat'
+% };
+% names = {'huge all' 'huge 80%' 'huge 60%' 'huge 40%' 'huge 20%'};
+
 in_meta = {
-  '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_meta.mat'
-  '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p8_meta.mat'
+  '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_meta.mat'
+  '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p8_meta.mat'
+  '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p6_meta.mat'
+  '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p4_meta.mat'
+  '/home/watkinspv/Data/efpl/efpl_none_sensitivity_crop_big_sample0p2_meta.mat'
 };
-names = {'huge all' 'huge 80%'};
+names = {'none all' 'none 80%' 'none 60%' 'none 40%' 'none 20%'};
 
 baseno = 11; figno = 0;
 nruns = 11;
@@ -48,6 +60,7 @@ nslices = length(merge_percs);
 npoints = length(split_percs);
 ndata = length(in_meta);
 std_lim = 0.08;
+meta_dim = [1 0.8 0.6 0.4 0.2];
 
 eftpl_u = zeros(nslices, npoints, ndata); eftpl_s = zeros(nslices, npoints, ndata);
 are_u = zeros(nslices, npoints, ndata); are_s = zeros(nslices, npoints, ndata);
@@ -125,3 +138,44 @@ imagesc(split_percs,merge_percs,d); colorbar
 set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','clim',[-m m]);
 xlabel('% splits'); ylabel('% merges'); title(['are std ' names{1} '-' names{2}]);
 
+
+
+figure(baseno+figno); figno = figno+1; clf
+colormap(gray)
+for i=1:npoints
+  subplot(3,4,i)
+  d = squeeze(eftpl_u(i,:,:));
+  imagesc(meta_dim,merge_percs,d); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','xdir','reverse');
+  xlabel('% sampling'); ylabel('% merges'); title(sprintf('tefpl mean at %.2f splits',split_percs(i)));
+end
+
+figure(baseno+figno); figno = figno+1; clf
+colormap(gray)
+for i=1:npoints
+  subplot(3,4,i)
+  d = squeeze(eftpl_s(i,:,:));
+  imagesc(meta_dim,merge_percs,d); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','xdir','reverse');
+  xlabel('% sampling'); ylabel('% merges'); title(sprintf('tefpl std at %.2f splits',split_percs(i)));
+end
+
+figure(baseno+figno); figno = figno+1; clf
+colormap(gray)
+for i=1:npoints
+  subplot(3,4,i)
+  d = squeeze(are_u(i,:,:));
+  imagesc(meta_dim,merge_percs,d); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','xdir','reverse');
+  xlabel('% sampling'); ylabel('% merges'); title(sprintf('are mean at %.2f splits',split_percs(i)));
+end
+
+figure(baseno+figno); figno = figno+1; clf
+colormap(gray)
+for i=1:npoints
+  subplot(3,4,i)
+  d = squeeze(are_s(i,:,:));
+  imagesc(meta_dim,merge_percs,d); colorbar
+  set(gca,'plotboxaspectratio',[1 1 1],'ydir','normal','xdir','reverse');
+  xlabel('% sampling'); ylabel('% merges'); title(sprintf('are std at %.2f splits',split_percs(i)));
+end
