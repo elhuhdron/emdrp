@@ -378,8 +378,11 @@ p.p_resample = 0;
 % p.p_resample = 0.01;
 
 % set to < 1 for subsampling sensitivity tests
-%p.skel_subsample_perc = 1;
-p.skel_subsample_perc = 0.2;
+p.skel_subsample_perc = 1;
+%p.skel_subsample_perc = 0.2;
+
+% feature to estimate neurite diameters at error free edges
+p.estimate_diameters = true;
 
 % usually set these two to true for interpolation, but false for normal
 % set this to true to remove non-ICS nodes from polluting the rand error

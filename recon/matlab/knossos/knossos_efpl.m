@@ -318,7 +318,7 @@ for prm=1:o.nparams
   [are,prec,rec,ri,ari] = getRandErrors(m_ij, nnodes); 
   o.are_precrec(prm,:) = [rec prec]; o.are(prm) = are; o.ri(prm) = ri; o.ari(prm) = ari;
   
-  %% second pass over all edges for all skeletons along the actual skeleton paths to get errror free path lengths.
+  %% second pass over all edges for all skeletons along the actual skeleton paths to get error free path lengths.
   fprintf(1,'\tcomputing split/merger efpl by traversing trees\n'); t = now;
   [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p, edge_split, label_merged, nodes_to_labels, -1);
   o.efpls(prm,:) = efpl; o.efpl_thing_ptrs(prm,:,:) = efpl_thing_ptr; 
@@ -335,6 +335,76 @@ for prm=1:o.nparams
   end
   display(sprintf('\t\tmean split/merger error rate %.4f %.4f',o.error_rates(prm,1),o.error_rates(prm,2)));
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
+  
+  %% optionally estimate neurite diameter at error free edges
+  if p.estimate_diameters
+    % get all the bounding boxes for the label data
+    props = regionprops(Vlbls, 'boundingbox');
+    
+    % first method, borrowed code from knossos_skel_to_gipl (old method efpl which rasterized the knossos skeletons).
+    %   (1) get line segment describing the edge
+    %   (2) get plane perpendicular to line segment
+    %   (3) intersect the supervoxel with the plane
+    %   (4) get diameter as major axis of supervoxel intersected with plane
+    pass = 3; % which pass to use for error free, 3 is split or merger
+    minnormal = 1e-4;
+    dx = o.scale*10;
+    % iterate over skeletons
+    for n=1:o.nThings
+      if o.empty_things_use(n), continue; end
+      
+      % iterate over edges
+      for e=1:o.nedges(n)
+        if ~o.edges_use{n}(e), continue; end
+        if ~o.error_free_edges{prm,pass}{n}(e), continue; end
+        n1 = o.info(n).edges(e,1); n2 = o.info(n).edges(e,2); % current nodes involved in this edge
+
+        assert( nodes_to_labels{n}(n1) == nodes_to_labels{n}(n2) ); % not an error free edge
+        lbl = nodes_to_labels{n}(n1);
+
+        % crop out the supervoxel and get points that define the supervoxel
+        corner = round(props(lbl).BoundingBox(1:3)); rng = round(props(lbl).BoundingBox(4:6));
+        pmin = corner; pmax = pmin + rng - 1;
+        bwcrp = (Vlbls(pmin(1):pmax(1),pmin(2):pmax(2),pmin(3):pmax(3)) == lbl);
+        [x,y,z] = ind2sub(rng,find(bwcrp(:)));
+        x = (x - p.matlab_base(1))*o.scale(1); 
+        y = (y - p.matlab_base(2))*o.scale(2); 
+        z = (z - p.matlab_base(3))*o.scale(3);
+        srng = rng.*o.scale; npts = length(x);
+
+        % get points the define this edge
+        n1pt = (o.info(n).nodes(n1,1:3) - p.knossos_base - o.loadcorner - corner).*o.scale;
+        n2pt = (o.info(n).nodes(n2,1:3) - p.knossos_base - o.loadcorner - corner).*o.scale;
+
+        % create the plane orthgonal to the edge within cropped area
+        normal = n1pt - n2pt; d = -sum(n2pt .* normal); assert(any(abs(normal)>minnormal));
+        if normal(3) > minnormal
+          [xx,yy] = ndgrid(0:dx(1):srng(1),0:dx(2):srng(2));
+          zz = -(normal(1)*xx + normal(2)*yy + d)/normal(3);
+          %sel = (crpz <= -(normal(1)*crpx + normal(2)*crpy + d)/normal(3));
+        elseif normal(2) > minnormal
+          [xx,zz] = ndgrid(0:dx(1):srng(1),0:dx(3):srng(3));
+          yy = -(normal(1)*xx + normal(3)*zz + d)/normal(2);
+          %sel = (crpy <= -(normal(1)*crpx + normal(3)*crpz + d)/normal(2));
+        else
+          [yy,zz] = ndgrid(0:dx(2):srng(2),0:dx(3):srng(3));
+          xx = -(normal(2)*yy + normal(3)*zz + d)/normal(1);
+          %sel = (crpx <= -(normal(2)*crpy + normal(3)*crpz + d)/normal(1));
+        end
+        
+        % calculate distance between supervoxel points and plane
+        P = [x y z; xx(:) yy(:) zz(:)];
+        distance_matrix = squareform(pdist(P));
+        
+        
+      end
+        
+    end
+    
+    % second method, calculate diameter using bwdistgeodesic on supervoxel versus rasterized skeleton.
+    %   xxx - get code from tmp_avgdia_vs_avgfreePL.m to implement this
+    %   xxx - not clear which method is better, other methods? 3d ellipsoid filling method?
+  end
   
   %% optionally resample over the skeletons to get confidence intervals
   fprintf(1,'\tresample skeletons to get confidence intervals\n'); t = now;
