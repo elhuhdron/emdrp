@@ -73,33 +73,33 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-% % with almost no ECS
-% i = 1;
-% pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
-% pdata(i).chunk = [12 14 2];
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
-% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_supervoxels.h5';
-% pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_probs.h5';
-% pdata(i).name = 'none';
-% pdata(i).subgroups = {'with_background'};
-% pdata(i).segparam_attr = 'thresholds';
-% pdata(i).nlabels_attr = 'types_nlabels';
-% 
-% % with ~20% ECS
-% i = 2;
-% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-% pdata(i).chunk = [16 17 0];
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
-% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
-% pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
-% pdata(i).name = 'huge';
-% pdata(i).subgroups = {'with_background'};
-% pdata(i).segparam_attr = 'thresholds';
-% pdata(i).nlabels_attr = 'types_nlabels';
+% with almost no ECS
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).chunk = [12 14 2];
+%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
+%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
+pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_supervoxels.h5';
+pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_probs.h5';
+pdata(i).name = 'none';
+pdata(i).subgroups = {'with_background'};
+pdata(i).segparam_attr = 'thresholds';
+pdata(i).nlabels_attr = 'types_nlabels';
+
+% with ~20% ECS
+i = 2;
+pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+pdata(i).chunk = [16 17 0];
+%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
+%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
+pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
+pdata(i).name = 'huge';
+pdata(i).subgroups = {'with_background'};
+pdata(i).segparam_attr = 'thresholds';
+pdata(i).nlabels_attr = 'types_nlabels';
 
 % % k0725
 % i = 1;
@@ -306,41 +306,41 @@ pdata = struct;  % input parameters depending on dataset
 %   end
 % end
 
-% sensitivity normal split merger tiling.
-merge_percs = 0:0.02:0.2;
-split_percs = 0:0.08:0.8;
-[merge, split]=ndgrid(merge_percs,split_percs); 
-nruns = 11;
-for x = 1:nruns
-  strb = sprintf('huge%d',x);
-  %strb = sprintf('none%d',x);
-
-  for y = 1:length(merge_percs)
-    i = length(merge_percs)*(x-1) + y;
-
-    pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-    %pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
-
-    pdata(i).chunk = [16 17 0];
-    %pdata(i).chunk = [12 14 2];
-    
-    %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-    pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
-    %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-    %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-    %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
-    %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
-
-    pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
-    %pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0027/tmp%d.h5',x);
-
-    pdata(i).name = [strb sprintf(' %g',merge_percs(y))];
-    pdata(i).subgroups = {'perc_merge_split'};
-    pdata(i).segparam_attr = '';
-    pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
-    pdata(i).nlabels_attr = '';
-  end
-end
+% % sensitivity normal split merger tiling.
+% merge_percs = 0:0.02:0.2;
+% split_percs = 0:0.08:0.8;
+% [merge, split]=ndgrid(merge_percs,split_percs); 
+% nruns = 11;
+% for x = 1:nruns
+%   strb = sprintf('huge%d',x);
+%   %strb = sprintf('none%d',x);
+% 
+%   for y = 1:length(merge_percs)
+%     i = length(merge_percs)*(x-1) + y;
+% 
+%     pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+%     %pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+% 
+%     pdata(i).chunk = [16 17 0];
+%     %pdata(i).chunk = [12 14 2];
+%     
+%     pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+%     %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
+%     %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+%     %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+%     %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
+%     %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
+% 
+%     pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0007/tmp%d.h5',x);
+%     %pdata(i).lblsh5 = sprintf('/Data/watkinspv/sensitivity/M0027/tmp%d.h5',x);
+% 
+%     pdata(i).name = [strb sprintf(' %g',merge_percs(y))];
+%     pdata(i).subgroups = {'perc_merge_split'};
+%     pdata(i).segparam_attr = '';
+%     pdata(i).segparams = {round(merge(y,:),8) round(split(y,:),8)};
+%     pdata(i).nlabels_attr = '';
+%   end
+% end
 
 
 
@@ -420,5 +420,5 @@ end
 
 % save the results
 %save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');
-save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');
-%save('/home/watkinspv/Data/efpl/efpl_paper_and_xyz_crop.mat','p','pdata','o');
+%save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat','p','pdata','o');

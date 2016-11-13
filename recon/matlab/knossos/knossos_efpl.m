@@ -265,6 +265,8 @@ o.are_CI = zeros(o.nparams,2); o.are_precrec_CI = zeros(o.nparams,2,2);
 o.nSMs_CI = zeros(o.nparams,2,2); o.nSMs_segEM_CI = zeros(o.nparams,2,2);
 o.ri_CI = zeros(o.nparams,2); o.ari_CI = zeros(o.nparams,2);
 o.error_rate_CI = zeros(o.nparams,p.npasses_edges,2); o.eftpl_CI = zeros(o.nparams,p.npasses_edges,2);
+% only calculate for a single error free pass (i.e. 3, no split or merger)
+o.error_free_diameters = cell(o.nparams); o.error_free_deviations = cell(o.nparams); 
 
 for prm=1:o.nparams
   
@@ -338,9 +340,8 @@ for prm=1:o.nparams
   
   %% optionally estimate neurite diameter at error free edges
   if p.estimate_diameters
-    % get all the bounding boxes for the label data
-    props = regionprops(Vlbls, 'boundingbox');
-    
+    fprintf(1,'\testimating diameters at error free edges\n'); t = now;
+
     % first method, borrowed code from knossos_skel_to_gipl (old method efpl which rasterized the knossos skeletons).
     %   (1) get line segment describing the edge
     %   (2) get plane perpendicular to line segment
@@ -348,9 +349,24 @@ for prm=1:o.nparams
     %   (4) get diameter as major axis of supervoxel intersected with plane
     pass = 3; % which pass to use for error free, 3 is split or merger
     minnormal = 1e-4;
-    dx = o.scale*10;
+    % xxx - distance to plane method doesn't work, see below
+    %dx = o.scale*10; dthr = sqrt(sum(o.scale.^2))*10; % worked for debug using sensitivity simulated labels
+    %dx = o.scale/2; dthr = min(o.scale)/2; % for realistic supervoxels
+    dx = o.scale/4;
+    
+    % getting bounding boxes is slow for larger volumes, so only do it if we know there are error free edges available
+    if any(o.error_rates(prm,pass) < 1)
+      % xxx - regionprops becomes painfully slow for large numbers of supervoxels
+      % % get all the bounding boxes for the label data
+      % props = regionprops(Vlbls, 'boundingbox');
+      [label_mins, label_maxs] = find_objects_mex(uint32(Vlbls), uint32(nlabels));
+      %assert( all(label_mins(:) > 0) && all(all(label_maxs <= repmat(size(Vlbls),[nlabels 1])')) );
+    end
+    
     % iterate over skeletons
+    o.error_free_diameters{prm} = cell(1,o.nThings); o.error_free_deviations{prm} = cell(1,o.nThings);
     for n=1:o.nThings
+      o.error_free_diameters{prm}{n} = nan(o.nedges(n),3); o.error_free_deviations{prm}{n} = nan(o.nedges(n),3);
       if o.empty_things_use(n), continue; end
       
       % iterate over edges
@@ -363,48 +379,102 @@ for prm=1:o.nparams
         lbl = nodes_to_labels{n}(n1);
 
         % crop out the supervoxel and get points that define the supervoxel
-        corner = round(props(lbl).BoundingBox(1:3)); rng = round(props(lbl).BoundingBox(4:6));
-        pmin = corner; pmax = pmin + rng - 1;
+        % % old method with regionprops
+        % corner = round(props(lbl).BoundingBox(1:3)); rng = round(props(lbl).BoundingBox(4:6));
+        % % xxx - matlab flipping xy like it loves to do, not documented, hopefully doesn't change in future release
+        % corner = corner([2 1 3]); rng = rng([2 1 3]);
+        % pmin = corner; pmax = pmin + rng - 1;
+        pmin = label_mins(:,lbl)'; pmax = label_maxs(:,lbl)';
+        corner = double(pmin); rng = double(pmax - pmin + 1); srng = rng.*o.scale;
         bwcrp = (Vlbls(pmin(1):pmax(1),pmin(2):pmax(2),pmin(3):pmax(3)) == lbl);
-        [x,y,z] = ind2sub(rng,find(bwcrp(:)));
-        x = (x - p.matlab_base(1))*o.scale(1); 
-        y = (y - p.matlab_base(2))*o.scale(2); 
-        z = (z - p.matlab_base(3))*o.scale(3);
-        srng = rng.*o.scale; npts = length(x);
+        assert(all(rng == size(bwcrp)));
 
-        % get points the define this edge
-        n1pt = (o.info(n).nodes(n1,1:3) - p.knossos_base - o.loadcorner - corner).*o.scale;
-        n2pt = (o.info(n).nodes(n2,1:3) - p.knossos_base - o.loadcorner - corner).*o.scale;
+        % get points the define this edge, corner is one based (matlab) so don't subtract knossos_base
+        n1pt = (o.info(n).nodes(n1,1:3) - o.loadcorner - corner).*o.scale;
+        n2pt = (o.info(n).nodes(n2,1:3) - o.loadcorner - corner).*o.scale;
 
         % create the plane orthgonal to the edge within cropped area
-        normal = n1pt - n2pt; d = -sum(n2pt .* normal); assert(any(abs(normal)>minnormal));
-        if normal(3) > minnormal
+        normal = n1pt - n2pt; d = -sum((n1pt+n2pt)/2 .* normal); assert(any(abs(normal)>minnormal));
+        if normal(3) > minnormal || normal(3) < -minnormal
           [xx,yy] = ndgrid(0:dx(1):srng(1),0:dx(2):srng(2));
           zz = -(normal(1)*xx + normal(2)*yy + d)/normal(3);
-          %sel = (crpz <= -(normal(1)*crpx + normal(2)*crpy + d)/normal(3));
-        elseif normal(2) > minnormal
+        elseif normal(2) > minnormal || normal(2) < -minnormal
           [xx,zz] = ndgrid(0:dx(1):srng(1),0:dx(3):srng(3));
           yy = -(normal(1)*xx + normal(3)*zz + d)/normal(2);
-          %sel = (crpy <= -(normal(1)*crpx + normal(3)*crpz + d)/normal(2));
         else
           [yy,zz] = ndgrid(0:dx(2):srng(2),0:dx(3):srng(3));
           xx = -(normal(2)*yy + normal(3)*zz + d)/normal(1);
-          %sel = (crpx <= -(normal(2)*crpy + normal(3)*crpz + d)/normal(1));
         end
+
+        % xxx - this method takes way too much memory for large supervoxels, rasterize the plane instead
+        % % convert supervoxel to points
+        % [x,y,z] = ind2sub(rng,find(bwcrp(:)));
+        % x = (x - p.matlab_base(1))*o.scale(1);
+        % y = (y - p.matlab_base(2))*o.scale(2);
+        % z = (z - p.matlab_base(3))*o.scale(3);
+        % pts = [x y z]; npts = length(x);
+        % % calculate distance between supervoxel points and plane
+        % distance_matrix = squareform(pdist([pts; xx(:) yy(:) zz(:)]));
+        % distance_matrix = distance_matrix(1:npts,npts+1:end);
+        % % take all points below a threshold distance from the plane as the intersected points
+        % [inds,~] = find(distance_matrix < dthr); clear distance_matrix
+        % % take unique as there could be multiple plane points below distance threshold to same supervoxel point
+        % pts = pts(labels_unique_nonzeros(inds),:); npts = size(pts,1);
         
-        % calculate distance between supervoxel points and plane
-        P = [x y z; xx(:) yy(:) zz(:)];
-        distance_matrix = squareform(pdist(P));
-        
-        
-      end
-        
-    end
+        % rasterize the plane
+        plane_subs = round(bsxfun(@rdivide,[xx(:) yy(:) zz(:)],o.scale));
+        % remove out of bounds
+        plane_subs = plane_subs(~any(bsxfun(@gt, plane_subs, rng),2),:); 
+        plane_subs = plane_subs(~any(plane_subs < 1,2),:);         
+        plane_sel = false(rng); plane_sel(sub2ind(rng,plane_subs(:,1),plane_subs(:,2),plane_subs(:,3))) = true;
+
+        % intersect rasterized plane with supervoxel and convert back to points again.
+        % super special case should be rare for normal contiguous supervoxels, if intersection is empty.
+        inds = find(bwcrp(:) & plane_sel(:));
+        if ~isempty(inds)
+          % convert rasterized intersection of plane and supervoxel to points
+          [x,y,z] = ind2sub(rng,inds);
+          x = (x - p.matlab_base(1))*o.scale(1);
+          y = (y - p.matlab_base(2))*o.scale(2);
+          z = (z - p.matlab_base(3))*o.scale(3);
+          pts = [x y z]; npts = length(x);
+          
+          % svd on centered points to get principal axes.
+          % in matlab V is returned normal (not transposed), so "eigenvectors" are along columns,
+          %   i.e. V(:,1) V(:,2) V(:,3)
+          C = mean(pts,1); [~,S,V] = svd(bsxfun(@minus,pts,C),0); s = sqrt(diag(S).^2/(npts-1));
+          
+          % rotate the points to align on cartesian axes
+          ptsR = bsxfun(@plus,(V'*bsxfun(@minus,pts',C')),C')';
+          
+          % % for debug / sanity check
+          % figure(1234);clf; scatter3(pts(:,1),pts(:,2),pts(:,3)); hold on; Vs = bsxfun(@times,V,s'); 
+          % set(gca,'dataaspectratio',[1 1 1]); scatter3(ptsR(:,1),ptsR(:,2),ptsR(:,3),'g'); %surf(xx,yy,zz);
+          % plot3([n1pt(1) n2pt(1)],[n1pt(2) n2pt(2)],[n1pt(3) n2pt(3)]); scatter3(C(1),C(2),C(3),'r');
+          % a=bsxfun(@plus,Vs,C'); b=repmat(C',[1 3]); ci = get(gca,'colororderindex');
+          % for i=1:3, plot3([a(1,i) b(1,i)], [a(2,i) b(2,i)], [a(3,i) b(3,i)]); end
+          % a=bsxfun(@plus,-Vs,C'); b=repmat(C',[1 3]); set(gca,'colororderindex',ci);
+          % for i=1:3, plot3([a(1,i) b(1,i)], [a(2,i) b(2,i)], [a(3,i) b(3,i)]); end
+          
+          % take full range of bounding box for rotated points as diameters.
+          % z-diameter should be close to zero, as we intersected with a plance, but keep for prosperity.
+          % also save the deviations in each direction (from singular values).
+          for i=1:3
+            o.error_free_diameters{prm}{n}(e,i) = max(ptsR(:,i)) - min(ptsR(:,i));
+            o.error_free_deviations{prm}{n}(e,i) = s(i);
+          end
+        else % if plane normal to edge does not intersect supervoxel
+          o.error_free_diameters{prm}{n}(e,:) = [0 0 0];
+          o.error_free_deviations{prm}{n}(e,:) = [0 0 0];
+        end
+      end % for each edge
+    end % for each skeleton
+    display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
     
     % second method, calculate diameter using bwdistgeodesic on supervoxel versus rasterized skeleton.
     %   xxx - get code from tmp_avgdia_vs_avgfreePL.m to implement this
     %   xxx - not clear which method is better, other methods? 3d ellipsoid filling method?
-  end
+  end % if estimate diameters
   
   %% optionally resample over the skeletons to get confidence intervals
   fprintf(1,'\tresample skeletons to get confidence intervals\n'); t = now;
@@ -882,3 +952,11 @@ function [are,prec,rec,ri,ari] = getRandErrors(m_ij, n)
   are = 1.0 - fScore;
 
 end % getRandErrors
+
+% %% Very simple function for faster version of the horribly inefficient builtin matlab unique 
+% % Get unique nonzero elements. Assume array input and asume non-negative integer elements.
+% 
+% function u = labels_unique_nonzeros(x)
+% x = nonzeros(x); u = zeros(1,max(x)); u(x) = 1; u = find(u);
+% %x = nonzeros(x); u = sparse(x,ones(length(x),1),1,max(x),1); u = find(u); % slower for typical cases
+% end
