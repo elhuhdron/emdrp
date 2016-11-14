@@ -243,7 +243,7 @@ end
 %   after removing nodes outside of the labeled volume. verified that this had < 1% effect on metrics for huge/none ECS.
 % going forward, used a cropped nml file output from knossos_clean_crop.m so that this is not an issue.
 fprintf(1,'\tcomputing best/worse case efpl (no errors / all errors)\n'); t = now;
-[efpl, ~] = labelsWalkEdges(o,p, [], [], [], [0 1]); 
+[efpl, ~, ~] = labelsWalkEdges(o,p, [], [], [], [0 1]); 
 o.efpl_bestcase = efpl{1}; o.efpl_worstcase = efpl{2};
 display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 fprintf(1,'\t\tbest case count  = %d, worst case count = %d\n',length(efpl{1}),length(efpl{2}));
@@ -258,7 +258,7 @@ o.are = zeros(o.nparams,1); o.are_precrec = zeros(o.nparams,2);
 o.ri = zeros(o.nparams,1); o.ari = zeros(o.nparams,1);
 p.npasses_edges = p.npasses_edges;  % xxx - make this more clear somewhere as a top level define?
 o.efpls = cell(o.nparams,p.npasses_edges); o.efpl_thing_ptrs = zeros(o.nparams,o.nThings,p.npasses_edges); 
-o.error_free_edges = cell(o.nparams,p.npasses_edges);
+o.error_free_edges = cell(o.nparams,p.npasses_edges); o.efpl_edges = cell(o.nparams,p.npasses_edges);
 o.eftpl = zeros(o.nparams,o.nThings,p.npasses_edges); o.error_rates = zeros(o.nparams,p.npasses_edges); 
 o.types_nlabels = zeros(o.nparams,2);
 o.are_CI = zeros(o.nparams,2); o.are_precrec_CI = zeros(o.nparams,2,2); 
@@ -322,8 +322,8 @@ for prm=1:o.nparams
   
   %% second pass over all edges for all skeletons along the actual skeleton paths to get error free path lengths.
   fprintf(1,'\tcomputing split/merger efpl by traversing trees\n'); t = now;
-  [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p, edge_split, label_merged, nodes_to_labels, -1);
-  o.efpls(prm,:) = efpl; o.efpl_thing_ptrs(prm,:,:) = efpl_thing_ptr; 
+  [efpl, efpl_thing_ptr, efpl_edges] = labelsWalkEdges(o,p, edge_split, label_merged, nodes_to_labels, -1);
+  o.efpls(prm,:) = efpl; o.efpl_thing_ptrs(prm,:,:) = efpl_thing_ptr; o.efpl_edges(prm,:) = efpl_edges;
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   
   % third pass over all edges for all skeletons along to get edge error metrics.
@@ -681,7 +681,13 @@ end % labelsPassEdges
 %% walk trees using stacks to calculate error free path lengths separately for splits and for mergers.
 % this calculates the efpl along the actual skeletons, not just based on the confusion matrix.
 % turned this into a function for resampling techniques.
-function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_rate)
+% xxx - in retrospect, this function implements graph connected components.
+%   would have been easier to simply remove the error edges, run graph connected components 
+%   and sum the component lengths. 
+% xxx - in order to get "component" identifiers decided to leave this as is for now, decided to simply add this
+%   to the next_nodes stack instead of re-implementing this to use graph connected components.
+function [efpl, efpl_thing_ptr, efpl_edges] = ...
+  labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_rate)
 
   % rand_error_rate is optional, but if specified contains all non-negative entries,
   %   then make a pass for each rand error rate entry.
@@ -695,6 +701,9 @@ function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, 
   % keep track of where each thing starts on the efpl lists
   efpl_thing_ptr = zeros(o.nThings,npasses);
   
+  % feature added after the paper, associated each edge with it's final efpl for it's "connected edges"
+  efpl_edges = cell(1, p.npasses_edges);
+  
   randcnt = 1; rands = rand(1,p.nalloc);  % for rand_error_rate
   nalloc = 5000;   % local allocation max, just for node stacks
   % need to calculate split efpl and merger efpl separately
@@ -703,12 +712,17 @@ function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, 
     for n=1:o.nThings
       if o.empty_things_use(n), continue; end
       efpl_thing_ptr(n,pass) = efpl_cnt(pass)+1;
+      
+      % feature added after the paper, associated each edge with it's final efpl for it's "connected edges".
+      % only do this for error free edges (as error edges either don't count, or count half on two different componets).
+      efpl_edges{pass}{n} = nan(1,o.nedges(n)); edges_comps = zeros(1,o.nedges(n)); ncomps = 0;
 
       % keep updated set of unvisited edges
       edges_unvisited = o.edges_use{n}; cur_edges = o.info(n).edges(edges_unvisited, :);
       % stack to return to nodes when an error has occurred along the current path.
       % second index is to store the half path length of the edge on which the error ocurred.
-      next_nodes = zeros(nalloc,2); next_node_cnt = 0;
+      % third index, added after paper, is the connected component number for this thing
+      next_nodes = zeros(nalloc,3); next_node_cnt = 0;
       % stack to return to branch points when encountered along the current path.
       % error free path length is accumulated as long as cur_nodes stack is not empty.
       cur_nodes = zeros(nalloc,1); cur_node_cnt = 0;
@@ -724,14 +738,15 @@ function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, 
           end_node = find(cur_nodes_hist > 0, 1); assert( ~isempty(end_node) );
         end
         
+        ncomps = ncomps + 1; % start new component (for current thing)
         % push end node (or starting node) onto the next node stack with zero current path length
-        next_node_cnt = next_node_cnt+1; next_nodes(next_node_cnt,:) = [end_node 0];
+        next_node_cnt = next_node_cnt+1; next_nodes(next_node_cnt,:) = [end_node 0 ncomps];
         
         % next node stack keeps track of nodes to continue on after an error has occurred
         while next_node_cnt > 0
           % pop the next node stack
           tmp = next_nodes(next_node_cnt,:); next_node_cnt = next_node_cnt - 1;
-          cur_node = tmp(1); cur_efpl = tmp(2);
+          cur_node = tmp(1); cur_efpl = tmp(2); cur_comp = tmp(3);
 
           % get the remaining edges out of this node
           [cur_node_edges,~] = find(cur_edges==cur_node);
@@ -795,12 +810,16 @@ function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, 
               % update current error free path length with half this edge length
               cur_efpl = cur_efpl + cur_len;
               % push the other node onto the next node stack with half this edge length
-              next_node_cnt = next_node_cnt+1; next_nodes(next_node_cnt,:) = [other_node cur_len];
+              ncomps = ncomps + 1; % edge starting at other node is new component
+              next_node_cnt = next_node_cnt+1; next_nodes(next_node_cnt,:) = [other_node cur_len ncomps];
             else
               % update current error free path length with this edge length
               cur_efpl = cur_efpl + o.edge_length{n}(e);
               % push other node onto current node stack
               cur_node_cnt = cur_node_cnt+1; cur_nodes(cur_node_cnt) = other_node;
+              % save the connected component number for this edge.
+              % only associate components with error free edges (error edges are removed).
+              edges_comps(e) = cur_comp;
             end
             
             % tally that current edge has been visited, udpate current edges
@@ -810,6 +829,8 @@ function [efpl, efpl_thing_ptr] = labelsWalkEdges(o,p,edge_split, label_merged, 
           % add the accumulated error free path length after cur_nodes stack is empty
           efpl_cnt(pass) = efpl_cnt(pass)+1; efpl{pass}(efpl_cnt(pass)) = cur_efpl;
           
+          % associate this efpl with all the error free edges that were involved in it.
+          efpl_edges{pass}{n}(edges_comps==cur_comp) = cur_efpl;
         end % while next node stack
       end % while unvisited edges
 
