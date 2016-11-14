@@ -266,7 +266,7 @@ o.nSMs_CI = zeros(o.nparams,2,2); o.nSMs_segEM_CI = zeros(o.nparams,2,2);
 o.ri_CI = zeros(o.nparams,2); o.ari_CI = zeros(o.nparams,2);
 o.error_rate_CI = zeros(o.nparams,p.npasses_edges,2); o.eftpl_CI = zeros(o.nparams,p.npasses_edges,2);
 % only calculate for a single error free pass (i.e. 3, no split or merger)
-o.error_free_diameters = cell(o.nparams); o.error_free_deviations = cell(o.nparams); 
+o.error_free_diameters = cell(o.nparams,1); o.error_free_deviations = cell(o.nparams,1); 
 
 for prm=1:o.nparams
   
