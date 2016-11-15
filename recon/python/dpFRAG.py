@@ -378,7 +378,7 @@ class dpFRAG(emLabels):
 
     def createFRAG(self, features=True, update=False):
         # get bounding boxes for each supervoxel
-        self.svox_bnd = nd.measurements.find_objects(self.supervoxels)
+        self.svox_bnd = nd.measurements.find_objects(self.supervoxels, self.nsupervox)
 
         # use update to only calculate features for nodes and neighbors in FRAG updated by agglomerate()
         make_outRAG = False
@@ -499,7 +499,7 @@ class dpFRAG(emLabels):
                         # create another bounding box arond the overlap area. this is simply an optimization for the
                         #   mean features, as this will be a smaller cropped area. in addition, used to calculate
                         #   more completex features of the objects and the overlap in the local overlap volume.
-                        obnd = nd.measurements.find_objects(svox_ovlp)[0]
+                        obnd = nd.measurements.find_objects(svox_ovlp,1)[0]
                         # convert bounding box back to entire volume space.
                         aobnd = tuple([slice(x.start+y.start-self.perim[k],
                             x.stop+y.start+self.perim[k]) for x,y,k in zip(obnd,n['pbnd'],range(dpLoadh5.ND))])
@@ -734,7 +734,7 @@ class dpFRAG(emLabels):
                 mapped_gt = np.unique(supervox_to_gt)
 
                 # get bounding boxes for each ground truth
-                gt_bnd = nd.measurements.find_objects(self.gt)
+                gt_bnd = nd.measurements.find_objects(self.gt, self.ngtlbl)
 
                 out = open(self.mapout, 'w')
                 out.write('\nunmapped relabeled GT at bnd (x,y,z with index starting at 1):\n')
