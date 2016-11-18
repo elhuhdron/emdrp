@@ -34,6 +34,10 @@
 %   separately for splits and mergers as total path length along edges before an
 %   error occurs. optionally add half path length to current and next efpls when
 %   an error is encountered at an edge.
+% xxx - realized in retrospect that this is very close to graph connected components
+%   with the error edges removed. implementation left as a two stack graph traversal
+%   that essentially implements connected components. possible might need this anyways
+%   so that the error "half edges" can work (p.count_half_error_edges)
 %
 % thing is knossos-speak for a connected skeleton
 

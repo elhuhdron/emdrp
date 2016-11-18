@@ -114,16 +114,22 @@
 % %load_indices = [2 3 4 3 4 1]; % none
 % load_indices = [2 3 4 1 2 1 2 3 4 3 4 1]; % all
 
-% metric sensitivity
-load_files = repmat({'/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat'},[1 121]);
-load_indices = 1:121; 
+% % metric sensitivity
+% load_files = repmat({'/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big.mat'},[1 121]);
+% load_indices = 1:121; 
 
 % load_files = {
-%   '~/Documents/Data/em/efpl/efpl_nointerp_k0725.mat'
-%   '~/Documents/Data/em/efpl/efpl_interp_k0725.mat'
-%   '~/Documents/Data/em/efpl/efpl_interp_k0725_agglo.mat'
+%   '/home/watkinspv/Data/efpl/efpl_nointerp_k0725.mat'
+%   '/home/watkinspv/Data/efpl/efpl_interp_k0725.mat'
+%   '/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo.mat'
 % };
 % load_indices = [1 1 1];
+
+load_files = {
+  '/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat'
+  '/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat'
+};
+load_indices = [1 2];
 
 
 
@@ -166,12 +172,18 @@ pplot.dndx = 5; pplot.ndx = 0+pplot.dndx/2:pplot.dndx:2000-pplot.dndx/2; pplot.n
 pplot.param_name = '';
 pplot.dxticksel = 3;
 
+% plot the efpls related metrics (were not used in paper)
+pplot.plot_efpl_metrics = false;
+
+% plot density of error free path length versus error free diameter scatters (were not used in paper)
+pplot.plot_efpl_diameters = false;
+
 % this parameter plots the are metric as the sum of 1 - prec/rec instead of typical 1 - f-score
 pplot.are_sum = false;
 
 % whether to return the intermediate variables used for plotting in output struct (empty for no)
-%pplot.save_plot_results = '';
-pplot.save_plot_results = '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2_meta.mat';
+pplot.save_plot_results = '';
+%pplot.save_plot_results = '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2_meta.mat';
 
 pplot.baseno = 3000;
 

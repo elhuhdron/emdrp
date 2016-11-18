@@ -3,6 +3,9 @@ function po = knossos_efpl_plot(pdata,o,p)
 
 useColorOrder = ~verLessThan('matlab','8.4');
 
+% remove really small internode distances that are just from dropping nodes right next to each other
+minPL = 10^(p.plx(1)-p.dplx(1)/2);
+
 po = struct;
 ndatasets = length(pdata);
 % use old name for parameter dimension, typically thresholds.
@@ -26,7 +29,6 @@ for i = 1:ndatasets
   internode_lengths{i} = o{i}.efpl_worstcase / 1000;
   
   % remove really small internode distances that are just from dropping nodes right next to each other
-  minPL = 10^(p.plx(1)-p.dplx(1)/2);
   path_lengths{i} = path_lengths{i}(path_lengths{i} >= minPL);
   internode_lengths{i} = internode_lengths{i}(internode_lengths{i} >= minPL);
   
@@ -55,7 +57,6 @@ are_CI = nan(ndatasets,nparams,2); are_precrec_CI = nan(ndatasets,nparams,2,2);
 combined_eftpl = nan(ndatasets,nparams); combined_eftpl_CI = nan(ndatasets,nparams,2);
 norm_params = nan(ndatasets,nparams);
 nlabels = nan(ndatasets,nparams);
-
 for k = 1:ndatasets
   nthr = length(params{k}); ind = 1:nthr;
   split_er(k,ind) = o{k}.error_rates(ind,1);
@@ -105,25 +106,95 @@ pl_pdf = pl_hist./repmat(sum(pl_hist,2),[1 p.nplx]);
 inpl_pdf = inpl_hist./repmat(sum(inpl_hist,2),[1 p.nplx]);
 pl_cdf = cumsum(pl_pdf,2); inpl_cdf = cumsum(inpl_pdf,2);
 
-% pl_cdf_roc = cumsum(pl_hist_roc,2)./repmat(sum(pl_hist_roc,2),[1 p.nplxs]); 
-% inpl_cdf_roc = cumsum(inpl_hist_roc,2)./repmat(sum(inpl_hist_roc,2),[1 p.nplxs]); 
-
 nd_pdf = node_hist./repmat(sum(node_hist,2),[1 p.nndx]); nd_cdf = cumsum(nd_pdf,2);
 
 % % get actual median above
 % [~,k] = min(abs(pl_cdf - 0.5),[],2); pl_median = p.plx(k);
 % [~,k] = min(abs(pl_cdf_roc - 0.5),[],2); pl_median_roc = p.plxs(k);
 
-% max_auroc = zeros(1,ndatasets);
-% for i = 1:ndatasets
-%   max_auroc(i) = sum(inpl_cdf_roc(i,1:end-1).*diff(pl_cdf_roc(i,:)));
-% end
+pl_cdf_roc = cumsum(pl_hist_roc,2)./repmat(sum(pl_hist_roc,2),[1 p.nplxs]); 
+inpl_cdf_roc = cumsum(inpl_hist_roc,2)./repmat(sum(inpl_hist_roc,2),[1 p.nplxs]); 
+
+
+if p.plot_efpl_metrics
+  max_auroc = zeros(1,ndatasets);
+  for i = 1:ndatasets
+    max_auroc(i) = sum(inpl_cdf_roc(i,1:end-1).*diff(pl_cdf_roc(i,:)));
+  end
+  
+  % compute aurocs and medians for combined efpls, normalize by best and worst cases
+  % compute aurocs for combined efpl distribution versus best case path length distribution
+  combined_efpl_norm_med = nan(ndatasets,nparams);
+  combined_efpl_med = nan(ndatasets,nparams);
+  combined_efpl_norm_auroc = nan(ndatasets,nparams);
+  for i = 1:ndatasets
+    nthr = length(params{i}); ind = 1:nthr;
+    for k=ind
+      cur_efpls = o{i}.efpls{k,3}/1000; cur_efpls = cur_efpls(cur_efpls >= minPL);
+      
+      combined_efpl_med(i,k) = median(cur_efpls);
+      %   pl_actual_median(i) = median(path_lengths{i});
+      %   inpl_actual_median(i) = median(internode_lengths{i});
+      % make norm efpl med range:
+      %   1 (median same as skeleton path lengths, best case, distribution)
+      %   0 (median same as half path lengths)
+      tmp = (combined_efpl_med(i,k) - inpl_actual_median(i)) / (pl_actual_median(i) - inpl_actual_median(i));
+      %tmp = log10(tmp + 1e-10);
+      %n = 2; logn = 10^-n; tmp(tmp < logn) = logn; tmp = (log10(tmp) + n) / n;
+      combined_efpl_norm_med(i,k) = tmp;
+      
+      tmp = hist(log10(cur_efpls), p.plxs); tmp = cumsum(tmp)./sum(tmp);
+      % make norm auroc range:
+      %   1 (completely overlapping with skeleton path lengths, best case, distribution)
+      %   0 (completely overlapping with half path lengths, worst case, normalize by worst case auroc)
+      tmp = 1 - 2*(sum(tmp(1:end-1).*diff(pl_cdf_roc(i,:))) - 0.5) / max_auroc(i);
+      %tmp = log10(tmp + 1e-10);
+      %n = 2; logn = 10^-n; tmp(tmp < logn) = logn; tmp = (log10(tmp) + n) / n;
+      combined_efpl_norm_auroc(i,k) = tmp;
+    end
+    
+    % normalize these metrics to [0 1] on a log scale, per dataset.
+    % these metrics are too sensitive on a linear scale.
+    % this is why they were not used in the ECS paper.
+    tmp = combined_efpl_norm_med(i,:);
+    n = min(tmp(tmp>0)); tmp(tmp < n) = n; logn = log10(n); tmp = -(log10(tmp) - logn) / logn;
+    combined_efpl_norm_med(i,:) = tmp;
+    tmp = combined_efpl_norm_auroc(i,:);
+    n = min(tmp(tmp>0)); tmp(tmp < n) = n; logn = log10(n); tmp = -(log10(tmp) - logn) / logn;
+    combined_efpl_norm_auroc(i,:) = tmp;
+  end
+  
+end % if plot efpl metrics
+
+if p.plot_efpl_diameters
+  % make 3 density plots, less than optimal threshold, at optimal threshold, greater than optimal threshold
+  [~,mi] = max(combined_eftpl,[],2); % threshold on max eftpl
+  error_free_diameters = cell(ndatasets,3); efpl_edges = cell(ndatasets,3);
+  error_free_dia_edge_cnt = zeros(ndatasets,3); error_free_dia_total_cnt = zeros(ndatasets,3);
+  error_free_diameter_ithr = mi;
+  for k = 1:ndatasets
+    nthr = length(params{k}); inds = {1:mi(k)-1 mi(k) mi(k)+1:nthr};
+    for j=1:length(inds)
+      for i=inds{j}
+        tmp = [o{k}.error_free_diameters{i}]; tmp = vertcat(tmp{:});
+        error_free_diameters{k,j} = [error_free_diameters{k,j} tmp(:,1)'];
+        
+        tmp = [o{k}.efpl_edges{i,3}];
+        efpl_edges{k,j} = [efpl_edges{k,j} tmp{:}];
+      end
+      
+      assert( ~any(xor(isnan(error_free_diameters{k,j}), isnan(efpl_edges{k,j}))) )
+      sel = ~isnan(error_free_diameters{k,j});
+      error_free_diameters{k,j} = error_free_diameters{k,j}(sel); efpl_edges{k,j} = efpl_edges{k,j}(sel);
+      error_free_dia_edge_cnt(k,j) = sum(sel); error_free_dia_total_cnt(k,j) = size(sel,2);
+    end
+  end
+end % if plotting error free neurite diameters
+
+
 
 ticksel = 1:p.dxticksel:nparams; if ticksel(end) ~= nparams, ticksel = [ticksel nparams]; end
 baseno = p.baseno; figno = 0;
-
-
-
 
 if ~isempty(p.save_plot_results)
   save_vars = {
@@ -180,7 +251,7 @@ title(sprintf('none: %d skels, median %.2f (%.4f)\nhuge: %d skels, median %.2f (
   nskels(1),pl_actual_median(1),inpl_actual_median(1),nskels(2),pl_actual_median(2),inpl_actual_median(2),pt,pin,...
   pl_actual_iqr(1,1),pl_actual_iqr(1,2),pl_actual_iqr(2,1),pl_actual_iqr(2,2)));
 
-% subplot(2,2,3);
+% subplot(2,2,4);
 % plot(pl_cdf_roc(1,:),inpl_cdf_roc(1,:));
 % hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % plot(pl_cdf_roc(2,:),inpl_cdf_roc(2,:));
@@ -261,6 +332,59 @@ set(gca,'ylim',[-0.025 0.8]); box off
 title(sprintf('maxd=%g\n%g %g\n@split edges=%g %g',abs(m(2)-m(1)),m(1),m(2),...
   split_er(1,mi(1)),split_er(2,mi(2))));
 
+
+
+
+
+if p.plot_efpl_metrics
+  
+  figure(baseno+figno); figno = figno+1; clf
+  subplot(1,2,1);
+  plot(norm_params',combined_efpl_norm_med');
+  hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+  % hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % plot(norm_params',squeeze(combined_eftpl_CI(:,:,1))','--');
+  % hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % plot(norm_params',squeeze(combined_eftpl_CI(:,:,2))','--');
+  set(gca,'plotboxaspectratio',[1 1 1]);
+  ylabel('normalized median efpl'); box off
+  if p.param_name
+    set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
+    xlabel(p.param_name)
+  else
+    xlabel('norm parameter')
+  end
+  [m,mi] = max(combined_efpl_norm_med,[],2);
+  %set(gca,'ylim',[-0.00025 0.01]);
+  %set(gca,'ylim',[-0.025 1]);
+  %set(gca,'yscale','log');
+  title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+    params{1}(mi(1)),params{2}(mi(2))));
+  
+  subplot(1,2,2);
+  plot(norm_params',combined_efpl_norm_auroc');
+  hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+  % hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % plot(norm_params',squeeze(combined_eftpl_CI(:,:,1))','--');
+  % hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % plot(norm_params',squeeze(combined_eftpl_CI(:,:,2))','--');
+  set(gca,'plotboxaspectratio',[1 1 1]);
+  ylabel('normalized auroc'); box off;
+  if p.param_name
+    set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
+    xlabel(p.param_name)
+  else
+    xlabel('norm parameter')
+  end
+  [m,mi] = max(combined_efpl_norm_auroc,[],2);
+  %set(gca,'ylim',[-0.0025 0.1]);
+  %set(gca,'ylim',[-0.025 1]);
+  %set(gca,'yscale','log');
+  title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+    params{1}(mi(1)),params{2}(mi(2))));
+end
 
 
 
@@ -377,6 +501,37 @@ plot(lnlabels(2,mi(2)),combined_eftpl(2,mi(2)),'x');
 title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
   nlabels(1,mi(1)),nlabels(2,mi(2))));
 
+
+
+if p.plot_efpl_diameters
+  figure(baseno+figno); figno = figno+1; clf
+  nc=64; colormap([1 1 1; jet(nc)]);
+
+  ebins_efpl = 2:0.1:5; bins_efpl = ebins_efpl(1:end-1) + (ebins_efpl(2)-ebins_efpl(1))/2;
+  ebins_dia = 1.5:0.1:4.5; bins_dia = ebins_dia(1:end-1) + (ebins_dia(2)-ebins_dia(1))/2;
+  
+  % only plot the first few datasets
+  nplot = 2;
+  for i=1:min([nplot ndatasets])
+    % make 3 density plots, less than optimal threshold, at optimal threshold, greater than optimal threshold
+    %   error_free_diameters = cell(ndatasets,3); efpl_edges = cell(ndatasets,3);
+    %   error_free_diameter_ithr = mi;
+    strs = {sprintf('thr < %g, %s',params{i}(error_free_diameter_ithr(i)),names{i}) ...
+      sprintf('thr == %g max eftpl',params{i}(error_free_diameter_ithr(i))) ...
+      sprintf('thr > %g',params{i}(error_free_diameter_ithr(i)))};
+    for j=1:3
+      subplot(nplot,3,(i-1)*3 + j)
+      N = histcounts2(log10(error_free_diameters{i,j}),log10(efpl_edges{i,j}),ebins_dia,ebins_efpl);
+      maxN = max(N(:)); N = N/maxN*(nc-1); sel = (N > 0); N(sel) = fix(N(sel))+2; N(~sel) = 1;
+      image(bins_dia,bins_efpl,N'); hc = colorbar;
+      set(gca,'dataaspectratio',[1 1 1],'ydir','normal');
+      xlabel('log10 diameters (nm)'); ylabel('log10 efpl (nm)');
+      set(hc, 'yticklabel', [0 linspace(1,maxN,nc-1)/error_free_dia_total_cnt(i,j)*100], 'ytick',(0:8:nc)+1);
+      title(hc,'% edges')
+      title(strs{j});
+    end
+  end
+end
 
 
 if isempty(p.meta_param), return; end
