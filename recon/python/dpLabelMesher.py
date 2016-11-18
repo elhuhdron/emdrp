@@ -52,21 +52,14 @@ class dpLabelMesher(emLabels):
 
     # type to use for all processing operations
     PDTYPE = np.double
-    #DTYPE = np.uint16
-    DTYPE_MAX = 65535
     RAD = 5  # for padding
-    #doplots = False  # for debug, added as argument
 
-    # moved seed_range back to command line
-    #seed_range = [-1,-1]    # for normal use
-    #seed_range = [-1,10]    # for debug
-    print_every = 500
+    print_every = 500 # modulo for print update
 
-    SEED_DTYPE = np.uint32
-    #VERTEX_DTYPE = np.float32
-    #FACE_DTYPE = np.uint32
-    VERTEX_DTYPE = np.float16   # use half precision floating point to save space
-    FACE_DTYPE = np.uint16      # assumes there are less than 64k vertices for each supervoxel
+    VERTEX_DTYPE = np.uint16    # decided to use fixed precision to represent vertices, sets max vertex value
+    VERTEX_BPLACES = 0          # binary place to fix vertices to (precision depends on if set_voxel_scale)
+    FACE_DTYPE = np.uint32      # sets max number of vertices
+    BOUNDS_DTYPE = np.uint32    # the bounding box types (sets max x/y/z coordinates)
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -109,6 +102,7 @@ class dpLabelMesher(emLabels):
         #self.nVoxels = emLabels.getSizes(cube)[1:]
         self.nVoxels = emLabels.getSizesMax(cube, sum(self.data_attrs['types_nlabels']))[1:]
         self.seeds = np.arange(1, self.nVoxels.size+1, dtype=np.int64); self.seeds = self.seeds[self.nVoxels>0]
+        #print(np.argmax(self.nVoxels))
 
         assert( self.seeds.size > 0 )   # error, no labels
         n = self.seeds.size; #self.nVoxels = np.zeros((n,), dtype=np.int64)
@@ -117,6 +111,9 @@ class dpLabelMesher(emLabels):
         # intended for debug, only process a subset of the seeds
         if self.seed_range[0] < 1 or self.seed_range[0] > n: self.seed_range[0] = 0
         if self.seed_range[1] < 1 or self.seed_range[1] < 0: self.seed_range[1] = n
+
+        # threw me off in debug twice, if the supervoxels are contiguous then have the seed_range mean actual seed
+        if n == self.seeds[-1] and self.seed_range[0] > 0: self.seed_range[0] -= 1
 
         # other inits
         if self.do_smooth: W = np.ones(self.smooth, dtype=self.PDTYPE) / self.smooth.prod()
@@ -128,7 +125,7 @@ class dpLabelMesher(emLabels):
         if self.doplots or self.mesh_outfile_stl: self.allPolyData = vtk.vtkAppendPolyData()
 
         # get bounding boxes for each supervoxel
-        svox_bnd = nd.measurements.find_objects(dataPad)
+        svox_bnd = nd.measurements.find_objects(dataPad, n)
 
         if self.dpLabelMesher_verbose:
             tloop = time.time(); t = time.time()
@@ -180,9 +177,12 @@ class dpLabelMesher(emLabels):
             # Because the data that is imported only contains an intensity value (i.e. not RGB), the importer
             # must be told this is the case.
             dataImporter.SetNumberOfScalarComponents(1)
+            if self.set_voxel_scale:
+                # Have to set the voxel anisotropy here, as there does not seem an easy way once the poly is created.
+                dataImporter.SetDataSpacing(self.data_attrs['scale'])
             # Data extent is the extent of the actual buffer, whole extent is ???
             # Use extents that are relative to non-padded cube
-            beg = self.mins[i]; end = np.array(crpdpls.shape) - 1 + beg
+            beg = self.mins[i]; end = self.mins[i] + self.rngs[i] - 1
             dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
             dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
 
@@ -283,20 +283,64 @@ class dpLabelMesher(emLabels):
             writer.Write()
         else:
             if self.dpLabelMesher_verbose: print('Writing output to %s' % self.mesh_outfile)
+
+            # do some checking on the stored types
+            max_nvertices = np.iinfo(self.FACE_DTYPE).max
+            max_vertex = 2**(np.iinfo(self.VERTEX_DTYPE).bits - self.VERTEX_BPLACES)-1
+            max_bounds = 2**(np.iinfo(self.BOUNDS_DTYPE).bits - self.VERTEX_BPLACES)-1
+            bplace = 2**self.VERTEX_BPLACES
+
             h5file = h5py.File(self.mesh_outfile, 'w')
             dataset_root = 'meshes'
             for i in range(self.seed_range[0], self.seed_range[1]):
+                # need to scale the bounds if the spacing has been set
+                mins = self.mins[i]; beg = self.bounds_beg[i]; end = self.bounds_end[i];
+                if self.set_voxel_scale:
+                    scale = self.data_attrs['scale']; mins = mins*scale; beg = beg*scale; end = end*scale
+
+                # the vertices were calculated relative to the whole area being meshed because of:
+                #   dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+                #   dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+                # wanted this so that for debug in this script the meshes can be rendered in the same axes by vtk.
+                # make the vertices relative to the bounding box here before writing to the hdf5 output.
+                #vertices = np.round(self.vertices[i] - mins, decimals=self.VERTEX_DROUND)
+                # decided to use a fixed point for the vertex coordinates
+                vertices = np.fix((self.vertices[i] - mins)*bplace)
+
+                # do some checking on the stored types
+                if vertices.shape[0] > max_nvertices:
+                    print('Supervoxel %d (%d voxels) %d vertices' % (self.seeds[i], self.nVoxels[i], vertices.shape[0]))
+                    assert(False)
+                if vertices.max() > max_vertex:
+                    print('Supervoxel %d max vertex %d' % (self.seeds[i], self.nVoxels[i], vertices.max()))
+                    assert(False)
+                if beg.max() > max_bounds:
+                    print('Supervoxel %d max beg bound %d' % (self.seeds[i], self.nVoxels[i], beg.max()))
+                    assert(False)
+                if end.max() > max_bounds:
+                    print('Supervoxel %d max end bound %d' % (self.seeds[i], self.nVoxels[i], end.max()))
+                    assert(False)
+
                 #self.nVoxels; self.faces; self.vertices; self.bounds_beg; self.bounds_end
                 str_seed = ('%08d' % self.seeds[i])
                 dsetpath = dataset_root + '/' + str_seed
                 h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
                                       compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
-                h5file.create_dataset(dsetpath + '/vertices', data=self.vertices[i], dtype=self.VERTEX_DTYPE,
+                h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
                                       compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
                 dset = h5file[dataset_root][str_seed]['vertices']
                 dset.attrs.create('nVoxels',self.nVoxels[i])
-                dset.attrs.create('bounds_beg',self.bounds_beg[i])
-                dset.attrs.create('bounds_end',self.bounds_end[i])
+                beg = np.array([int(x) for x in beg*bplace], dtype=self.BOUNDS_DTYPE)
+                end = np.array([int(x) for x in end*bplace], dtype=self.BOUNDS_DTYPE)
+                dset.attrs.create('bounds_beg',beg); dset.attrs.create('bounds_end',end)
+
+            # use seed 0 (0 is always background) to store global attributes
+            str_seed = ('%08d' % 0)
+            dsetpath = dataset_root + '/' + str_seed
+            h5file.create_dataset(dsetpath + '/faces', data=np.zeros((0,1),dtype=self.FACE_DTYPE),dtype=self.FACE_DTYPE)
+            dset = h5file[dataset_root][str_seed]['faces']
+            dset.attrs.create('vertex_divisor',bplace)
+
             h5file.close()
 
     @classmethod
@@ -373,6 +417,8 @@ class dpLabelMesher(emLabels):
             help='Do not use decimate pro from vtk for meshing (use quadric clustering instead)')
         #p.add_argument('--decimatePro', action='store_true', dest='decimatePro',
         #    help='Use decimate pro from vtk for meshing (default quadric clustering)')
+        p.add_argument('--set-voxel-scale', action='store_true', dest='set_voxel_scale',
+            help='Use the voxel scale to set the data spacing to vtk (vertices in nm)')
         p.add_argument('--doplots', action='store_true', help='Debugging plotting enabled for each supervoxel')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
