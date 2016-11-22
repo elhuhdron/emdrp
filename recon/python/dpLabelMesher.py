@@ -265,6 +265,9 @@ class dpLabelMesher(emLabels):
                 print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
         if self.dpLabelMesher_verbose: print('Total ellapsed time meshing %.3f s' % (time.time() - tloop,))
 
+    def readMeshInfile(self):
+        pass
+
     def writeMeshOutfile(self):
         if not self.mesh_outfile: return
 
@@ -392,7 +395,9 @@ class dpLabelMesher(emLabels):
     def addArgs(p):
         # adds arguments required for this object to specified ArgumentParser object
         dpWriteh5.addArgs(p)
-        p.add_argument('--mesh-outfile', nargs=1, type=str, default='', help='Output label mesh file (stl)')
+        p.add_argument('--mesh-outfile', nargs=1, type=str, default='', help='Output label mesh file')
+        p.add_argument('--mesh-infile', nargs=1, type=str, default='', 
+                       help='Input label mesh file (calculate stats / show plots only)')
         p.add_argument('--reduce-frac', nargs=1, type=float, default=[0.2], metavar=('PERC'),
             help='Reduce fraction for reducing meshes (decimate pro)')
         #p.add_argument('--reduce-spacing', nargs=3, type=float, default=[10.0, 10.0, 5.0], metavar=('SPC'),
@@ -429,7 +434,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    seg2mesh.readCubeToBuffers()
-    seg2mesh.procData()
-    seg2mesh.writeMeshOutfile()
-
+    if args.mesh_infile:
+        seg2mesh.readMeshInfile()
+    else:
+        seg2mesh.readCubeToBuffers()
+        seg2mesh.procData()
+        seg2mesh.writeMeshOutfile()
