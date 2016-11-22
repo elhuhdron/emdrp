@@ -55,6 +55,7 @@ class dpLabelMesher(emLabels):
     RAD = 5  # for padding
 
     print_every = 500 # modulo for print update
+    dataset_root = 'meshes'
 
     VERTEX_DTYPE = np.uint16    # decided to use fixed precision to represent vertices, sets max vertex value
     VERTEX_BPLACES = 0          # binary place to fix vertices to (precision depends on if set_voxel_scale)
@@ -62,6 +63,7 @@ class dpLabelMesher(emLabels):
     BOUNDS_DTYPE = np.uint32    # the bounding box types (sets max x/y/z coordinates)
 
     def __init__(self, args):
+        self.LIST_ARGS += ['mesh_infiles']
         emLabels.__init__(self,args)
 
         #self.data_type = self.DTYPE
@@ -87,6 +89,9 @@ class dpLabelMesher(emLabels):
         # changed this to off by default and use same flag from dpLoadh5
         if self.legacy_transpose: cube = self.data_cube.transpose((1,0,2))
         else: cube = self.data_cube
+
+        # for easy saving of scale as attribute in hdf5 output
+        self.scale = self.data_attrs['scale']
 
         # Pad data with zeros so that meshes are closed on the edges
         sizes = np.array(cube.shape); r = self.RAD; sz = sizes + 2*r;
@@ -265,9 +270,6 @@ class dpLabelMesher(emLabels):
                 print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
         if self.dpLabelMesher_verbose: print('Total ellapsed time meshing %.3f s' % (time.time() - tloop,))
 
-    def readMeshInfile(self):
-        pass
-
     def writeMeshOutfile(self):
         if not self.mesh_outfile: return
 
@@ -285,7 +287,8 @@ class dpLabelMesher(emLabels):
             writer.SetFileName(self.mesh_outfile_stl)
             writer.Write()
         else:
-            if self.dpLabelMesher_verbose: print('Writing output to %s' % self.mesh_outfile)
+            if self.dpLabelMesher_verbose:
+                print('Writing output to %s' % self.mesh_outfile); t = time.time()
 
             # do some checking on the stored types
             max_nvertices = np.iinfo(self.FACE_DTYPE).max
@@ -294,7 +297,7 @@ class dpLabelMesher(emLabels):
             bplace = 2**self.VERTEX_BPLACES
 
             h5file = h5py.File(self.mesh_outfile, 'w')
-            dataset_root = 'meshes'
+            dataset_root = self.dataset_root
             for i in range(self.seed_range[0], self.seed_range[1]):
                 # need to scale the bounds if the spacing has been set
                 mins = self.mins[i]; beg = self.bounds_beg[i]; end = self.bounds_end[i];
@@ -327,10 +330,17 @@ class dpLabelMesher(emLabels):
                 #self.nVoxels; self.faces; self.vertices; self.bounds_beg; self.bounds_end
                 str_seed = ('%08d' % self.seeds[i])
                 dsetpath = dataset_root + '/' + str_seed
-                h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
-                                      compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
-                h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
-                                      compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+                # only enable compression for larger supervoxels
+                if self.nVertices[i] > 128:
+                    h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
+                        compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+                else:
+                    h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE)
+                if self.nFaces[i] > 256:
+                    h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
+                        compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+                else:
+                    h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE)
                 dset = h5file[dataset_root][str_seed]['vertices']
                 dset.attrs.create('nVoxels',self.nVoxels[i])
                 beg = np.array([int(x) for x in beg*bplace], dtype=self.BOUNDS_DTYPE)
@@ -342,9 +352,112 @@ class dpLabelMesher(emLabels):
             dsetpath = dataset_root + '/' + str_seed
             h5file.create_dataset(dsetpath + '/faces', data=np.zeros((0,1),dtype=self.FACE_DTYPE),dtype=self.FACE_DTYPE)
             dset = h5file[dataset_root][str_seed]['faces']
+
             dset.attrs.create('vertex_divisor',bplace)
+            dset.attrs.create('nlabels',self.seeds[self.seed_range[1]-1])
+            save_vars = ['reduce_frac', 'decimatePro', 'reduce_nbins', 'min_faces', 'smooth', 'contour_lvl',
+                         'set_voxel_scale', 'scale']
+            for v in save_vars:
+                dset.attrs.create(v, getattr(self, v))
 
             h5file.close()
+            if self.dpLabelMesher_verbose:
+                print('\tdone in %.3f s' % (time.time() - t,))
+
+    # these routines are for reading previously generated mesh hdf5 files and plotting/writing out statistics
+    def readMeshInfiles(self):
+        from matplotlib import pylab as pl
+        import matplotlib as plt
+
+        nFiles = len(self.mesh_infiles);
+        mesh_info = [None]*nFiles; reduce_fracs = np.zeros((nFiles,))
+        file_sizes = np.zeros((nFiles,),dtype=np.uint64)
+        nlabels = np.zeros((nFiles,), dtype=np.uint64)
+        nVertices = np.zeros((nFiles,), dtype=np.uint64)
+        nFaces = np.zeros((nFiles,), dtype=np.uint64)
+        comp_bytes = np.zeros((nFiles,),dtype=np.uint64)
+        bin_bytes = np.zeros((nFiles,),dtype=np.uint64)
+        for i, infile in zip(range(nFiles), self.mesh_infiles):
+            mesh_info[i] = self.readMeshInfile(infile)
+            reduce_fracs[i] = mesh_info[i]['reduce_frac']
+            file_sizes[i] = os.path.getsize(infile)
+            nVertices[i] = mesh_info[i]['nVertices'].sum(dtype=np.uint64)
+            nFaces[i] = mesh_info[i]['nFaces'].sum(dtype=np.uint64)
+            bin_bytes[i] += (3*nVertices[i]*mesh_info[i]['dtypeVertices'].itemsize + \
+                3*nFaces[i]*mesh_info[i]['dtypeFaces'].itemsize)
+            comp_bytes[i] += (mesh_info[i]['storageSizeVertices'].sum(dtype=np.uint64) + \
+                mesh_info[i]['storageSizeFaces'].sum(dtype=np.uint64))
+            nlabels[i] = mesh_info[i]['nlabels']
+
+        # print info to console
+        scale = np.array(2**20,dtype=np.double); scale_str = 'MB'
+        for i, infile in zip(range(nFiles), self.mesh_infiles):
+            print('For reduce frac %g:' % (reduce_fracs[i],))
+            print('\tvertices/faces %d/%d size uncompressed %g %s, compressed %g %s' % (nVertices[i], nFaces[i],
+                bin_bytes[i]/scale,scale_str,comp_bytes[i]/scale,scale_str))
+            print('\tratio %g, files size %g %s, svox %d, overhead / svox %g %s' % (comp_bytes/bin_bytes,
+                file_sizes[i]/scale,scale_str, nlabels[i], (file_sizes[i] - comp_bytes[i])/nlabels[i]/scale, scale_str))
+
+        # the plot is dead, long live the plot, huzzah!
+        pl.figure(1);
+        pl.subplot(1,2,1)
+        pl.plot(reduce_fracs,comp_bytes/scale,'x--')
+        pl.plot(reduce_fracs,bin_bytes/scale,'x--')
+        pl.legend(['compressed', 'uncompressed'])
+        pl.ylabel('meshing size (%s)' % (scale_str,))
+        pl.xlabel('reduce fraction')
+        pl.title('%d supervoxels' % (nlabels[0], ))
+
+        pl.subplot(1,2,2);
+        m = plt.markers
+        clrs = ['r','g','b','m','c','y','k']; markers = ['x','+',m.CARETLEFT,m.CARETRIGHT,m.CARETUP,m.CARETDOWN,'*']
+        for i,frac in zip(range(nFiles),reduce_fracs):
+            size = 3*mesh_info[i]['nVertices']*mesh_info[i]['dtypeVertices'].itemsize+\
+                3*mesh_info[i]['nFaces']*mesh_info[i]['dtypeFaces'].itemsize
+            pl.scatter(np.log10(mesh_info[i]['nVoxels']), np.log10(size), s=8, c=clrs[i], alpha=0.5, marker=markers[i])
+        pl.xlabel('voxels (log count)'); pl.ylabel('meshing size (log bytes)'); pl.title('binary size')
+        pl.legend(reduce_fracs)
+
+        pl.show()
+
+    def readMeshInfile(self, mesh_infile):
+        h5file = h5py.File(mesh_infile, 'r')
+        dset_root = h5file[self.dataset_root]
+
+        # read meta-data in seed 0
+        str_seed = ('%08d' % 0)
+        nlabels = h5file[self.dataset_root][str_seed]['faces'].attrs['nlabels']
+        #vertex_divisor = h5file[self.dataset_root][str_seed]['faces'].attrs['vertex_divisor']
+        reduce_frac = h5file[self.dataset_root][str_seed]['faces'].attrs['reduce_frac']
+
+        nVoxels = -np.ones((nlabels+1,),dtype=np.int64)
+        nFaces = -np.ones((nlabels+1,),dtype=np.int64)
+        nVertices = -np.ones((nlabels+1,),dtype=np.int64)
+        storageSizeVertices = -np.ones((nlabels+1,),dtype=np.int64)
+        storageSizeFaces = -np.ones((nlabels+1,),dtype=np.int64)
+        for k in dset_root:
+            seed = int(k)
+            if seed == 0: continue
+            if seed > 0:
+                nVertices[seed] = dset_root[k]['vertices'].shape[0]
+                nFaces[seed] = dset_root[k]['faces'].shape[0]
+                nVoxels[seed] = dset_root[k]['vertices'].attrs['nVoxels']
+                storageSizeVertices[seed] = dset_root[k]['vertices'].id.get_storage_size()
+                storageSizeFaces[seed] = dset_root[k]['faces'].id.get_storage_size()
+
+                dtypeVertices = dset_root[k]['vertices'].dtype
+                dtypeFaces = dset_root[k]['faces'].dtype
+        h5file.close()
+
+        sel = (nVoxels > 0)
+        nVoxels = nVoxels[sel]; nFaces = nFaces[sel]; nVertices = nVertices[sel]
+        storageSizeVertices = storageSizeVertices[sel]; storageSizeFaces = storageSizeFaces[sel]
+
+        return_vars = ['nVoxels', 'nFaces', 'nVertices', 'storageSizeVertices', 'storageSizeFaces',
+                       'dtypeVertices', 'dtypeFaces', 'nlabels', 'reduce_frac']
+        return_dict = {}; cur = locals()
+        for v in return_vars: return_dict[v] = cur[v]
+        return return_dict
 
     @classmethod
     def labelMesher(cls, srcfile, dataset, chunk, offset, size, reduce_frac, verbose=False):
@@ -396,7 +509,7 @@ class dpLabelMesher(emLabels):
         # adds arguments required for this object to specified ArgumentParser object
         dpWriteh5.addArgs(p)
         p.add_argument('--mesh-outfile', nargs=1, type=str, default='', help='Output label mesh file')
-        p.add_argument('--mesh-infile', nargs=1, type=str, default='', 
+        p.add_argument('--mesh-infiles', nargs='*', type=str, default='',
                        help='Input label mesh file (calculate stats / show plots only)')
         p.add_argument('--reduce-frac', nargs=1, type=float, default=[0.2], metavar=('PERC'),
             help='Reduce fraction for reducing meshes (decimate pro)')
@@ -434,8 +547,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    if args.mesh_infile:
-        seg2mesh.readMeshInfile()
+    if len(seg2mesh.mesh_infiles) > 0:
+        seg2mesh.readMeshInfiles()
     else:
         seg2mesh.readCubeToBuffers()
         seg2mesh.procData()
