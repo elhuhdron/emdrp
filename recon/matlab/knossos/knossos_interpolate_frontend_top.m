@@ -6,8 +6,11 @@ giplout = '~/Downloads/out.gipl';
 % skelin = 'M0025_02_skelseeds.023.nml';
 % chunk = [14 14 4];
 % dim_order = [2 1 3];
-skelin = '/Data/datasets/skeletons/M0007_33_MLseeds.024.nml';
-chunk = [19 20 1];
+% skelin = '/Data/datasets/skeletons/M0007_33_MLseeds.024.nml';
+% chunk = [19 20 1];
+% dim_order = [1 2 3];
+skelin = '/Data/datasets/skeletons/k0725_contourcube_cube_8to9_9to10_3.055.nml';
+chunk = [8 9 3];
 dim_order = [1 2 3];
 
 raw_size = 128;
