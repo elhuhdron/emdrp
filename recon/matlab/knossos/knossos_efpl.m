@@ -247,8 +247,9 @@ end
 %   after removing nodes outside of the labeled volume. verified that this had < 1% effect on metrics for huge/none ECS.
 % going forward, used a cropped nml file output from knossos_clean_crop.m so that this is not an issue.
 fprintf(1,'\tcomputing best/worse case efpl (no errors / all errors)\n'); t = now;
-[efpl, ~, ~] = labelsWalkEdges(o,p, [], [], [], [0 1]); 
+[efpl, ~, efpl_edges] = labelsWalkEdges(o,p, [], [], [], [0 1]); 
 o.efpl_bestcase = efpl{1}; o.efpl_worstcase = efpl{2};
+o.efpl_edges_bestcase = efpl_edges{1}; o.efpl_edges_worstcase = efpl_edges{2};
 display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 fprintf(1,'\t\tbest case count  = %d, worst case count = %d\n',length(efpl{1}),length(efpl{2}));
 
@@ -706,7 +707,7 @@ function [efpl, efpl_thing_ptr, efpl_edges] = ...
   efpl_thing_ptr = zeros(o.nThings,npasses);
   
   % feature added after the paper, associated each edge with it's final efpl for it's "connected edges"
-  efpl_edges = cell(1, p.npasses_edges);
+  efpl_edges = cell(1, npasses);
   
   randcnt = 1; rands = rand(1,p.nalloc);  % for rand_error_rate
   nalloc = 5000;   % local allocation max, just for node stacks
@@ -719,7 +720,7 @@ function [efpl, efpl_thing_ptr, efpl_edges] = ...
       
       % feature added after the paper, associated each edge with it's final efpl for it's "connected edges".
       % only do this for error free edges (as error edges either don't count, or count half on two different componets).
-      efpl_edges{pass}{n} = nan(1,o.nedges(n)); edges_comps = zeros(1,o.nedges(n)); ncomps = 0;
+      efpl_edges{pass}{n} = nan(2,o.nedges(n)); edges_comps = zeros(2,o.nedges(n)); ncomps = 0;
 
       % keep updated set of unvisited edges
       edges_unvisited = o.edges_use{n}; cur_edges = o.info(n).edges(edges_unvisited, :);
@@ -759,7 +760,11 @@ function [efpl, efpl_thing_ptr, efpl_edges] = ...
           %   we've reached an end point without any more nodes after the last error.
           % save the half length of the previous edge that was stored on the next_nodes stack.
           if isempty(cur_node_edges)
-            efpl_cnt(pass) = efpl_cnt(pass)+1; efpl{pass}(efpl_cnt(pass)) = cur_efpl; 
+            efpl_cnt(pass) = efpl_cnt(pass)+1; efpl{pass}(efpl_cnt(pass)) = cur_efpl;             
+            % associate this efpl with all edges that were involved in it.
+            % error edges will record the efpl for both components.
+            sel = (edges_comps==cur_comp); efpl_edges{pass}{n}(sel) = cur_efpl;
+            selcnt = sum(sel,2); assert( (selcnt(1)==1 && selcnt(2)==0) || (selcnt(1)==0 && selcnt(2)==1) );
             continue;
           end
           
@@ -816,14 +821,17 @@ function [efpl, efpl_thing_ptr, efpl_edges] = ...
               % push the other node onto the next node stack with half this edge length
               ncomps = ncomps + 1; % edge starting at other node is new component
               next_node_cnt = next_node_cnt+1; next_nodes(next_node_cnt,:) = [other_node cur_len ncomps];
+              
+              % save the connected component number for this edge. error edge, so record both components.
+              edges_comps(1,e) = cur_comp; edges_comps(2,e) = ncomps;
             else
               % update current error free path length with this edge length
               cur_efpl = cur_efpl + o.edge_length{n}(e);
               % push other node onto current node stack
               cur_node_cnt = cur_node_cnt+1; cur_nodes(cur_node_cnt) = other_node;
-              % save the connected component number for this edge.
-              % only associate components with error free edges (error edges are removed).
-              edges_comps(e) = cur_comp;
+              
+              % save the connected component number for this edge. error free, so same component for both.
+              edges_comps(1,e) = cur_comp; edges_comps(2,e) = cur_comp;
             end
             
             % tally that current edge has been visited, udpate current edges
@@ -832,9 +840,9 @@ function [efpl, efpl_thing_ptr, efpl_edges] = ...
           
           % add the accumulated error free path length after cur_nodes stack is empty
           efpl_cnt(pass) = efpl_cnt(pass)+1; efpl{pass}(efpl_cnt(pass)) = cur_efpl;
-          
-          % associate this efpl with all the error free edges that were involved in it.
-          efpl_edges{pass}{n}(edges_comps==cur_comp) = cur_efpl;
+          % associate this efpl with all edges that were involved in it.
+          % error edges will record the efpl for both components.
+          sel = (edges_comps==cur_comp); efpl_edges{pass}{n}(sel) = cur_efpl;
         end % while next node stack
       end % while unvisited edges
 

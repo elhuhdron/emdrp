@@ -25,8 +25,16 @@ split_mergers_segEM_CI = cell(1,ndatasets);
 
 for i = 1:ndatasets
   use = ~o{i}.empty_things_use; nskels(i) = sum(use);
-  path_lengths{i} = o{i}.efpl_bestcase / 1000;
-  internode_lengths{i} = o{i}.efpl_worstcase / 1000;
+  
+  if p.use_efpl_edges
+    % new mode, with one efpl counted per each edge
+    path_lengths{i} = [o{i}.efpl_edges_bestcase{:}] / 1000;
+    internode_lengths{i} = [o{i}.efpl_edges_worstcase{:}] / 1000;
+  else
+    % old mode, with one efpl counted per each connected path
+    path_lengths{i} = o{i}.efpl_bestcase / 1000;
+    internode_lengths{i} = o{i}.efpl_worstcase / 1000;
+  end
   
   % remove really small internode distances that are just from dropping nodes right next to each other
   path_lengths{i} = path_lengths{i}(path_lengths{i} >= minPL);
@@ -130,7 +138,15 @@ if p.plot_efpl_metrics
   for i = 1:ndatasets
     nthr = length(params{i}); ind = 1:nthr;
     for k=ind
-      cur_efpls = o{i}.efpls{k,3}/1000; cur_efpls = cur_efpls(cur_efpls >= minPL);
+      if p.use_efpl_edges
+        % new mode, with one efpl counted per each edge
+        cur_efpls = [o{i}.efpl_edges{k,3}{:}]; cur_efpls = cur_efpls(:)/1000;
+      else
+        % old mode, with one efpl counted per each connected path
+        cur_efpls = o{i}.efpls{k,3}/1000;
+      end
+      % remove really small internode distances (nodes next to each other or zeros if not counting error half edges).
+      cur_efpls = cur_efpls(cur_efpls >= minPL);
       
       combined_efpl_med(i,k) = median(cur_efpls);
       %   pl_actual_median(i) = median(path_lengths{i});
@@ -153,15 +169,17 @@ if p.plot_efpl_metrics
       combined_efpl_norm_auroc(i,k) = tmp;
     end
     
-    % normalize these metrics to [0 1] on a log scale, per dataset.
-    % these metrics are too sensitive on a linear scale.
-    % this is why they were not used in the ECS paper.
-    tmp = combined_efpl_norm_med(i,:);
-    n = min(tmp(tmp>0)); tmp(tmp < n) = n; logn = log10(n); tmp = -(log10(tmp) - logn) / logn;
-    combined_efpl_norm_med(i,:) = tmp;
-    tmp = combined_efpl_norm_auroc(i,:);
-    n = min(tmp(tmp>0)); tmp(tmp < n) = n; logn = log10(n); tmp = -(log10(tmp) - logn) / logn;
-    combined_efpl_norm_auroc(i,:) = tmp;
+    if p.plot_efpl_metrics_log
+      % normalize these metrics to [0 1] on a log scale, per dataset.
+      % these metrics are too sensitive on a linear scale.
+      % this is why they were not used in the ECS paper.
+      tmp = combined_efpl_norm_med(i,:);
+      n = min(tmp(tmp>0)); tmp(tmp < n) = n; logn = log10(n); tmp = -(log10(tmp) - logn) / logn;
+      combined_efpl_norm_med(i,:) = tmp;
+      tmp = combined_efpl_norm_auroc(i,:);
+      n = min(tmp(tmp>0)); tmp(tmp < n) = n; logn = log10(n); tmp = -(log10(tmp) - logn) / logn;
+      combined_efpl_norm_auroc(i,:) = tmp;
+    end
   end
   
 end % if plot efpl metrics
@@ -183,9 +201,10 @@ if p.plot_efpl_diameters
         efpl_edges{k,j} = [efpl_edges{k,j} tmp{:}];
       end
       
-      assert( ~any(xor(isnan(error_free_diameters{k,j}), isnan(efpl_edges{k,j}))) )
+      %assert( ~any(xor(isnan(error_free_diameters{k,j}), isnan(efpl_edges{k,j}))) ) % before error edges were recorded
       sel = ~isnan(error_free_diameters{k,j});
-      error_free_diameters{k,j} = error_free_diameters{k,j}(sel); efpl_edges{k,j} = efpl_edges{k,j}(sel);
+      assert( all(efpl_edges{k,j}(1,sel) == efpl_edges{k,j}(2,sel)) ); % after error edges were recorded
+      error_free_diameters{k,j} = error_free_diameters{k,j}(sel); efpl_edges{k,j} = efpl_edges{k,j}(1,sel);
       error_free_dia_edge_cnt(k,j) = sum(sel); error_free_dia_total_cnt(k,j) = size(sel,2);
     end
   end
