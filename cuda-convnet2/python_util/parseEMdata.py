@@ -131,9 +131,8 @@ class EMDataParser():
         self.isTest = isTest   # added this for allowing test/train to use same ini file in chunk_list_all mode
 
         # added in another "sub-mode" of append features to write knossos-style raw outputs instead
-        fn, ext = os.path.splitext(self.outpath); ext = ext.lower()
-        self.append_features_knossos = self.append_features and (ext == '.conf')
-        if self.append_features_knossos: self.outpath = os.path.dirname(fn)
+        # xxx - guh, this has to be set externally due to the many overlapping feature adds / backcompat done here
+        self.append_features_knossos = False
 
         # Previously had these as constants, but moved label data type to ini file and special labels are defined 
         #   depending on the data type.

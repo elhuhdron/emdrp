@@ -126,8 +126,11 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
                                     image_in_size=image_in_size)
         if write_outputs or append_features:
             # force some properties if in mode for writing outputs.
+            # xxx - this is not clean, needs some rethinking on how write_outputs modes are initialized
             self.parser.outpath = write_output
             self.parser.no_label_lookup = True
+            self.parser.append_features_knossos = append_features and (ext == '.conf')
+            if self.parser.append_features_knossos: self.outpath = os.path.dirname(fn)
         # parser relies on having initBatches called right away, xxx - could revisit this?
         self.parser.initBatches()
 
