@@ -117,8 +117,8 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
         write_outputs = (write_output is not None); append_features = False
         if write_outputs:
             fn, ext = os.path.splitext(write_output); ext = ext.lower()
-            # .knossos indicates to write knossos-style outputs
-            append_features = (ext == '.h5' or ext == '.hdf5' or ext == '.knossos')
+            # .conf indicates to write knossos-style outputs
+            append_features = (ext == '.h5' or ext == '.hdf5' or ext == '.conf')
             write_outputs = not append_features
         # instantiate the actual em data parser, code shared with cuda-convnets2 em data parser
         self.parser = EMDataParser(cfg_file, write_outputs=write_outputs, append_features=append_features, 

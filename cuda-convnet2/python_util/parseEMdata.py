@@ -132,8 +132,8 @@ class EMDataParser():
 
         # added in another "sub-mode" of append features to write knossos-style raw outputs instead
         fn, ext = os.path.splitext(self.outpath); ext = ext.lower()
-        self.append_features_knossos = self.append_features and (ext == '.knossos')
-        if self.append_features_knossos: self.outpath = fn
+        self.append_features_knossos = self.append_features and (ext == '.conf')
+        if self.append_features_knossos: self.outpath = os.path.dirname(fn)
 
         # Previously had these as constants, but moved label data type to ini file and special labels are defined 
         #   depending on the data type.
