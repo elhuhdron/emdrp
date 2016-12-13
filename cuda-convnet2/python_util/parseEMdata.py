@@ -1598,6 +1598,8 @@ class EMDataParser():
             outfile.close()
 
         if self.append_features_knossos:
+            print 'EMDataParser: Appending to knossos-style output containing label probabilities "%s" at %d %d %d' % \
+                (self.outpath, self.last_chunk_rand[0], self.last_chunk_rand[1], self.last_chunk_rand[2])
             ind = self.last_chunk_rand
         elif self.append_features:
             # write outputs probabilities to a big hdf5 that spans entire dataset, used for "large feature dumps".
