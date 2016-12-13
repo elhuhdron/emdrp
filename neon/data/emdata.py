@@ -130,7 +130,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.parser.outpath = write_output
             self.parser.no_label_lookup = True
             self.parser.append_features_knossos = append_features and (ext == '.conf')
-            if self.parser.append_features_knossos: self.outpath = os.path.dirname(fn)
+            if self.parser.append_features_knossos: self.parser.outpath = os.path.dirname(fn)
         # parser relies on having initBatches called right away, xxx - could revisit this?
         self.parser.initBatches()
 
