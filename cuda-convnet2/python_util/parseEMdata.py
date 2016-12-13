@@ -59,6 +59,20 @@ def handle_hdf5_prob_output(start_queue, done_queue, probs_out, ind, label_names
             done_queue.put(1)
             break
     outfile.close()
+def handle_knossos_prob_output(start_queue, done_queue, probs_out, ind, label_names, outpath):
+    while True:
+        args = start_queue.get()
+        if args:
+            curpath = os.path.join(outpath, 'x%04d' % ind[0], 'y%04d' % ind[1], 'z%04d' % ind[2])
+            try: os.makedirs(curpath)
+            except: pass
+            for n in range(len(label_names)):
+                d = probs_out[:,:,:,n].transpose((2,1,0))
+                d.tofile(os.path.join(curpath, label_names[n] + '.f32'))
+            done_queue.put(1)
+        else:
+            done_queue.put(1)
+            break
 
 # no exception for plotting so this can still work from command line only (plotting is only for standalone validation)
 try: 
@@ -97,7 +111,7 @@ class EMDataParser():
             chunk_skip_list=[], dim_ordering='', image_in_size=None, isTest=False):
         self.cfg_file = cfg_file
         self.write_outputs = write_outputs; self.save_name = save_name; self.append_features = append_features
-
+        
         print 'EMDataParser: config file ''%s''' % cfg_file
         # retrieve / save options from ini files, see definitions parseEMdata.ini
         opts = EMDataParser.get_options(cfg_file)
@@ -115,6 +129,11 @@ class EMDataParser():
         # Options / Inits
 
         self.isTest = isTest   # added this for allowing test/train to use same ini file in chunk_list_all mode
+
+        # added in another "sub-mode" of append features to write knossos-style raw outputs instead
+        fn, ext = os.path.splitext(self.outpath); ext = ext.lower()
+        self.append_features_knossos = self.append_features and (ext == '.knossos')
+        if self.append_features_knossos: self.outpath = fn
 
         # Previously had these as constants, but moved label data type to ini file and special labels are defined 
         #   depending on the data type.
@@ -1577,8 +1596,10 @@ class EMDataParser():
                     outfile[label_names[n]].attrs.create(name,value)
             self.write_prior_hdf5(prior_export, prior_write)
             outfile.close()
-            
-        if self.append_features:
+
+        if self.append_features_knossos:
+            ind = self.last_chunk_rand
+        elif self.append_features:
             # write outputs probabilities to a big hdf5 that spans entire dataset, used for "large feature dumps".
             # always writes in F-order (inputs can be either order tho)
             assert( self.nz_tiled == 0 ) # use the rand cube only for "large feature dumps"
@@ -1613,6 +1634,7 @@ class EMDataParser():
             ind = ind[self.zreslice_dim_ordering][::-1] # re-order for specified ordering, then to F-order
             hdf.close()
 
+        if self.append_features:
             # parallel using multiprocessing, threading does not work
             if not hasattr(self, 'done_queue'):
                 # initialize 
@@ -1620,9 +1642,14 @@ class EMDataParser():
                 self.done_queue = mp.Queue()
                 self.shared_probs_out = sharedmem.empty_like(self.probs_out)
                 self.shared_ind = sharedmem.empty_like(ind)
-                self.probs_output_proc = mp.Process(target=handle_hdf5_prob_output, 
-                                                    args=(self.start_queue, self.done_queue, self.shared_probs_out, 
-                                                          self.shared_ind, label_names, self.outpath))
+                if self.append_features_knossos:
+                    self.probs_output_proc = mp.Process(target=handle_knossos_prob_output, 
+                                                        args=(self.start_queue, self.done_queue, self.shared_probs_out, 
+                                                              self.shared_ind, label_names, self.outpath))
+                else:
+                    self.probs_output_proc = mp.Process(target=handle_hdf5_prob_output, 
+                                                        args=(self.start_queue, self.done_queue, self.shared_probs_out, 
+                                                              self.shared_ind, label_names, self.outpath))
                 self.probs_output_proc.start()
             else:
                 self.done_queue.get()
