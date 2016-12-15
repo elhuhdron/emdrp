@@ -59,7 +59,7 @@ def handle_hdf5_prob_output(start_queue, done_queue, probs_out, ind, label_names
             done_queue.put(1)
             break
     outfile.close()
-def handle_knossos_prob_output(start_queue, done_queue, probs_out, ind, label_names, outpath):
+def handle_knossos_prob_output(start_queue, done_queue, probs_out, ind, label_names, outpath, strnetid):
     while True:
         args = start_queue.get()
         if args:
@@ -68,7 +68,7 @@ def handle_knossos_prob_output(start_queue, done_queue, probs_out, ind, label_na
             except: pass
             for n in range(len(label_names)):
                 d = probs_out[:,:,:,n].transpose((2,1,0))
-                d.tofile(os.path.join(curpath, label_names[n] + '.f32'))
+                d.tofile(os.path.join(curpath, label_names[n] + strnetid + '.f32'))
             done_queue.put(1)
         else:
             done_queue.put(1)
@@ -133,6 +133,7 @@ class EMDataParser():
         # added in another "sub-mode" of append features to write knossos-style raw outputs instead
         # xxx - guh, this has to be set externally due to the many overlapping feature adds / backcompat done here
         self.append_features_knossos = False
+        self.strnetid = ''; # unique integer for different trained nets for use with knossos-style output format
 
         # Previously had these as constants, but moved label data type to ini file and special labels are defined 
         #   depending on the data type.
@@ -1646,7 +1647,7 @@ class EMDataParser():
                 if self.append_features_knossos:
                     self.probs_output_proc = mp.Process(target=handle_knossos_prob_output, 
                                                         args=(self.start_queue, self.done_queue, self.shared_probs_out, 
-                                                              self.shared_ind, label_names, self.outpath))
+                                                              self.shared_ind, label_names, self.outpath,self.strnetid))
                 else:
                     self.probs_output_proc = mp.Process(target=handle_hdf5_prob_output, 
                                                         args=(self.start_queue, self.done_queue, self.shared_probs_out, 

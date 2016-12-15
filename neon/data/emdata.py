@@ -23,6 +23,7 @@
 import threading
 from threading import Thread
 import numpy as np
+import re
 import os
 
 from neon.data.dataiterator import ArrayIterator
@@ -130,7 +131,8 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.parser.outpath = write_output
             self.parser.no_label_lookup = True
             self.parser.append_features_knossos = append_features and (ext == '.conf')
-            if self.parser.append_features_knossos: self.parser.outpath = os.path.dirname(fn)
+            if self.parser.append_features_knossos: 
+                self.parser.outpath, fn = os.path.split(fn); self.parser.strnetid = re.findall(r'\d+', fn)[0]
         # parser relies on having initBatches called right away, xxx - could revisit this?
         self.parser.initBatches()
 
