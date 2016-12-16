@@ -214,11 +214,13 @@ class dpWriteh5(dpLoadh5):
             data = np.fromfile(self.inraw,dtype=self.data_type_out)
 
         # xxx - hacky command line over-ride for scale
-        if all([x > 0 for x in self.scale]):
-            self.data_attrs['scale'] = self.scale
-
+        if all([x > 0 for x in self.scale]): self.data_attrs['scale'] = self.scale
+            
         # xxx - this always assumes raw file is in F-order, add something here for C-order if we need it
-        self.data_cube = data.astype(self.data_type_out).reshape(self.size[::-1]).transpose((2,1,0))
+        #self.data_cube = data.astype(self.data_type_out).reshape(self.size[::-1]).transpose((2,1,0))
+        # add support for reslice reordering of raw inputs
+        zord = self.zreslice_dim_ordering; size = self.size[zord]; tord = [2,1,0]
+        self.data_cube = data.astype(self.data_type_out).reshape(size[::-1]).transpose([tord[i] for i in zord])
 
     # xxx - move this as a utility or a GIPL class?
     # translated from matlab toolbox http://www.mathworks.com/matlabcentral/fileexchange/16407-gipl-toolbox

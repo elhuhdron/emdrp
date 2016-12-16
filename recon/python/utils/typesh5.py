@@ -37,7 +37,6 @@ from utils import optimal_color
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-from pyCext import type_components, remove_adjacencies
 
 class emVoxelType(dpWriteh5):
     VOXTYPE_DTYPE = np.uint8
@@ -203,6 +202,7 @@ class emLabels(dpWriteh5):
     # get type of each supervoxel by majority vote by summing votes per supervoxel
     @staticmethod
     def type_components(labels, voxel_type, nlabels, ntypes):
+        from pyCext import type_components
         supervoxel_type = np.zeros((nlabels,), dtype=emVoxelType.VOXTYPE_DTYPE)
         voxel_out_type = np.zeros_like(voxel_type, dtype=emVoxelType.VOXTYPE_DTYPE)
         type_components(labels, voxel_type, supervoxel_type, voxel_out_type, ntypes)
@@ -211,6 +211,7 @@ class emLabels(dpWriteh5):
     # remove connected adjacencies between labels, arbitrary connectivity
     @staticmethod
     def remove_adjacencies_nconn(labels, connectivity=1, bwconn=None):
+        from pyCext import remove_adjacencies
         if bwconn is None:
             bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, connectivity)
         return remove_adjacencies(labels, bwconn)
