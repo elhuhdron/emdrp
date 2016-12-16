@@ -64,7 +64,7 @@ class dpAggProbs(emProbabilities):
         else:
             self.weightings = np.array(self.weightings, dtype=np.double)
             assert( self.weightings.size == self.nmerge )
-        
+
         if len(self.dim_orderings) == 0:
             # default all xyz
             self.dim_orderings = ['xyz' for i in range(self.nmerge)]
@@ -81,16 +81,15 @@ class dpAggProbs(emProbabilities):
         if self.dpAggProbs_verbose:
             print('dpAggProbs: Aggregating')
             t = time.time()
-        
-        for j in range(self.ntypes):            
+
+        for j in range(self.ntypes):
             cprobs = np.zeros(np.append(self.size, self.nmerge), dtype=emProbabilities.PROBS_DTYPE, order='C')
             fn = self.types[j].upper()
-            for i in range(self.nsrcfiles):
+            for i in range(self.nmerge):
                 # load the raw files
                 self.inraw = os.path.join( self.inrawpath, fn + str(i) + '.f32' )
-                self.loadFromRaw()
-                cprobs[:,:,:,i] = self.data_cube
-                
+                self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube
+
             for k in range(self.nops[j]):
                 strop = self.agg_ops_types[j][k].lower()
                 if strop == 'mean':
@@ -104,9 +103,9 @@ class dpAggProbs(emProbabilities):
                 else:
                     assert(False) # bad op
 
-                self.dataset = self.types[j] + '_' + strop
+                self.dataset_out = self.types[j] + ('' if strop=='mean' else '_' + strop)
                 self.writeCube()
-                    
+
         if self.dpAggProbs_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
 
@@ -120,11 +119,11 @@ class dpAggProbs(emProbabilities):
         # pertaining to voxel types
         p.add_argument('--types', nargs='+', type=str, default=['ICS','ECS','MEM'],
             metavar='TYPE', help='Names of the voxel types (prefix for raw file)')
-        p.add_argument('--agg-ops-types', nargs='*', type=str, default=[], 
+        p.add_argument('--agg-ops-types', nargs='*', type=str, default=[], metavar='OP',
             help='Specify which operations to be done for each type, 0 in list delimits types')
-            
+
         # pertaining to probs to be merged
-        p.add_argument('--nmerge', nargs=1, type=int, default=[1], 
+        p.add_argument('--nmerge', nargs=1, type=int, default=[1],
             metavar='N', help='Number of network probability output rawfiles to merge')
         p.add_argument('--weightings', nargs='*', type=float, default=[], metavar='W',
             help='Weightings for probabilities specified in each rawfile (un-reordered), default to equal weightings')
