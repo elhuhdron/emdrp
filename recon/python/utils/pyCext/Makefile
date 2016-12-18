@@ -12,14 +12,14 @@ NUMPY_INCLUDE_PATH = $(HOME)/anaconda3/lib/python3.5/site-packages/numpy/core/in
 PYTHON_LIBRARY_PATH = $(HOME)/anaconda3/lib
 PYTHON_VERSION = 3.5m
 
-# ---- gcc C compile ------------------
-pyCext.o:  pyCext.c pyCext.h
-	gcc  -c -fPIC pyCext.c -O3 -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH)
-
 # ---- Link --------------------------- 
 _pyCext.so:  pyCext.o 
 	gcc -L$(PYTHON_LIBRARY_PATH) -shared pyCext.o -o _pyCext.so -lpython$(PYTHON_VERSION)
 	#install_name_tool -change libpython$(PYTHON_VERSION).dylib $(PYTHON_LIBRARY_PATH)/libpython$(PYTHON_VERSION).dylib _pyCext.so
+
+# ---- gcc C compile ------------------
+pyCext.o:  pyCext.c pyCext.h
+	gcc  -c -fPIC pyCext.c -O3 -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH)
 
 clean:
 	rm -rf *.o *.so *.pyc
