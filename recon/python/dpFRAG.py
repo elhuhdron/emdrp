@@ -227,7 +227,7 @@ class dpFRAG(emLabels):
         ftype = ftype.lower()
         if ftype=='kuwahara':
             for i in range(data.shape[2]):
-                data[:,:,i] = Kuwahara(data, 9)
+                data[:,:,i] = Kuwahara(data[:,:,i], 9)
         elif ftype=='blur30':
             data = nd.gaussian_filter(data, [3.0/x for x in sampling_ratio], mode='constant')
         elif ftype=='blur40':
@@ -351,13 +351,14 @@ class dpFRAG(emLabels):
             if not self.rawaugfile and (self.naugments > 0 or (self.nstatic_augments > 0 and (self.nstatic_augments \
                 > sum([self.static_augments[x][0] != '_' for x in range(self.nstatic_augments)])))):
 
-                fpad=10; o2 = offset - fpad; s2 = size + 2*fpad
+                fpad=10; offset = offset - fpad; size = size + 2*fpad
                 loadh5 = dpLoadh5.readData(srcfile=self.rawfile, dataset=self.raw_dataset, chunk=self.chunk.tolist(),
-                    offset=o2.tolist(), size=s2.tolist(), verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+                    offset=offset.tolist(), size=size.tolist(), verbose=self.dpLoadh5_verbose); rdata = loadh5.data_cube
 
                 self.raw_aug = [None]*self.naugments
                 for j in range(self.naugments):
-                    data = dpFRAG.filter_data(data, self.augments[j], self.sampling_ratio)[o2:-o2,o2:-o2,o2:-o2]
+                    data = dpFRAG.filter_data(rdata, self.augments[j], 
+                                              self.sampling_ratio)[fpad:-fpad,fpad:-fpad,fpad:-fpad]
     
                     if self.pad_raw_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
@@ -370,8 +371,8 @@ class dpFRAG(emLabels):
                 self.raw_static_aug = [None]*self.nstatic_augments
                 for j in range(self.nstatic_augments):
                     if self.static_augments[j][0] == '_':
-                        data = dpFRAG.filter_data(data, self.static_augments[j][1:], 
-                                                  self.sampling_ratio)[o2:-o2,o2:-o2,o2:-o2]
+                        data = dpFRAG.filter_data(rdata, self.static_augments[j][1:], 
+                                                  self.sampling_ratio)[fpad:-fpad,fpad:-fpad,fpad:-fpad]
     
                         if self.pad_raw_perim:
                             # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
