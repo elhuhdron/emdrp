@@ -225,20 +225,21 @@ class dpFRAG(emLabels):
     @staticmethod
     def filter_data(data, ftype, sampling_ratio):
         ftype = ftype.lower()
+        # xxx - expand this out with more options, parameterize blur / others?
         if ftype=='kuwahara':
             for i in range(data.shape[2]):
-                data[:,:,i] = Kuwahara(data[:,:,i], 9)
+                data[:,:,i] = Kuwahara(data[:,:,i], 5)
         elif ftype=='blur30':
             data = nd.gaussian_filter(data, [3.0/x for x in sampling_ratio], mode='constant')
         elif ftype=='blur40':
             data = nd.gaussian_filter(data, [4.0/x for x in sampling_ratio], mode='constant')
         elif ftype=='max':
-            data = nd.maximum_filter(data, [5, 5, 3], mode='constant')
+            data = nd.maximum_filter(data, [np.ceil(5.0/x) for x in sampling_ratio], mode='constant')
         else:
             assert(False)
-        
+
         return data
-        
+
     def __init__(self, args):
         emLabels.__init__(self,args)
 
@@ -351,35 +352,43 @@ class dpFRAG(emLabels):
             if not self.rawaugfile and (self.naugments > 0 or (self.nstatic_augments > 0 and (self.nstatic_augments \
                 > sum([self.static_augments[x][0] != '_' for x in range(self.nstatic_augments)])))):
 
-                fpad=10; offset = offset - fpad; size = size + 2*fpad
+                fpad=16; offset = offset - fpad; size = size + 2*fpad
                 loadh5 = dpLoadh5.readData(srcfile=self.rawfile, dataset=self.raw_dataset, chunk=self.chunk.tolist(),
                     offset=offset.tolist(), size=size.tolist(), verbose=self.dpLoadh5_verbose); rdata = loadh5.data_cube
 
                 self.raw_aug = [None]*self.naugments
                 for j in range(self.naugments):
-                    data = dpFRAG.filter_data(rdata, self.augments[j], 
+                    if self.dpFRAG_verbose:
+                        print('\tFiltering raw data with %s' % (self.augments[j],)); t = time.time()
+                    data = dpFRAG.filter_data(rdata, self.augments[j],
                                               self.sampling_ratio)[fpad:-fpad,fpad:-fpad,fpad:-fpad]
-    
+                    if self.dpFRAG_verbose:
+                        print('\t\tdone in %.4f s' % (time.time() - t,))
+
                     if self.pad_raw_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                         self.raw_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=128)
                     else:
                         self.raw_aug[j] = data
-    
+
                     self.raw_aug[j][np.logical_not(np.isfinite(self.raw_aug[j]))] = 0   # no NaNs/Infs
-    
+
                 self.raw_static_aug = [None]*self.nstatic_augments
                 for j in range(self.nstatic_augments):
                     if self.static_augments[j][0] == '_':
-                        data = dpFRAG.filter_data(rdata, self.static_augments[j][1:], 
+                        if self.dpFRAG_verbose:
+                            print('\tFiltering raw data with %s' % (self.static_augments[j],)); t = time.time()
+                        data = dpFRAG.filter_data(rdata, self.static_augments[j][1:],
                                                   self.sampling_ratio)[fpad:-fpad,fpad:-fpad,fpad:-fpad]
-    
+                        if self.dpFRAG_verbose:
+                            print('\t\tdone in %.4f s' % (time.time() - t,))
+
                         if self.pad_raw_perim:
                             # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                             self.raw_static_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=128)
                         else:
                             self.raw_static_aug[j] = data
-    
+
                         self.raw_static_aug[j][np.logical_not(np.isfinite(self.raw_static_aug[j]))] = 0 # no NaNs/Infs
             # normal raw augment loading procedure (precalculated)
             else:
@@ -388,29 +397,29 @@ class dpFRAG(emLabels):
                     loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile, dataset=self.raw_dataset+self.augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
                         verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
-    
+
                     if self.pad_raw_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                         self.raw_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=128)
                     else:
                         self.raw_aug[j] = data
-    
+
                     self.raw_aug[j][np.logical_not(np.isfinite(self.raw_aug[j]))] = 0   # no NaNs/Infs
-    
+
                 self.raw_static_aug = [None]*self.nstatic_augments
                 for j in range(self.nstatic_augments):
                     if self.static_augments[j][0] == '_':
-                        loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile, verbose=self.dpLoadh5_verbose, 
+                        loadh5 = dpLoadh5.readData(srcfile=self.rawaugfile, verbose=self.dpLoadh5_verbose,
                             dataset=self.raw_dataset+self.static_augments[j],
                             chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist())
                         data = loadh5.data_cube
-    
+
                         if self.pad_raw_perim:
                             # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                             self.raw_static_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=128)
                         else:
                             self.raw_static_aug[j] = data
-    
+
                         self.raw_static_aug[j][np.logical_not(np.isfinite(self.raw_static_aug[j]))] = 0 # no NaNs/Infs
 
         # load the ground truth data
