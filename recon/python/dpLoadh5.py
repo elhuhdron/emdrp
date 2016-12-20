@@ -31,8 +31,6 @@ import numpy as np
 import argparse
 import time
 import os
-import snappy
-import zipfile
 
 class dpLoadh5(object):
 
@@ -280,9 +278,6 @@ class dpLoadh5(object):
             data, fw, inv = relabel_sequential(data); data = data.astype(self.data_type)
             if self.dpLoadh5_verbose:
                 print('\tafter relabeling: min ' + str(data.min()) + ' max ' + str(data.max()))
-        if self.sigmaLOG > 0:
-            from scipy import ndimage as nd
-            data = nd.filters.gaussian_laplace(data, self.sigmaLOG/self.sampling_ratio)
         if len(self.sel_eq):
             data = (data == self.sel_eq[0]).astype(np.uint8)
         if len(self.sel_gt):
@@ -329,6 +324,8 @@ class dpLoadh5(object):
             dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
         else:
             if self.raw_compression:
+                import snappy
+                import zipfile
                 print('\traw compression enabled ' + self.outraw + '.sz.zip')
                 with open(self.outraw + '.sz', 'wb') as fh: fh.write(snappy.compress(data.tostring()))
                 zf = zipfile.ZipFile(self.outraw + '.sz.zip', mode='w')
@@ -476,8 +473,6 @@ class dpLoadh5(object):
             help='Specify non-zero number of colors for uint data (apply modulo, raw output)')
         p.add_argument('--dtypeGray', nargs=1, type=str, default=[0], metavar=('DTYPE'),
             help='Specify data type for converting to grayscale (raw output)')
-        p.add_argument('--sigmaLOG', nargs=1, type=float, default=[0], metavar=('DTYPE'),
-            help='Specify sigma for applying gaussian laplacian filter (raw output)')
         p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0],
             metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'),
             help='Size in voxels to zero pad (b=before, a=after) (raw output)')
