@@ -297,6 +297,7 @@ class dpLabelMesher(emLabels):
             bplace = 2**self.VERTEX_BPLACES
 
             h5file = h5py.File(self.mesh_outfile, 'w')
+            #h5file = h5py.File(self.mesh_outfile, 'a')
             dataset_root = self.dataset_root
             for i in range(self.seed_range[0], self.seed_range[1]):
                 # need to scale the bounds if the spacing has been set
@@ -331,11 +332,13 @@ class dpLabelMesher(emLabels):
                 str_seed = ('%08d' % self.seeds[i])
                 dsetpath = dataset_root + '/' + str_seed
                 # only enable compression for larger supervoxels
+                if 'vertices' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['vertices']
                 if self.nVertices[i] > 128:
                     h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
                         compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
                 else:
                     h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE)
+                if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
                 if self.nFaces[i] > 256:
                     h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
                         compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
@@ -350,11 +353,13 @@ class dpLabelMesher(emLabels):
             # use seed 0 (0 is always background) to store global attributes
             str_seed = ('%08d' % 0)
             dsetpath = dataset_root + '/' + str_seed
+            if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
             h5file.create_dataset(dsetpath + '/faces', data=np.zeros((0,1),dtype=self.FACE_DTYPE),dtype=self.FACE_DTYPE)
             dset = h5file[dataset_root][str_seed]['faces']
 
             dset.attrs.create('vertex_divisor',bplace)
             dset.attrs.create('nlabels',self.seeds[self.seed_range[1]-1])
+            #dset.attrs.create('nlabels',self.nVoxels.size)
             save_vars = ['reduce_frac', 'decimatePro', 'reduce_nbins', 'min_faces', 'smooth', 'contour_lvl',
                          'set_voxel_scale', 'scale']
             for v in save_vars:
