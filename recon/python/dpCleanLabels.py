@@ -48,6 +48,19 @@ class dpCleanLabels(emLabels):
 
     def clean(self):
 
+        # read voxel types first, allows for cavity_fill and get_svox_type to be both specified
+        if self.get_svox_type or self.write_voxel_type:
+            if self.dpCleanLabels_verbose:
+                print('Reading supervoxel types'); t = time.time()
+
+            voxType = emVoxelType.readVoxType(srcfile=self.srcfile, chunk=self.chunk.tolist(),
+                offset=self.offset.tolist(), size=self.size.tolist())
+            voxel_type = voxType.data_cube.copy(order='C')
+            ntypes = len(voxType.data_attrs['types'])
+
+            if self.dpCleanLabels_verbose:
+                print('\tdone in %.4f s' % (time.time() - t))
+
         # smoothing operates on each label one at a time
         if self.smooth:
             if self.dpCleanLabels_verbose:
@@ -166,8 +179,20 @@ class dpCleanLabels(emLabels):
                 sampling=self.data_attrs['scale'])
 
             if self.dpCleanLabels_verbose:
-                print('\tdone in %.4f s' % (time.time() - t))
                 print('\tnumber bg vox after = %d' % ((self.data_cube==0).sum(dtype=np.int64),))
+                print('\tdone in %.4f s' % (time.time() - t))
+
+            if self.get_svox_type or self.write_voxel_type:
+                if self.dpCleanLabels_verbose:
+                    print('\tRemoving cavities from voxel type'); t = time.time()
+                if ntypes-1 > 1:
+                    voxel_type = emLabels.nearest_neighbor_fill(voxel_type, mask=selbg,
+                                                                sampling=self.data_attrs['scale'])
+                else:
+                    voxel_type[msk] = 1
+                print('\t\tdone in %.4f s' % (time.time() - t))
+
+            del msk, selbg
 
         if self.relabel:
             labels = self.data_cube
@@ -193,13 +218,15 @@ class dpCleanLabels(emLabels):
             if self.dpCleanLabels_verbose:
                 print('Recomputing supervoxel types and re-ordering labels'); t = time.time()
 
-            voxType = emVoxelType.readVoxType(srcfile=self.srcfile, chunk=self.chunk.tolist(),
-                offset=self.offset.tolist(), size=self.size.tolist())
-            voxel_type = voxType.data_cube.copy(order='C')
+            # moved this as first step to allow other steps to modify voxel_type
+            #voxType = emVoxelType.readVoxType(srcfile=self.srcfile, chunk=self.chunk.tolist(),
+            #    offset=self.offset.tolist(), size=self.size.tolist())
+            #voxel_type = voxType.data_cube.copy(order='C')
+            #ntypes = len(voxType.data_attrs['types'])
 
             labels = self.data_cube.copy(order='C')
             #nlabels = labels.max(); assert(nlabels == self.data_attrs['types_nlabels'][0])
-            nlabels = sum(self.data_attrs['types_nlabels']); ntypes = len(voxType.data_attrs['types'])
+            nlabels = sum(self.data_attrs['types_nlabels'])
             supervoxel_type, voxel_type = emLabels.type_components(labels, voxel_type, nlabels, ntypes)
             assert( supervoxel_type.size == nlabels )
             # reorder labels so that supervoxels are grouped by / in order of supervoxel type
