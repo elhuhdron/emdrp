@@ -44,9 +44,9 @@ from utils import csr_csc_argmax
 class dpCubeStitcher(emLabels):
 
     # Constants
-    LIST_ARGS = dpLoadh5.LIST_ARGS + ['fileflags', 'filepaths', 'fileprefixes', 'volume_range_beg', 'volume_range_end',
-                                      'overlap', 'left_remainder_size', 'right_remainder_size', 'use_chunksize',
-                                      'leave_edge']
+    LIST_ARGS = dpLoadh5.LIST_ARGS + ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes',
+                                      'volume_range_beg', 'volume_range_end', 'overlap', 'left_remainder_size',
+                                      'right_remainder_size', 'use_chunksize', 'leave_edge']
 
     def __init__(self, args):
         emLabels.__init__(self,args)
