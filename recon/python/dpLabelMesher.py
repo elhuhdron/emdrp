@@ -130,7 +130,7 @@ class dpLabelMesher(emLabels):
         if self.doplots or self.mesh_outfile_stl: self.allPolyData = vtk.vtkAppendPolyData()
 
         # get bounding boxes for each supervoxel
-        svox_bnd = nd.measurements.find_objects(dataPad, n)
+        svox_bnd = nd.measurements.find_objects(dataPad, self.seeds[self.seed_range[1]-1])
 
         if self.dpLabelMesher_verbose:
             tloop = time.time(); t = time.time()
@@ -332,13 +332,13 @@ class dpLabelMesher(emLabels):
                 str_seed = ('%08d' % self.seeds[i])
                 dsetpath = dataset_root + '/' + str_seed
                 # only enable compression for larger supervoxels
-                if 'vertices' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['vertices']
+                #if 'vertices' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['vertices']
                 if self.nVertices[i] > 128:
                     h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
                         compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
                 else:
                     h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE)
-                if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
+                #if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
                 if self.nFaces[i] > 256:
                     h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
                         compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
@@ -353,7 +353,7 @@ class dpLabelMesher(emLabels):
             # use seed 0 (0 is always background) to store global attributes
             str_seed = ('%08d' % 0)
             dsetpath = dataset_root + '/' + str_seed
-            if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
+            #if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
             h5file.create_dataset(dsetpath + '/faces', data=np.zeros((0,1),dtype=self.FACE_DTYPE),dtype=self.FACE_DTYPE)
             dset = h5file[dataset_root][str_seed]['faces']
 
@@ -442,16 +442,15 @@ class dpLabelMesher(emLabels):
         storageSizeFaces = -np.ones((nlabels+1,),dtype=np.int64)
         for k in dset_root:
             seed = int(k)
-            if seed == 0: continue
-            if seed > 0:
-                nVertices[seed] = dset_root[k]['vertices'].shape[0]
-                nFaces[seed] = dset_root[k]['faces'].shape[0]
-                nVoxels[seed] = dset_root[k]['vertices'].attrs['nVoxels']
-                storageSizeVertices[seed] = dset_root[k]['vertices'].id.get_storage_size()
-                storageSizeFaces[seed] = dset_root[k]['faces'].id.get_storage_size()
+            if seed < 1: continue
+            nVertices[seed] = dset_root[k]['vertices'].shape[0]
+            nFaces[seed] = dset_root[k]['faces'].shape[0]
+            nVoxels[seed] = dset_root[k]['vertices'].attrs['nVoxels']
+            storageSizeVertices[seed] = dset_root[k]['vertices'].id.get_storage_size()
+            storageSizeFaces[seed] = dset_root[k]['faces'].id.get_storage_size()
 
-                dtypeVertices = dset_root[k]['vertices'].dtype
-                dtypeFaces = dset_root[k]['faces'].dtype
+            dtypeVertices = dset_root[k]['vertices'].dtype
+            dtypeFaces = dset_root[k]['faces'].dtype
         h5file.close()
 
         sel = (nVoxels > 0)
