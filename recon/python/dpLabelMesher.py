@@ -37,6 +37,7 @@ import numpy as np
 import h5py
 import argparse
 import time
+import glob
 
 from scipy import ndimage as nd
 import scipy.ndimage.filters as filters
@@ -54,13 +55,21 @@ class dpLabelMesher(emLabels):
     PDTYPE = np.double
     RAD = 5  # for padding
 
-    print_every = 500 # modulo for print update
+    #print_every = 500 # modulo for print update
     dataset_root = 'meshes'
 
     VERTEX_DTYPE = np.uint16    # decided to use fixed precision to represent vertices, sets max vertex value
     VERTEX_BPLACES = 0          # binary place to fix vertices to (precision depends on if set_voxel_scale)
     FACE_DTYPE = np.uint32      # sets max number of vertices
     BOUNDS_DTYPE = np.uint32    # the bounding box types (sets max x/y/z coordinates)
+
+    max_nvertices = np.iinfo(FACE_DTYPE).max
+    max_vertex = 2**(np.iinfo(VERTEX_DTYPE).bits - VERTEX_BPLACES)-1
+    max_bounds = 2**(np.iinfo(BOUNDS_DTYPE).bits - VERTEX_BPLACES)-1
+    vertex_divisor = 2**VERTEX_BPLACES
+
+    save_params = ['reduce_frac', 'decimatePro', 'reduce_nbins', 'min_faces', 'smooth', 'contour_lvl',
+                   'set_voxel_scale', 'scale', 'vertex_divisor', 'nlabels']
 
     def __init__(self, args):
         self.LIST_ARGS += ['mesh_infiles']
@@ -79,6 +88,8 @@ class dpLabelMesher(emLabels):
                 self.mesh_outfile_stl = self.mesh_outfile
             else:
                 assert( ext == 'h5' ) # only stl or h5 outputs supported
+
+        self.nlabels = sum(self.data_attrs['types_nlabels'])
 
         # print out all initialized variables in verbose mode
         if self.dpLabelMesher_verbose: print('dpLabelMesher, verbose mode:\n'); print(vars(self))
@@ -105,7 +116,7 @@ class dpLabelMesher(emLabels):
 
         # get sizes first with hist (prevents sums in meshing loop)
         #self.nVoxels = emLabels.getSizes(cube)[1:]
-        self.nVoxels = emLabels.getSizesMax(cube, sum(self.data_attrs['types_nlabels']))[1:]
+        self.nVoxels = emLabels.getSizesMax(cube, self.nlabels)[1:]
         self.seeds = np.arange(1, self.nVoxels.size+1, dtype=np.int64); self.seeds = self.seeds[self.nVoxels>0]
         #print(np.argmax(self.nVoxels))
 
@@ -130,7 +141,11 @@ class dpLabelMesher(emLabels):
         if self.doplots or self.mesh_outfile_stl: self.allPolyData = vtk.vtkAppendPolyData()
 
         # get bounding boxes for each supervoxel
+        if self.dpLabelMesher_verbose:
+            print('Getting supervoxel bounding boxes'); t = time.time()
         svox_bnd = nd.measurements.find_objects(dataPad, self.seeds[self.seed_range[1]-1])
+        if self.dpLabelMesher_verbose:
+            print('\tdone in %.3f s' % (time.time() - t,))
 
         if self.dpLabelMesher_verbose:
             tloop = time.time(); t = time.time()
@@ -290,21 +305,19 @@ class dpLabelMesher(emLabels):
             if self.dpLabelMesher_verbose:
                 print('Writing output to %s' % self.mesh_outfile); t = time.time()
 
-            # do some checking on the stored types
-            max_nvertices = np.iinfo(self.FACE_DTYPE).max
-            max_vertex = 2**(np.iinfo(self.VERTEX_DTYPE).bits - self.VERTEX_BPLACES)-1
-            max_bounds = 2**(np.iinfo(self.BOUNDS_DTYPE).bits - self.VERTEX_BPLACES)-1
-            bplace = 2**self.VERTEX_BPLACES
+            ## do some checking on the stored types
+            #max_nvertices = np.iinfo(self.FACE_DTYPE).max
+            #max_vertex = 2**(np.iinfo(self.VERTEX_DTYPE).bits - self.VERTEX_BPLACES)-1
+            #max_bounds = 2**(np.iinfo(self.BOUNDS_DTYPE).bits - self.VERTEX_BPLACES)-1
+            #bplace = 2**self.VERTEX_BPLACES
 
             h5file = h5py.File(self.mesh_outfile, 'w')
-            #h5file = h5py.File(self.mesh_outfile, 'a')
-            dataset_root = self.dataset_root
             for i in range(self.seed_range[0], self.seed_range[1]):
                 # need to scale the bounds if the spacing has been set
                 mins = self.mins[i]; beg = self.bounds_beg[i]; end = self.bounds_end[i];
                 if self.set_voxel_scale:
                     scale = self.data_attrs['scale']; mins = mins*scale; beg = beg*scale; end = end*scale
-
+        
                 # the vertices were calculated relative to the whole area being meshed because of:
                 #   dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
                 #   dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
@@ -312,63 +325,124 @@ class dpLabelMesher(emLabels):
                 # make the vertices relative to the bounding box here before writing to the hdf5 output.
                 #vertices = np.round(self.vertices[i] - mins, decimals=self.VERTEX_DROUND)
                 # decided to use a fixed point for the vertex coordinates
-                vertices = np.fix((self.vertices[i] - mins)*bplace)
-
-                # do some checking on the stored types
-                if vertices.shape[0] > max_nvertices:
-                    print('Supervoxel %d (%d voxels) %d vertices' % (self.seeds[i], self.nVoxels[i], vertices.shape[0]))
-                    assert(False)
-                if vertices.max() > max_vertex:
-                    print('Supervoxel %d max vertex %d' % (self.seeds[i], self.nVoxels[i], vertices.max()))
-                    assert(False)
-                if beg.max() > max_bounds:
-                    print('Supervoxel %d max beg bound %d' % (self.seeds[i], self.nVoxels[i], beg.max()))
-                    assert(False)
-                if end.max() > max_bounds:
-                    print('Supervoxel %d max end bound %d' % (self.seeds[i], self.nVoxels[i], end.max()))
-                    assert(False)
-
-                #self.nVoxels; self.faces; self.vertices; self.bounds_beg; self.bounds_end
+                vertices = np.fix((self.vertices[i] - mins)*self.vertex_divisor)
                 str_seed = ('%08d' % self.seeds[i])
-                dsetpath = dataset_root + '/' + str_seed
-                # only enable compression for larger supervoxels
-                #if 'vertices' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['vertices']
-                if self.nVertices[i] > 128:
-                    h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
-                        compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
-                else:
-                    h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE)
-                #if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
-                if self.nFaces[i] > 256:
-                    h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE,
-                        compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
-                else:
-                    h5file.create_dataset(dsetpath + '/faces', data=self.faces[i], dtype=self.FACE_DTYPE)
-                dset = h5file[dataset_root][str_seed]['vertices']
-                dset.attrs.create('nVoxels',self.nVoxels[i])
-                beg = np.array([int(x) for x in beg*bplace], dtype=self.BOUNDS_DTYPE)
-                end = np.array([int(x) for x in end*bplace], dtype=self.BOUNDS_DTYPE)
-                dset.attrs.create('bounds_beg',beg); dset.attrs.create('bounds_end',end)
+                self.writeData(h5file, beg, end, str_seed, self.faces[i], vertices, self.nVoxels[i])
 
-            # use seed 0 (0 is always background) to store global attributes
-            str_seed = ('%08d' % 0)
-            dsetpath = dataset_root + '/' + str_seed
-            #if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
-            h5file.create_dataset(dsetpath + '/faces', data=np.zeros((0,1),dtype=self.FACE_DTYPE),dtype=self.FACE_DTYPE)
-            dset = h5file[dataset_root][str_seed]['faces']
-
-            dset.attrs.create('vertex_divisor',bplace)
-            dset.attrs.create('nlabels',self.seeds[self.seed_range[1]-1])
-            #dset.attrs.create('nlabels',self.nVoxels.size)
-            save_vars = ['reduce_frac', 'decimatePro', 'reduce_nbins', 'min_faces', 'smooth', 'contour_lvl',
-                         'set_voxel_scale', 'scale']
-            for v in save_vars:
-                dset.attrs.create(v, getattr(self, v))
-
+            self.nlabels = self.seeds[self.seed_range[1]-1]
+            self.writeMeta(h5file)
             h5file.close()
             if self.dpLabelMesher_verbose:
                 print('\tdone in %.3f s' % (time.time() - t,))
 
+    def writeData(self, h5file, beg, end, str_seed, faces, vertices, nVoxels):
+        nVertices = vertices.shape[0]; nFaces = faces.shape[0]
+                
+        # do some checking on the stored types
+        if nVertices > self.max_nvertices:
+            print('Supervoxel %d (%d voxels) %d vertices' % (str_seed, nVoxels, nVertices))
+            assert(False)
+        if vertices.max() > self.max_vertex:
+            print('Supervoxel %d max vertex %d' % (str_seed, nVoxels, vertices.max()))
+            assert(False)
+        if beg.max() > self.max_bounds:
+            print('Supervoxel %d max beg bound %d' % (str_seed, nVoxels, beg.max()))
+            assert(False)
+        if end.max() > self.max_bounds:
+            print('Supervoxel %d max end bound %d' % (str_seed, nVoxels, end.max()))
+            assert(False)
+        
+        #self.nVoxels; self.faces; self.vertices; self.bounds_beg; self.bounds_end
+        #str_seed = ('%08d' % seed)
+        dsetpath = self.dataset_root + '/' + str_seed
+        # only enable compression for larger supervoxels
+        if nVertices > 128:
+            h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE,
+                compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+        else:
+            h5file.create_dataset(dsetpath + '/vertices', data=vertices, dtype=self.VERTEX_DTYPE)
+        if nFaces > 256:
+            h5file.create_dataset(dsetpath + '/faces', data=faces, dtype=self.FACE_DTYPE,
+                compression='gzip',compression_opts=self.HDF5_CLVL,shuffle=True,fletcher32=True)
+        else:
+            h5file.create_dataset(dsetpath + '/faces', data=faces, dtype=self.FACE_DTYPE)
+        dset = h5file[self.dataset_root][str_seed]['vertices']
+        dset.attrs.create('nVoxels',nVoxels)
+        beg = np.array([int(x) for x in beg*self.vertex_divisor], dtype=self.BOUNDS_DTYPE)
+        end = np.array([int(x) for x in end*self.vertex_divisor], dtype=self.BOUNDS_DTYPE)
+        dset.attrs.create('bounds_beg',beg); dset.attrs.create('bounds_end',end)
+
+    def writeMeta(self, h5file):
+        # use seed 0 (0 is always background) to store global attributes
+        str_seed = ('%08d' % 0); dsetpath = self.dataset_root + '/' + str_seed
+        #if 'faces' in h5file[dataset_root][str_seed]: del h5file[dataset_root][str_seed]['faces']
+        h5file.create_dataset(dsetpath + '/faces', data=np.zeros((0,1),dtype=self.FACE_DTYPE),dtype=self.FACE_DTYPE)
+        dset = h5file[self.dataset_root][str_seed]['faces']
+        for v in self.save_params: dset.attrs.create(v, getattr(self, v))
+
+    # for merging separate mesh files into a single hdf5 (assumes meshes are for non-overlapping volumes)
+    def mergeMeshInfiles(self):
+        mesh_infiles = glob.glob(os.path.join(self.merge_mesh_path, '*.h5')); nFiles = len(mesh_infiles);
+        if self.dpLabelMesher_verbose: print('Merging %d mesh files' % (nFiles,))
+        
+        # use seed 0 (0 is always background) to store global attributes
+        h5outfile = h5py.File(self.mesh_outfile, 'w');
+        self.writeMeta(h5outfile)
+        dsetout_root = h5outfile[self.dataset_root]
+        
+        # open all the hdf5 files to be merged
+        h5files = nFiles*[None]; dset_roots = nFiles*[None]
+        for i, mesh_infile in zip(range(nFiles), mesh_infiles):
+            h5files[i] = h5py.File(mesh_infile, 'r'); dset_roots[i] = h5files[i][self.dataset_root]
+        
+        if self.dpLabelMesher_verbose:
+            tloop = time.time(); t = time.time()
+        for seed in range(1,self.nlabels+1):
+            if self.dpLabelMesher_verbose and (seed-1) % self.print_every == 0:
+                print('seed : %d / %d' % (seed,self.nlabels))
+            str_seed = ('%08d' % seed)
+            for i in range(nFiles):
+                #h5file = h5py.File(mesh_infile, 'r'); dset_root = h5file[self.dataset_root]
+                dset_root = dset_roots[i]
+                if str_seed in dset_root and 'vertices' in dset_root[str_seed]:
+                    vertices = np.empty_like(dset_root[str_seed]['vertices'])
+                    faces = np.empty_like(dset_root[str_seed]['faces'])
+                    dset_root[str_seed]['vertices'].read_direct(vertices)
+                    dset_root[str_seed]['faces'].read_direct(faces)
+                    if str_seed in dsetout_root and 'vertices' in dsetout_root[str_seed]:                        
+                        cvertices = np.empty_like(dsetout_root[str_seed]['vertices'])
+                        cfaces = np.empty_like(dsetout_root[str_seed]['faces'])
+                        dsetout_root[str_seed]['vertices'].read_direct(cvertices)
+                        dsetout_root[str_seed]['faces'].read_direct(cfaces)
+
+                        # concatenate the meshes
+                        faces += cvertices.shape[0]; faces = np.vstack((cfaces, faces))
+                        nVoxels = dset_root[str_seed]['vertices'].attrs['nVoxels'] + \
+                            dsetout_root[str_seed]['vertices'].attrs['nVoxels']                        
+                        beg = np.min(np.stack((dset_root[str_seed]['vertices'].attrs['bounds_beg'],
+                                                dsetout_root[str_seed]['vertices'].attrs['bounds_beg']), axis=1),axis=1)
+                        end = np.max(np.stack((dset_root[str_seed]['vertices'].attrs['bounds_end'],
+                                                dsetout_root[str_seed]['vertices'].attrs['bounds_end']), axis=1),axis=1)
+                        vertices += (dset_root[str_seed]['vertices'].attrs['bounds_beg'] - beg)
+                        cvertices += (dsetout_root[str_seed]['vertices'].attrs['bounds_beg'] - beg)
+                        vertices = np.vstack((cvertices, vertices))
+                                                
+                        del dsetout_root[str_seed]
+                        self.writeData(h5outfile, beg, end, str_seed, faces, vertices, nVoxels)
+                    else:
+                        self.writeData(h5outfile, dset_root[str_seed]['vertices'].attrs['bounds_beg'], 
+                                       dset_root[str_seed]['vertices'].attrs['bounds_end'], str_seed, 
+                                       faces, vertices, dset_root[str_seed]['vertices'].attrs['nVoxels'])
+                #h5file.close()
+            if self.dpLabelMesher_verbose and (seed-1) % self.print_every == 0:
+                print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
+
+        # close all the hdf5 files
+        for i in range(nFiles): h5files[i].close()
+        h5outfile.close()
+
+        if self.dpLabelMesher_verbose: print('Total ellapsed time merging %.3f s' % (time.time() - tloop,))
+    
     # these routines are for reading previously generated mesh hdf5 files and plotting/writing out statistics
     def readMeshInfiles(self):
         from matplotlib import pylab as pl
@@ -515,6 +589,8 @@ class dpLabelMesher(emLabels):
         p.add_argument('--mesh-outfile', nargs=1, type=str, default='', help='Output label mesh file')
         p.add_argument('--mesh-infiles', nargs='*', type=str, default='',
                        help='Input label mesh file (calculate stats / show plots only)')
+        p.add_argument('--merge-mesh-path', nargs=1, type=str, default='',
+                       help='Input path for mesh files to be merged')
         p.add_argument('--reduce-frac', nargs=1, type=float, default=[0.2], metavar=('PERC'),
             help='Reduce fraction for reducing meshes (decimate pro)')
         #p.add_argument('--reduce-spacing', nargs=3, type=float, default=[10.0, 10.0, 5.0], metavar=('SPC'),
@@ -542,6 +618,8 @@ class dpLabelMesher(emLabels):
         p.add_argument('--set-voxel-scale', action='store_true', dest='set_voxel_scale',
             help='Use the voxel scale to set the data spacing to vtk (vertices in nm)')
         p.add_argument('--doplots', action='store_true', help='Debugging plotting enabled for each supervoxel')
+        p.add_argument('--print-every', nargs=1, type=int, default=[500], metavar=('ITER'),
+                       help='Modulo for print update')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
 if __name__ == '__main__':
@@ -551,7 +629,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    if len(seg2mesh.mesh_infiles) > 0:
+    if seg2mesh.merge_mesh_path:
+        seg2mesh.mergeMeshInfiles()
+    elif len(seg2mesh.mesh_infiles) > 0:
         seg2mesh.readMeshInfiles()
     else:
         seg2mesh.readCubeToBuffers()
