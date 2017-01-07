@@ -38,6 +38,7 @@ import h5py
 import argparse
 import time
 import glob
+import zipfile
 
 from scipy import ndimage as nd
 import scipy.ndimage.filters as filters
@@ -93,6 +94,32 @@ class dpLabelMesher(emLabels):
 
         # print out all initialized variables in verbose mode
         if self.dpLabelMesher_verbose: print('dpLabelMesher, verbose mode:\n'); print(vars(self))
+
+        # xxx - add capability to specify imagej lut on command line
+        self.cmap = np.array([ 0.0000, 0.0000, 1.0000,
+                          1.0000, 0.0000, 0.0000,
+                          0.0000, 1.0000, 0.0000,
+                          ],dtype=np.double).reshape((-1,3))
+
+        #self.colorMap = vtk.vtkColorTransferFunction()
+        #self.colorMap.SetColorSpaceToRGB()
+        ##cmap = np.array([ 0,0,0,1,
+        ##                  1,1,0,0,
+        ##                  2,0,1,1,
+        ##                  ],dtype=np.double).reshape((-1,4))
+        ##self.colorMap.FillFromDataPointer(cmap.shape[0], cmap.tostring())
+        #self.colorMap.AddRGBPoint(0.0, 0.0, 0.0, 1.0)
+        #self.colorMap.AddRGBPoint(1.0, 1.0, 0.0, 0.0)
+        #self.colorMap.AddRGBPoint(2.0, 0.0, 1.0, 0.0)
+        #self.colorMap.Build()
+
+        ## xxx - add capability to specify imagej lut on command line
+        #self.colorMap = vtk.vtkLookupTable()
+        #self.colorMap.SetNumberOfTableValues(256)
+        #self.colorMap.SetTableValue(0, 0.0000, 0.0000, 1.0000, 1)
+        #self.colorMap.SetTableValue(1, 1.0000, 0.0000, 0.0000, 1)
+        #self.colorMap.SetTableValue(2, 0.0000, 1.0000, 0.0000, 1)
+        #self.colorMap.Build()
 
     def procData(self):
         # double negative so that the name doesn't collide with the same option that is off by default in dpLoadh5
@@ -265,7 +292,7 @@ class dpLabelMesher(emLabels):
             if self.doplots:
                 mapper = vtk.vtkPolyDataMapper()
                 mapper.SetInputConnection(deci.GetOutputPort())
-                dpLabelMesher.vtkShow(mapper)
+                dpLabelMesher.vtkShow(mapper=mapper)
 
             # append the current surface to vtk object with all the surfaces
             if self.doplots or self.mesh_outfile_stl:
@@ -279,7 +306,7 @@ class dpLabelMesher(emLabels):
                 mapper = vtk.vtkPolyDataMapper()
                 mapper.SetInputConnection(connectivityFilter.GetOutputPort())
                 mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
-                dpLabelMesher.vtkShow(mapper)
+                dpLabelMesher.vtkShow(mapper=mapper)
 
             if self.dpLabelMesher_verbose and i % self.print_every == 0:
                 print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
@@ -317,7 +344,7 @@ class dpLabelMesher(emLabels):
                 mins = self.mins[i]; beg = self.bounds_beg[i]; end = self.bounds_end[i];
                 if self.set_voxel_scale:
                     scale = self.data_attrs['scale']; mins = mins*scale; beg = beg*scale; end = end*scale
-        
+
                 # the vertices were calculated relative to the whole area being meshed because of:
                 #   dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
                 #   dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
@@ -337,7 +364,7 @@ class dpLabelMesher(emLabels):
 
     def writeData(self, h5file, beg, end, str_seed, faces, vertices, nVoxels):
         nVertices = vertices.shape[0]; nFaces = faces.shape[0]
-                
+
         # do some checking on the stored types
         if nVertices > self.max_nvertices:
             print('Supervoxel %d (%d voxels) %d vertices' % (str_seed, nVoxels, nVertices))
@@ -351,7 +378,7 @@ class dpLabelMesher(emLabels):
         if end.max() > self.max_bounds:
             print('Supervoxel %d max end bound %d' % (str_seed, nVoxels, end.max()))
             assert(False)
-        
+
         #self.nVoxels; self.faces; self.vertices; self.bounds_beg; self.bounds_end
         #str_seed = ('%08d' % seed)
         dsetpath = self.dataset_root + '/' + str_seed
@@ -384,17 +411,17 @@ class dpLabelMesher(emLabels):
     def mergeMeshInfiles(self):
         mesh_infiles = glob.glob(os.path.join(self.merge_mesh_path, '*.h5')); nFiles = len(mesh_infiles);
         if self.dpLabelMesher_verbose: print('Merging %d mesh files' % (nFiles,))
-        
+
         # use seed 0 (0 is always background) to store global attributes
         h5outfile = h5py.File(self.mesh_outfile, 'w');
         self.writeMeta(h5outfile)
         dsetout_root = h5outfile[self.dataset_root]
-        
+
         # open all the hdf5 files to be merged
         h5files = nFiles*[None]; dset_roots = nFiles*[None]
         for i, mesh_infile in zip(range(nFiles), mesh_infiles):
             h5files[i] = h5py.File(mesh_infile, 'r'); dset_roots[i] = h5files[i][self.dataset_root]
-        
+
         if self.dpLabelMesher_verbose:
             tloop = time.time(); t = time.time()
         for seed in range(1,self.nlabels+1):
@@ -409,7 +436,7 @@ class dpLabelMesher(emLabels):
                     faces = np.empty_like(dset_root[str_seed]['faces'])
                     dset_root[str_seed]['vertices'].read_direct(vertices)
                     dset_root[str_seed]['faces'].read_direct(faces)
-                    if str_seed in dsetout_root and 'vertices' in dsetout_root[str_seed]:                        
+                    if str_seed in dsetout_root and 'vertices' in dsetout_root[str_seed]:
                         cvertices = np.empty_like(dsetout_root[str_seed]['vertices'])
                         cfaces = np.empty_like(dsetout_root[str_seed]['faces'])
                         dsetout_root[str_seed]['vertices'].read_direct(cvertices)
@@ -418,7 +445,7 @@ class dpLabelMesher(emLabels):
                         # concatenate the meshes
                         faces += cvertices.shape[0]; faces = np.vstack((cfaces, faces))
                         nVoxels = dset_root[str_seed]['vertices'].attrs['nVoxels'] + \
-                            dsetout_root[str_seed]['vertices'].attrs['nVoxels']                        
+                            dsetout_root[str_seed]['vertices'].attrs['nVoxels']
                         beg = np.min(np.stack((dset_root[str_seed]['vertices'].attrs['bounds_beg'],
                                                 dsetout_root[str_seed]['vertices'].attrs['bounds_beg']), axis=1),axis=1)
                         end = np.max(np.stack((dset_root[str_seed]['vertices'].attrs['bounds_end'],
@@ -426,12 +453,12 @@ class dpLabelMesher(emLabels):
                         vertices += (dset_root[str_seed]['vertices'].attrs['bounds_beg'] - beg)
                         cvertices += (dsetout_root[str_seed]['vertices'].attrs['bounds_beg'] - beg)
                         vertices = np.vstack((cvertices, vertices))
-                                                
+
                         del dsetout_root[str_seed]
                         self.writeData(h5outfile, beg, end, str_seed, faces, vertices, nVoxels)
                     else:
-                        self.writeData(h5outfile, dset_root[str_seed]['vertices'].attrs['bounds_beg'], 
-                                       dset_root[str_seed]['vertices'].attrs['bounds_end'], str_seed, 
+                        self.writeData(h5outfile, dset_root[str_seed]['vertices'].attrs['bounds_beg'],
+                                       dset_root[str_seed]['vertices'].attrs['bounds_end'], str_seed,
                                        faces, vertices, dset_root[str_seed]['vertices'].attrs['nVoxels'])
                 #h5file.close()
             if self.dpLabelMesher_verbose and (seed-1) % self.print_every == 0:
@@ -442,7 +469,7 @@ class dpLabelMesher(emLabels):
         h5outfile.close()
 
         if self.dpLabelMesher_verbose: print('Total ellapsed time merging %.3f s' % (time.time() - tloop,))
-    
+
     # these routines are for reading previously generated mesh hdf5 files and plotting/writing out statistics
     def readMeshInfiles(self):
         from matplotlib import pylab as pl
@@ -537,6 +564,89 @@ class dpLabelMesher(emLabels):
         for v in return_vars: return_dict[v] = cur[v]
         return return_dict
 
+    def showMergeMesh(self):
+        # xxx - add support for multiple mesh files somehow (need knossos support likely with supercube ids)
+        h5file = h5py.File(self.mesh_infiles[0], 'r'); dset_root = h5file[self.dataset_root]
+
+        # read meta-data in seed 0
+        str_seed = ('%08d' % 0)
+        #nlabels = h5file[self.dataset_root][str_seed]['faces'].attrs['nlabels']
+        vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
+        #reduce_frac = dset_root[str_seed]['faces'].attrs['reduce_frac']
+
+        while True:
+            zf = zipfile.ZipFile(self.annotation_file, mode='r'); inmerge = zf.read('mergelist.txt'); zf.close()
+            merge_list = inmerge.decode("utf-8").split('\n'); del inmerge
+            nlines = len(merge_list); n = nlines // 4
+
+            # reallocate everything
+            renderer = vtk.vtkRenderer()
+            self.faces = n * [None]; self.vertices = n * [None]
+            self.allPolyData = n * [None]; self.allMappers = n * [None]; self.allActors = n * [None]
+            self.nFaces = np.zeros((n,), dtype=np.uint64); self.nVertices = np.zeros((n,), dtype=np.uint64);
+
+            # xxx - currently display all objects, add option to select objects
+            for i in range(n):
+                self.allPolyData[i] = vtk.vtkAppendPolyData()
+
+                # Object_ID, ToDo_flag, Immutability_flag, Supervoxel_IDs, '\n'
+                tomerge = merge_list[i*4].split(' ')
+                #cobj = tomerge[0];
+                tomerge = tomerge[3:]
+
+                nsvox = len(tomerge)
+                self.faces[i] = nsvox * [None]; self.vertices[i] = nsvox * [None]
+                for j in range(nsvox):
+                    str_seed = ('%08d' % int(tomerge[j]))
+                    cvertices = np.empty_like(dset_root[str_seed]['vertices'])
+                    cfaces = np.empty_like(dset_root[str_seed]['faces'])
+                    dset_root[str_seed]['vertices'].read_direct(cvertices)
+                    dset_root[str_seed]['faces'].read_direct(cfaces)
+                    nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
+
+                    # vertices are stored as fixed-point
+                    cvertices = cvertices.astype(np.double) / vertex_divisor
+                    cvertices += dset_root[str_seed]['vertices'].attrs['bounds_beg']
+
+                    # vtk needs unstructured grid with number of points in each cell
+                    cfaces = np.hstack((3*np.ones((nfaces, 1),dtype=cfaces.dtype), cfaces))
+
+                    # need to keep references around apparently to avoid segfault
+                    # https://github.com/Kitware/VTK/blob/master/Wrapping/Python/vtk/util/numpy_support.py
+                    self.vertices[i][j] = cvertices; self.faces[i][j] = cfaces
+
+                    # just for printing to console for each object
+                    self.nFaces[i] += nfaces; self.nVertices[i] += nvertices
+
+                    # create and append poly data
+                    # http://www.vtk.org/Wiki/VTK/Examples/Python/GeometricObjects/Display/Polygon
+                    points = vtk.vtkPoints(); points.SetData(nps.numpy_to_vtk(cvertices))
+
+                    # http://stackoverflow.com/questions/20146421/how-to-convert-a-mesh-to-vtk-format/20146620#20146620
+                    cells = vtk.vtkCellArray()
+                    cells.SetCells(nfaces, nps.numpy_to_vtk(cfaces, array_type=vtk.vtkIdTypeArray().GetDataType()))
+
+                    polyData = vtk.vtkPolyData(); polyData.SetPoints(points); polyData.SetPolys(cells)
+                    self.allPolyData[i].AddInputData(polyData)
+
+                self.allMappers[i] = vtk.vtkPolyDataMapper()
+                self.allMappers[i].SetInputConnection(self.allPolyData[i].GetOutputPort())
+                #mapper.SetLookupTable(self.colorMap)
+                self.allActors[i] = vtk.vtkActor()
+                self.allActors[i].SetMapper(self.allMappers[i])
+                self.allActors[i].GetProperty().SetColor(self.cmap[i,0],self.cmap[i,1],self.cmap[i,2])
+                #self.allActors[i].SetOpacity(self.opacities[i])
+                renderer.AddActor(self.allActors[i])
+
+            print('For %d objects' % (n,))
+            print('\tnVertices %s' % (np.array_str(self.nVertices)[1:-1]))
+            print('\tnFaces %s' % (np.array_str(self.nFaces)[1:-1]))
+            dpLabelMesher.vtkShow(renderer=renderer)
+
+            # xxx - add some keyboard input here to select different object when select is added
+
+        h5file.close()
+
     @classmethod
     def labelMesher(cls, srcfile, dataset, chunk, offset, size, reduce_frac, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpLabelMesher',
@@ -555,14 +665,17 @@ class dpLabelMesher(emLabels):
         return stm
 
     @staticmethod
-    def vtkShow(mapper):
-        # open a window and display the data specified by mapper
-        # need an actor and a renderer to display data
-        actor = vtk.vtkActor()
-        actor.SetMapper(mapper)
-        renderer = vtk.vtkRenderer()
-        renderer.AddActor(actor)
-        renderer.SetBackground(1.0, 1.0, 1.0)
+    def vtkShow(mapper=None, renderer=None):
+        if renderer is None:
+            # open a window and display the data specified by mapper
+            # need an actor and a renderer to display data
+            actor = vtk.vtkActor()
+            actor.SetMapper(mapper)
+            renderer = vtk.vtkRenderer()
+            renderer.AddActor(actor)
+
+        #renderer.SetBackground(1.0, 1.0, 1.0)
+        renderer.SetBackground(0.0, 0.0, 0.0)
 
         # optionally setup the camera (xxx - and lighting?)
         #camera = renderer.MakeCamera()
@@ -591,6 +704,8 @@ class dpLabelMesher(emLabels):
                        help='Input label mesh file (calculate stats / show plots only)')
         p.add_argument('--merge-mesh-path', nargs=1, type=str, default='',
                        help='Input path for mesh files to be merged')
+        p.add_argument('--annotation-file', nargs=1, type=str, default='',
+                       help='Input annotation file from knossos (show merged meshes)')
         p.add_argument('--reduce-frac', nargs=1, type=float, default=[0.2], metavar=('PERC'),
             help='Reduce fraction for reducing meshes (decimate pro)')
         #p.add_argument('--reduce-spacing', nargs=3, type=float, default=[10.0, 10.0, 5.0], metavar=('SPC'),
@@ -629,7 +744,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    if seg2mesh.merge_mesh_path:
+    if seg2mesh.annotation_file:
+        seg2mesh.showMergeMesh()
+    elif seg2mesh.merge_mesh_path:
         seg2mesh.mergeMeshInfiles()
     elif len(seg2mesh.mesh_infiles) > 0:
         seg2mesh.readMeshInfiles()
