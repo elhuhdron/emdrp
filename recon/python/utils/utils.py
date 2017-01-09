@@ -1,6 +1,7 @@
 
 import numpy as np
 import scipy.sparse as sp
+import re
 
 # argmax over csr sparse matrix, inspired from:
 # http://stackoverflow.com/questions/30742572/argmax-of-each-row-or-column-in-scipy-sparse-matrix
@@ -74,14 +75,88 @@ def optimal_color(graph, chromatic):
     solution_exists = graphColoringUtil(graph, chromatic, color, 0)
     return dict((n, c-1) for n,c in color.items()) if solution_exists else None
 
+# based on modified knossos_read_nml.m which in tern is
+# modified version of KLEE_readKNOSSOS_v4.m from kb
+# works with knossos release 4.2.1
+# function [krk_output, meta, commentsString] = knossos_read_nml(krk_fname)
+def knossos_read_nml(krk_fname=None, krk_contents=None):
+    if krk_contents is None:
+        with open(krk_fname, 'r') as myfile:
+            krk_contents=myfile.read()
+    
+    # load PARAMETERS (returned in meta), modified by pwatkins
+    meta = {}
+    krk_parameters = re.search('<parameters>(.*?)</parameters>',krk_contents,re.DOTALL)
+    params = re.findall('<(\S+?)\s+(.*?)\/>',krk_parameters.group(1),re.DOTALL)
+    for krk_pc in range(len(params)):
+        subparams = re.findall('(\S*?)=\"(.*?)\"',params[krk_pc][1])
+        meta[params[krk_pc][0]] = {}
+        for krk_sub in range(len(subparams)):
+            #print(params[krk_pc][0], subparams[krk_sub][0], subparams[krk_sub][1])
+            try:
+                meta[params[krk_pc][0]][subparams[krk_sub][0]] = float(subparams[krk_sub][1])
+            except ValueError:
+                meta[params[krk_pc][0]][subparams[krk_sub][0]] = subparams[krk_sub][1]
+
+    krk_things = re.findall('(<thing id.*?</thing>)',krk_contents,re.DOTALL)
+    
+    # load COMMENTS
+    commentsString = re.findall('<comments>(.*)</comments>',krk_contents,re.DOTALL)[0].strip()
+
+    # load THINGS
+    nThings = len(krk_things); krk_output = [{} for i in range(nThings)]
+    # decided to drop radius and return node info as integers
+    node_fields = [0,2,3,4] # node id, [radius], x, y, z
+    return_fields = [3,0,1,2]; nnode_fields = len(node_fields) 
+    dtype_nodes = np.uint32; dtype_edges = np.uint32
+    for krk_tc in range(nThings):
+        # xxx - not using this, commented for speed
+        #krk_output[krk_tc]['comment'] = re.search('comment="(.*?)"', 
+        #    re.match('<thing id.*?>', krk_things[krk_tc]).group(0)).group(1)
+
+        krk_output[krk_tc]["thingID"] = int(re.match('<thing id="(.*?)"',krk_things[krk_tc]).group(1))
+    
+        krk_theseNodes = re.findall('<node .*?/>',krk_things[krk_tc]); nnodes = len(krk_theseNodes)
+        krk_output[krk_tc]["nodes"] = np.zeros((nnodes,nnode_fields),dtype=dtype_nodes)
+        
+        for krk_nc in range(nnodes):
+            krk_thisNode = re.findall('\".+?\"',krk_theseNodes[krk_nc])
+            for i,n in zip(return_fields, node_fields):
+                krk_output[krk_tc]["nodes"][krk_nc,i] = int(krk_thisNode[n][1:-1])
+
+        krk_theseEdges = re.findall('<edge .*?/>',krk_things[krk_tc]); nedges = len(krk_theseEdges)
+        krk_output[krk_tc]["edges"] = np.zeros((nedges,2),dtype=dtype_edges)
+
+        for krk_nc in range(nedges):
+            krk_thisEdge = re.findall('\".+?\"',krk_theseEdges[krk_nc])
+            krk_output[krk_tc]["edges"][krk_nc,0] = int(krk_thisEdge[0][1:-1])
+            krk_output[krk_tc]["edges"][krk_nc,1] = int(krk_thisEdge[1][1:-1])
+
+        if nnodes == 0 or nedges == 0:
+            krk_output[krk_tc]["edges"] = None
+            continue
+            
+        krk_nodeIDconversion = np.zeros((krk_output[krk_tc]["nodes"][:,3].max(),), dtype=dtype_nodes)
+        sel = np.arange(nnodes,dtype=dtype_nodes)
+        krk_nodeIDconversion[krk_output[krk_tc]["nodes"][sel,3]-1] = sel
+
+        krk_output[krk_tc]["edges"] = krk_nodeIDconversion[krk_output[krk_tc]["edges"]-1]
+                
+    return krk_output, meta, commentsString
+    
 # testing
 if __name__ == '__main__':
-    #X = sp.identity(5, dtype='int8', format='csc')
-    #X = sp.rand(900, 1200, density=0.01, format='csr', dtype=np.float32); X[400:410,:] = 0; X.eliminate_zeros()
-    #X = sp.coo_matrix( np.array([[1,0,3,4],[0,7,6,5],[0,0,0,2]]) ).tocsr()
-    #x = np.zeros((5,5)); x[3,3]=1; x[2,1]=1; X = sp.coo_matrix( x ).tocsc()
-    x = np.zeros((5,5)); X = sp.coo_matrix( x ).tocsr()
-    print(X)
+    #    #X = sp.identity(5, dtype='int8', format='csc')
+    #    #X = sp.rand(900, 1200, density=0.01, format='csr', dtype=np.float32); X[400:410,:] = 0; X.eliminate_zeros()
+    #    #X = sp.coo_matrix( np.array([[1,0,3,4],[0,7,6,5],[0,0,0,2]]) ).tocsr()
+    #    #x = np.zeros((5,5)); x[3,3]=1; x[2,1]=1; X = sp.coo_matrix( x ).tocsc()
+    #    x = np.zeros((5,5)); X = sp.coo_matrix( x ).tocsr()
+    #    print(X)
+    #
+    #    Xa = csr_csc_argmax(X)
+    #    print(Xa); print(Xa.shape, Xa.dtype)
 
-    Xa = csr_csc_argmax(X)
-    print(Xa); print(Xa.shape, Xa.dtype)
+    info, meta, comments = knossos_read_nml('/Users/pwatkins/Downloads/skeleton-kara-mod.054.nml')
+    print(len(info))
+    
+    

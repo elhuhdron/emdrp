@@ -39,6 +39,7 @@ import argparse
 import time
 import glob
 import zipfile
+import re
 
 from scipy import ndimage as nd
 import scipy.ndimage.filters as filters
@@ -48,7 +49,7 @@ from vtk.util import numpy_support as nps
 #from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
 from typesh5 import emLabels
-from utils import showImgData
+from utils import showImgData, knossos_read_nml
 
 class dpLabelMesher(emLabels):
 
@@ -73,7 +74,7 @@ class dpLabelMesher(emLabels):
                    'set_voxel_scale', 'scale', 'vertex_divisor', 'nlabels']
 
     def __init__(self, args):
-        self.LIST_ARGS += ['mesh_infiles']
+        self.LIST_ARGS += ['mesh_infiles', 'merge_objects', 'skeletons']
         emLabels.__init__(self,args)
 
         #self.data_type = self.DTYPE
@@ -574,24 +575,39 @@ class dpLabelMesher(emLabels):
         vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
         #reduce_frac = dset_root[str_seed]['faces'].attrs['reduce_frac']
 
+        nobjs = len(self.merge_objects); nskels = len(self.skeletons)
+
+        # this loop continues until ctrl-C, automatically updates to next annotation file
         while True:
-            zf = zipfile.ZipFile(self.annotation_file, mode='r'); inmerge = zf.read('mergelist.txt'); zf.close()
+            zf = zipfile.ZipFile(self.annotation_file, mode='r'); 
+            inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
+            zf.close()
+
+            # read the merge list
             merge_list = inmerge.decode("utf-8").split('\n'); del inmerge
             nlines = len(merge_list); n = nlines // 4
 
-            # reallocate everything
+            # read the skeletons
+            info, meta, commentsString = knossos_read_nml(krk_contents=inskel.decode("utf-8")); m = len(info)
+
+            # allocate renderer for this pass
             renderer = vtk.vtkRenderer()
+
+            # reallocate everything for the meshes
             self.faces = n * [None]; self.vertices = n * [None]
             self.allPolyData = n * [None]; self.allMappers = n * [None]; self.allActors = n * [None]
             self.nFaces = np.zeros((n,), dtype=np.uint64); self.nVertices = np.zeros((n,), dtype=np.uint64);
 
-            # xxx - currently display all objects, add option to select objects
+            # iterated over objects to be meshed, render all the meshes in the mergelist for each object
+            cnt = -1; obj_sel = np.zeros((n,),dtype=np.bool)
             for i in range(n):
                 self.allPolyData[i] = vtk.vtkAppendPolyData()
 
                 # Object_ID, ToDo_flag, Immutability_flag, Supervoxel_IDs, '\n'
                 tomerge = merge_list[i*4].split(' ')
-                #cobj = tomerge[0];
+                cobj = int(tomerge[0])
+                if nobjs > 0 and cobj not in self.merge_objects: continue
+                cnt += 1; obj_sel[i] = 1
                 tomerge = tomerge[3:]
 
                 nsvox = len(tomerge)
@@ -634,16 +650,75 @@ class dpLabelMesher(emLabels):
                 #mapper.SetLookupTable(self.colorMap)
                 self.allActors[i] = vtk.vtkActor()
                 self.allActors[i].SetMapper(self.allMappers[i])
-                self.allActors[i].GetProperty().SetColor(self.cmap[i,0],self.cmap[i,1],self.cmap[i,2])
-                #self.allActors[i].SetOpacity(self.opacities[i])
+                self.allActors[i].GetProperty().SetColor(self.cmap[cnt,0],self.cmap[cnt,1],self.cmap[cnt,2])
+                self.allActors[i].GetProperty().SetOpacity(0.6)
                 renderer.AddActor(self.allActors[i])
 
-            print('For %d objects' % (n,))
-            print('\tnVertices %s' % (np.array_str(self.nVertices)[1:-1]))
-            print('\tnFaces %s' % (np.array_str(self.nFaces)[1:-1]))
+            # reallocate everything for the skeletons
+            self.skel_faces = m * [None]; self.skel_vertices = m * [None]
+            self.skel_allPolyData = m * [None]; self.skel_allMappers = m * [None]; self.skel_allActors = m * [None]
+            self.skel_nFaces = np.zeros((m,), dtype=np.uint64); self.skel_nVertices = np.zeros((m,), dtype=np.uint64);
+            
+            # iterate over skeletons to be rendered
+            cnt = -1; skel_sel = np.zeros((m,),dtype=np.bool)
+            for i in range(m):
+                self.skel_allPolyData[i] = vtk.vtkAppendPolyData()
+
+                if nskels > 0 and info[i]['thingID'] not in self.skeletons: continue
+                cnt += 1; skel_sel[i] = 1
+
+                cvertices = info[i]['nodes'][:,:3].copy(order='C')
+                cfaces = info[i]['edges']
+                nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
+
+                # vertices are stored in nml as dataset voxel coordinates
+                if self.set_voxel_scale: cvertices = cvertices * self.data_attrs['scale']
+
+                # vtk needs unstructured grid with number of points in each cell
+                cfaces = np.hstack((2*np.ones((nfaces, 1),dtype=cfaces.dtype), cfaces))
+
+                # need to keep references around apparently to avoid segfault
+                # https://github.com/Kitware/VTK/blob/master/Wrapping/Python/vtk/util/numpy_support.py
+                self.skel_vertices[i] = cvertices; self.skel_faces[i] = cfaces
+
+                # just for printing to console for each object
+                self.skel_nFaces[i] += nfaces; self.skel_nVertices[i] += nvertices
+
+                # create and append poly data
+                # http://www.vtk.org/Wiki/VTK/Examples/Python/GeometricObjects/Display/Polygon
+                points = vtk.vtkPoints(); points.SetData(nps.numpy_to_vtk(cvertices))
+
+                # http://stackoverflow.com/questions/20146421/how-to-convert-a-mesh-to-vtk-format/20146620#20146620
+                cells = vtk.vtkCellArray()
+                cells.SetCells(nfaces, nps.numpy_to_vtk(cfaces, array_type=vtk.vtkIdTypeArray().GetDataType()))
+
+                polyData = vtk.vtkPolyData(); polyData.SetPoints(points); polyData.SetLines(cells)
+                self.skel_allPolyData[i].AddInputData(polyData)
+
+                self.skel_allMappers[i] = vtk.vtkPolyDataMapper()
+                self.skel_allMappers[i].SetInputConnection(self.skel_allPolyData[i].GetOutputPort())
+                #mapper.SetLookupTable(self.colorMap)
+                self.skel_allActors[i] = vtk.vtkActor()
+                self.skel_allActors[i].SetMapper(self.skel_allMappers[i])
+                self.skel_allActors[i].GetProperty().SetColor(self.cmap[cnt,0],self.cmap[cnt,1],self.cmap[cnt,2])
+                renderer.AddActor(self.skel_allActors[i])
+
+            print('For %d objects' % (n if nobjs==0 else nobjs,))
+            print('\tnVertices %s' % (np.array_str(self.nVertices[obj_sel])[1:-1]))
+            print('\tnFaces %s' % (np.array_str(self.nFaces[obj_sel])[1:-1]))
+            print('For %d skeletons' % (m if nskels==0 else nskels,))
+            print('\tnNodes %s' % (np.array_str(self.skel_nVertices[skel_sel])[1:-1]))
+            print('\tnEdges %s' % (np.array_str(self.skel_nFaces[skel_sel])[1:-1]))
             dpLabelMesher.vtkShow(renderer=renderer)
 
-            # xxx - add some keyboard input here to select different object when select is added
+            parts = re.match('(.+?)\.(\d+?)\.(.+)', self.annotation_file).groups()
+            if len(parts) == 3:
+                try:
+                    self.annotation_file = '%s.%03d.%s' % (parts[0],int(parts[1])+1,parts[2])
+                except ValueError:
+                    pass
+            fn = input('Enter next annotation file [%s]: ' % self.annotation_file).strip()
+            if len(fn) > 0: self.annotation_file = fn
 
         h5file.close()
 
@@ -735,6 +810,10 @@ class dpLabelMesher(emLabels):
         p.add_argument('--doplots', action='store_true', help='Debugging plotting enabled for each supervoxel')
         p.add_argument('--print-every', nargs=1, type=int, default=[500], metavar=('ITER'),
                        help='Modulo for print update')
+        p.add_argument('--merge-objects', nargs='*', type=int, default=[], metavar=('OBJS'),
+                       help='Which objects to display (for annotation-file mode)')
+        p.add_argument('--skeletons', nargs='*', type=int, default=[], metavar=('SKELS'),
+                       help='Which skeletons to display (for annotation-file mode)')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
 if __name__ == '__main__':
