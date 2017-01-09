@@ -96,12 +96,20 @@ class dpLabelMesher(emLabels):
         # print out all initialized variables in verbose mode
         if self.dpLabelMesher_verbose: print('dpLabelMesher, verbose mode:\n'); print(vars(self))
 
-        # xxx - add capability to specify imagej lut on command line
-        self.cmap = np.array([ 0.0000, 0.0000, 1.0000,
-                          1.0000, 0.0000, 0.0000,
-                          0.0000, 1.0000, 0.0000,
-                          ],dtype=np.double).reshape((-1,3))
+        # colormap for annotation-file mode (viewing merged meshes / skeletons)
+        if self.lut_file:
+            self.cmap = np.fromfile(self.lut_file, dtype=np.uint8).reshape((3,-1)).T.astype(np.double)/255
+        else:
+            # a crappy default
+            self.cmap = np.array([ 0.0000, 0.0000, 1.0000,
+                                   1.0000, 0.0000, 0.0000,
+                                   0.0000, 1.0000, 0.0000,
+                                   0.0000, 1.0000, 1.0000,
+                                   1.0000, 1.0000, 0.0000,
+                                   1.0000, 0.0000, 1.0000,
+                                   ],dtype=np.double).reshape((-1,3))
 
+        # xxx - using vtkColorMap or vtkLookupTable with appendPolyData did not work, using multiple actors instead
         #self.colorMap = vtk.vtkColorTransferFunction()
         #self.colorMap.SetColorSpaceToRGB()
         ##cmap = np.array([ 0,0,0,1,
@@ -114,7 +122,6 @@ class dpLabelMesher(emLabels):
         #self.colorMap.AddRGBPoint(2.0, 0.0, 1.0, 0.0)
         #self.colorMap.Build()
 
-        ## xxx - add capability to specify imagej lut on command line
         #self.colorMap = vtk.vtkLookupTable()
         #self.colorMap.SetNumberOfTableValues(256)
         #self.colorMap.SetTableValue(0, 0.0000, 0.0000, 1.0000, 1)
@@ -566,26 +573,37 @@ class dpLabelMesher(emLabels):
         return return_dict
 
     def showMergeMesh(self):
-        # xxx - add support for multiple mesh files somehow (need knossos support likely with supercube ids)
-        h5file = h5py.File(self.mesh_infiles[0], 'r'); dset_root = h5file[self.dataset_root]
 
-        # read meta-data in seed 0
-        str_seed = ('%08d' % 0)
-        #nlabels = h5file[self.dataset_root][str_seed]['faces'].attrs['nlabels']
-        vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
-        #reduce_frac = dset_root[str_seed]['faces'].attrs['reduce_frac']
-
+        # for viewing subsets of the objects/skeletons in the annotation file.
+        # use object / skeleton < 0 to disable viewing objects / skeletons entirely.
         nobjs = len(self.merge_objects); nskels = len(self.skeletons)
+
+        # incase there is no meshing file and just using this to view skeletons
+        if nobjs > 0 and self.merge_objects[0] < 0:
+            h5file = None
+        else:
+            # xxx - add support for multiple mesh files somehow (need knossos support likely with supercube ids)
+            h5file = h5py.File(self.mesh_infiles[0], 'r'); dset_root = h5file[self.dataset_root]
+
+            # read meta-data in seed 0
+            str_seed = ('%08d' % 0)
+            #nlabels = h5file[self.dataset_root][str_seed]['faces'].attrs['nlabels']
+            vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
+            #reduce_frac = dset_root[str_seed]['faces'].attrs['reduce_frac']
+
+            # xxx - need to fix this not getting copied correctly during merge
+            # make skeleton rendering consistent with h5 file
+            #self.set_voxel_scale = dset_root[str_seed]['faces'].attrs['set_voxel_scale']
 
         # this loop continues until ctrl-C, automatically updates to next annotation file
         while True:
-            zf = zipfile.ZipFile(self.annotation_file, mode='r'); 
+            # get the nml skeleton file and mergelist out of the zipped knossos annotation file
+            zf = zipfile.ZipFile(self.annotation_file, mode='r');
             inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
             zf.close()
 
             # read the merge list
-            merge_list = inmerge.decode("utf-8").split('\n'); del inmerge
-            nlines = len(merge_list); n = nlines // 4
+            merge_list = inmerge.decode("utf-8").split('\n'); nlines = len(merge_list); n = nlines // 4
 
             # read the skeletons
             info, meta, commentsString = knossos_read_nml(krk_contents=inskel.decode("utf-8")); m = len(info)
@@ -597,9 +615,10 @@ class dpLabelMesher(emLabels):
             self.faces = n * [None]; self.vertices = n * [None]
             self.allPolyData = n * [None]; self.allMappers = n * [None]; self.allActors = n * [None]
             self.nFaces = np.zeros((n,), dtype=np.uint64); self.nVertices = np.zeros((n,), dtype=np.uint64);
+            self.nSVoxels = np.zeros((n,), dtype=np.uint64); self.nVoxels = np.zeros((n,), dtype=np.uint64)
 
             # iterated over objects to be meshed, render all the meshes in the mergelist for each object
-            cnt = -1; obj_sel = np.zeros((n,),dtype=np.bool)
+            obj_cnt = 0; obj_sel = np.zeros((n,),dtype=np.bool)
             for i in range(n):
                 self.allPolyData[i] = vtk.vtkAppendPolyData()
 
@@ -607,10 +626,10 @@ class dpLabelMesher(emLabels):
                 tomerge = merge_list[i*4].split(' ')
                 cobj = int(tomerge[0])
                 if nobjs > 0 and cobj not in self.merge_objects: continue
-                cnt += 1; obj_sel[i] = 1
+                obj_cnt += 1; obj_sel[i] = 1
                 tomerge = tomerge[3:]
 
-                nsvox = len(tomerge)
+                nsvox = len(tomerge); self.nSVoxels[i] = nsvox
                 self.faces[i] = nsvox * [None]; self.vertices[i] = nsvox * [None]
                 for j in range(nsvox):
                     str_seed = ('%08d' % int(tomerge[j]))
@@ -624,7 +643,7 @@ class dpLabelMesher(emLabels):
                     cvertices = cvertices.astype(np.double) / vertex_divisor
                     cvertices += dset_root[str_seed]['vertices'].attrs['bounds_beg']
 
-                    # vtk needs unstructured grid with number of points in each cell
+                    # vtk needs unstructured grid preceded with number of points in each cell
                     cfaces = np.hstack((3*np.ones((nfaces, 1),dtype=cfaces.dtype), cfaces))
 
                     # need to keep references around apparently to avoid segfault
@@ -633,6 +652,7 @@ class dpLabelMesher(emLabels):
 
                     # just for printing to console for each object
                     self.nFaces[i] += nfaces; self.nVertices[i] += nvertices
+                    self.nVoxels[i] += dset_root[str_seed]['vertices'].attrs['nVoxels']
 
                     # create and append poly data
                     # http://www.vtk.org/Wiki/VTK/Examples/Python/GeometricObjects/Display/Polygon
@@ -650,38 +670,41 @@ class dpLabelMesher(emLabels):
                 #mapper.SetLookupTable(self.colorMap)
                 self.allActors[i] = vtk.vtkActor()
                 self.allActors[i].SetMapper(self.allMappers[i])
-                self.allActors[i].GetProperty().SetColor(self.cmap[cnt,0],self.cmap[cnt,1],self.cmap[cnt,2])
-                self.allActors[i].GetProperty().SetOpacity(0.6)
+                self.allActors[i].GetProperty().SetColor(self.cmap[obj_cnt-1,0],self.cmap[obj_cnt-1,1],
+                    self.cmap[obj_cnt-1,2])
+                self.allActors[i].GetProperty().SetOpacity(0.4)
                 renderer.AddActor(self.allActors[i])
 
             # reallocate everything for the skeletons
             self.skel_faces = m * [None]; self.skel_vertices = m * [None]
             self.skel_allPolyData = m * [None]; self.skel_allMappers = m * [None]; self.skel_allActors = m * [None]
             self.skel_nFaces = np.zeros((m,), dtype=np.uint64); self.skel_nVertices = np.zeros((m,), dtype=np.uint64);
-            
+            self.skel_visPts = m * [None]; self.skel_lblMappers = m * [None]; self.skel_lblActors = m * [None]
+
             # iterate over skeletons to be rendered
-            cnt = -1; skel_sel = np.zeros((m,),dtype=np.bool)
+            skel_cnt = 0; skel_sel = np.zeros((m,),dtype=np.bool)
             for i in range(m):
                 self.skel_allPolyData[i] = vtk.vtkAppendPolyData()
 
                 if nskels > 0 and info[i]['thingID'] not in self.skeletons: continue
-                cnt += 1; skel_sel[i] = 1
+                skel_cnt += 1; skel_sel[i] = 1
 
                 cvertices = info[i]['nodes'][:,:3].copy(order='C')
+                cnode_ids = info[i]['nodes'][:,3].astype(np.double, copy=True)
                 cfaces = info[i]['edges']
                 nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
 
                 # vertices are stored in nml as dataset voxel coordinates
                 if self.set_voxel_scale: cvertices = cvertices * self.data_attrs['scale']
 
-                # vtk needs unstructured grid with number of points in each cell
+                # vtk needs unstructured grid preceded with number of points in each cell
                 cfaces = np.hstack((2*np.ones((nfaces, 1),dtype=cfaces.dtype), cfaces))
 
                 # need to keep references around apparently to avoid segfault
                 # https://github.com/Kitware/VTK/blob/master/Wrapping/Python/vtk/util/numpy_support.py
                 self.skel_vertices[i] = cvertices; self.skel_faces[i] = cfaces
 
-                # just for printing to console for each object
+                # just for printing to console for each skeleton
                 self.skel_nFaces[i] += nfaces; self.skel_nVertices[i] += nvertices
 
                 # create and append poly data
@@ -692,21 +715,46 @@ class dpLabelMesher(emLabels):
                 cells = vtk.vtkCellArray()
                 cells.SetCells(nfaces, nps.numpy_to_vtk(cfaces, array_type=vtk.vtkIdTypeArray().GetDataType()))
 
+                # vtkPolyData also works for lines, just have to use setlines instead of setpolys
                 polyData = vtk.vtkPolyData(); polyData.SetPoints(points); polyData.SetLines(cells)
+                polyData.GetCellData().SetScalars(nps.numpy_to_vtk(cnode_ids))
                 self.skel_allPolyData[i].AddInputData(polyData)
 
                 self.skel_allMappers[i] = vtk.vtkPolyDataMapper()
                 self.skel_allMappers[i].SetInputConnection(self.skel_allPolyData[i].GetOutputPort())
-                #mapper.SetLookupTable(self.colorMap)
+                self.skel_allMappers[i].ScalarVisibilityOff()
                 self.skel_allActors[i] = vtk.vtkActor()
                 self.skel_allActors[i].SetMapper(self.skel_allMappers[i])
-                self.skel_allActors[i].GetProperty().SetColor(self.cmap[cnt,0],self.cmap[cnt,1],self.cmap[cnt,2])
+                self.skel_allActors[i].GetProperty().SetColor(self.cmap[skel_cnt,0],self.cmap[skel_cnt,1],
+                    self.cmap[skel_cnt,2])
                 renderer.AddActor(self.skel_allActors[i])
 
-            print('For %d objects' % (n if nobjs==0 else nobjs,))
+                # Create labels for points
+                # xxx - left off here, http://www.vtk.org/Wiki/VTK/Examples/Cxx/Visualization/LabelPlacementMapper
+                self.skel_visPts[i] = vtk.vtkSelectVisiblePoints()
+                self.skel_visPts[i].SetInputConnection(self.skel_allPolyData[i].GetOutputPort())
+                self.skel_visPts[i].SetRenderer(renderer)
+                #visPts.SelectionWindowOn()
+                #visPts.SetSelection(xmin, xmin + xLength, ymin, ymin + yLength)
+                # Create the mapper to display the point ids.  Specify the format to
+                # use for the labels.  Also create the associated actor.
+                self.skel_lblMappers[i] = vtk.vtkLabeledDataMapper()
+                # ldm.SetLabelFormat("%g")
+                self.skel_lblMappers[i].SetInputConnection(self.skel_visPts[i].GetOutputPort())
+                self.skel_lblMappers[i].SetLabelModeToLabelIds()
+                #self.skel_lblMappers[i].SetLabelModeToLabelScalars()
+                self.skel_lblActors[i] = vtk.vtkActor2D()
+                self.skel_lblActors[i].SetMapper(self.skel_lblMappers[i])
+                renderer.AddActor(self.skel_lblActors[i])
+
+            print('For %d objects' % (n if nobjs==0 else obj_cnt,))
+            print('\tnSuperVoxels %s' % (np.array_str(self.nSVoxels[obj_sel])[1:-1]))
             print('\tnVertices %s' % (np.array_str(self.nVertices[obj_sel])[1:-1]))
             print('\tnFaces %s' % (np.array_str(self.nFaces[obj_sel])[1:-1]))
-            print('For %d skeletons' % (m if nskels==0 else nskels,))
+            print('\tnVoxels %s' % (np.array_str(self.nVoxels[obj_sel])[1:-1]))
+            print('\tworst case cube nVertices %s' % (np.array_str(8*self.nVoxels[obj_sel])[1:-1]))
+            print('\tworst case cube nFaces %s' % (np.array_str(6*self.nVoxels[obj_sel])[1:-1]))
+            print('For %d skeletons' % (m if nskels==0 else skel_cnt,))
             print('\tnNodes %s' % (np.array_str(self.skel_nVertices[skel_sel])[1:-1]))
             print('\tnEdges %s' % (np.array_str(self.skel_nFaces[skel_sel])[1:-1]))
             dpLabelMesher.vtkShow(renderer=renderer)
@@ -720,7 +768,7 @@ class dpLabelMesher(emLabels):
             fn = input('Enter next annotation file [%s]: ' % self.annotation_file).strip()
             if len(fn) > 0: self.annotation_file = fn
 
-        h5file.close()
+        if h5file is not None: h5file.close()
 
     @classmethod
     def labelMesher(cls, srcfile, dataset, chunk, offset, size, reduce_frac, verbose=False):
@@ -764,6 +812,7 @@ class dpLabelMesher(emLabels):
         renderWin = vtk.vtkRenderWindow()
         renderWin.AddRenderer(renderer)
         renderInteractor = vtk.vtkRenderWindowInteractor()
+        renderInteractor.GetInteractorStyle().SetCurrentStyleToTrackballCamera()
         renderInteractor.SetRenderWindow(renderWin)
         renderWin.SetSize(800, 800)
         renderInteractor.Initialize()
@@ -814,6 +863,7 @@ class dpLabelMesher(emLabels):
                        help='Which objects to display (for annotation-file mode)')
         p.add_argument('--skeletons', nargs='*', type=int, default=[], metavar=('SKELS'),
                        help='Which skeletons to display (for annotation-file mode)')
+        p.add_argument('--lut-file', nargs=1, type=str, default='', help='Specify colormap (for annotation-file mode')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
 if __name__ == '__main__':
