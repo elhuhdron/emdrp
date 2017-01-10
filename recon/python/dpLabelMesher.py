@@ -591,7 +591,7 @@ class dpLabelMesher(emLabels):
             vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
             #reduce_frac = dset_root[str_seed]['faces'].attrs['reduce_frac']
 
-            # xxx - need to fix this not getting copied correctly during merge
+            # xxx - need to fix this not getting copied during merge
             # make skeleton rendering consistent with h5 file
             #self.set_voxel_scale = dset_root[str_seed]['faces'].attrs['set_voxel_scale']
 
@@ -663,6 +663,8 @@ class dpLabelMesher(emLabels):
                     cells.SetCells(nfaces, nps.numpy_to_vtk(cfaces, array_type=vtk.vtkIdTypeArray().GetDataType()))
 
                     polyData = vtk.vtkPolyData(); polyData.SetPoints(points); polyData.SetPolys(cells)
+                    
+                    # use appendpolydata to render multiple supervoxels per object
                     self.allPolyData[i].AddInputData(polyData)
 
                 self.allMappers[i] = vtk.vtkPolyDataMapper()
@@ -677,20 +679,18 @@ class dpLabelMesher(emLabels):
 
             # reallocate everything for the skeletons
             self.skel_faces = m * [None]; self.skel_vertices = m * [None]
-            self.skel_allPolyData = m * [None]; self.skel_allMappers = m * [None]; self.skel_allActors = m * [None]
+            self.skel_polyData = m * [None]; self.skel_allMappers = m * [None]; self.skel_allActors = m * [None]
             self.skel_nFaces = np.zeros((m,), dtype=np.uint64); self.skel_nVertices = np.zeros((m,), dtype=np.uint64);
-            self.skel_visPts = m * [None]; self.skel_lblMappers = m * [None]; self.skel_lblActors = m * [None]
+            self.skel_lblStrings = m * [None]; self.skel_lblFilter = m * [None]
+            self.skel_lblMappers = m * [None]; self.skel_lblActors = m * [None]
 
             # iterate over skeletons to be rendered
             skel_cnt = 0; skel_sel = np.zeros((m,),dtype=np.bool)
             for i in range(m):
-                self.skel_allPolyData[i] = vtk.vtkAppendPolyData()
-
                 if nskels > 0 and info[i]['thingID'] not in self.skeletons: continue
                 skel_cnt += 1; skel_sel[i] = 1
 
                 cvertices = info[i]['nodes'][:,:3].copy(order='C')
-                cnode_ids = info[i]['nodes'][:,3].astype(np.double, copy=True)
                 cfaces = info[i]['edges']
                 nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
 
@@ -717,35 +717,45 @@ class dpLabelMesher(emLabels):
 
                 # vtkPolyData also works for lines, just have to use setlines instead of setpolys
                 polyData = vtk.vtkPolyData(); polyData.SetPoints(points); polyData.SetLines(cells)
-                polyData.GetCellData().SetScalars(nps.numpy_to_vtk(cnode_ids))
-                self.skel_allPolyData[i].AddInputData(polyData)
 
+                self.skel_polyData[i] = polyData
                 self.skel_allMappers[i] = vtk.vtkPolyDataMapper()
-                self.skel_allMappers[i].SetInputConnection(self.skel_allPolyData[i].GetOutputPort())
+                self.skel_allMappers[i].SetInputData(self.skel_polyData[i])
                 self.skel_allMappers[i].ScalarVisibilityOff()
                 self.skel_allActors[i] = vtk.vtkActor()
                 self.skel_allActors[i].SetMapper(self.skel_allMappers[i])
                 self.skel_allActors[i].GetProperty().SetColor(self.cmap[skel_cnt,0],self.cmap[skel_cnt,1],
                     self.cmap[skel_cnt,2])
                 renderer.AddActor(self.skel_allActors[i])
+                
+                if self.show_node_ids:
+                    # for adding node id labels to skeleton nodes
+                    # xxx - couldn't find a potentially more efficient way to convert to vtkStringArray
+                    #   neither setting the labels as an integer array or attempting to convert to string worked:
+                    #labels = nps.numpy_to_vtk(info[i]['nodes'][:,3].copy(order='C'))
+                    #labels = nps.numpy_to_vtk(info[i]['nodes'][:,3].copy(order='C'), 
+                    #                          array_type=vtk.vtkStringArray().GetDataType()); 
+                    labels = vtk.vtkStringArray(); labels.SetNumberOfValues(nvertices)
+                    for j in range(nvertices):
+                        labels.SetValue(j, str(info[i]['nodes'][j,3]))
+                    labels.SetName('NodeIDs')
+                    polyData.GetPointData().AddArray(labels)
+                    
+                    # Generate the label hierarchy.
+                    pointSetToLabelHierarchyFilter = vtk.vtkPointSetToLabelHierarchy()
+                    pointSetToLabelHierarchyFilter.SetInputData(polyData)
+                    pointSetToLabelHierarchyFilter.SetLabelArrayName('NodeIDs')
+                    #pointSetToLabelHierarchyFilter->SetPriorityArrayName("sizes");
+                    pointSetToLabelHierarchyFilter.Update()
+                    # Create a mapper and actor for the labels.
+                    labelMapper = vtk.vtkLabelPlacementMapper()
+                    labelMapper.SetInputConnection(pointSetToLabelHierarchyFilter.GetOutputPort())
+                    labelActor = vtk.vtkActor2D()
+                    labelActor.SetMapper(labelMapper)
 
-                # Create labels for points
-                # xxx - left off here, http://www.vtk.org/Wiki/VTK/Examples/Cxx/Visualization/LabelPlacementMapper
-                self.skel_visPts[i] = vtk.vtkSelectVisiblePoints()
-                self.skel_visPts[i].SetInputConnection(self.skel_allPolyData[i].GetOutputPort())
-                self.skel_visPts[i].SetRenderer(renderer)
-                #visPts.SelectionWindowOn()
-                #visPts.SetSelection(xmin, xmin + xLength, ymin, ymin + yLength)
-                # Create the mapper to display the point ids.  Specify the format to
-                # use for the labels.  Also create the associated actor.
-                self.skel_lblMappers[i] = vtk.vtkLabeledDataMapper()
-                # ldm.SetLabelFormat("%g")
-                self.skel_lblMappers[i].SetInputConnection(self.skel_visPts[i].GetOutputPort())
-                self.skel_lblMappers[i].SetLabelModeToLabelIds()
-                #self.skel_lblMappers[i].SetLabelModeToLabelScalars()
-                self.skel_lblActors[i] = vtk.vtkActor2D()
-                self.skel_lblActors[i].SetMapper(self.skel_lblMappers[i])
-                renderer.AddActor(self.skel_lblActors[i])
+                    self.skel_lblStrings[i] = labels; self.skel_lblFilter[i] = pointSetToLabelHierarchyFilter
+                    self.skel_lblMappers[i] = labelMapper; self.skel_lblActors[i] = labelActor
+                    renderer.AddActor(self.skel_lblActors[i])
 
             print('For %d objects' % (n if nobjs==0 else obj_cnt,))
             print('\tnSuperVoxels %s' % (np.array_str(self.nSVoxels[obj_sel])[1:-1]))
@@ -864,6 +874,7 @@ class dpLabelMesher(emLabels):
         p.add_argument('--skeletons', nargs='*', type=int, default=[], metavar=('SKELS'),
                        help='Which skeletons to display (for annotation-file mode)')
         p.add_argument('--lut-file', nargs=1, type=str, default='', help='Specify colormap (for annotation-file mode')
+        p.add_argument('--show-node-ids', action='store_true', help='Show node id strings (for annotation-file mode)')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
 if __name__ == '__main__':
