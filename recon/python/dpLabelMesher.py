@@ -730,6 +730,7 @@ class dpLabelMesher(emLabels):
                 
                 if self.show_node_ids:
                     # for adding node id labels to skeleton nodes
+                    # http://www.vtk.org/Wiki/VTK/Examples/Cxx/Visualization/LabelPlacementMapper
                     # xxx - couldn't find a potentially more efficient way to convert to vtkStringArray
                     #   neither setting the labels as an integer array or attempting to convert to string worked:
                     #labels = nps.numpy_to_vtk(info[i]['nodes'][:,3].copy(order='C'))
