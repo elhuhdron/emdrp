@@ -663,18 +663,18 @@ class dpLabelMesher(emLabels):
                     cells.SetCells(nfaces, nps.numpy_to_vtk(cfaces, array_type=vtk.vtkIdTypeArray().GetDataType()))
 
                     polyData = vtk.vtkPolyData(); polyData.SetPoints(points); polyData.SetPolys(cells)
-                    
+
                     # use appendpolydata to render multiple supervoxels per object
                     self.allPolyData[i].AddInputData(polyData)
 
                 self.allMappers[i] = vtk.vtkPolyDataMapper()
                 self.allMappers[i].SetInputConnection(self.allPolyData[i].GetOutputPort())
-                #mapper.SetLookupTable(self.colorMap)
+                ##mapper.SetLookupTable(self.colorMap)  # xxx - couldn't get this to work
                 self.allActors[i] = vtk.vtkActor()
                 self.allActors[i].SetMapper(self.allMappers[i])
                 self.allActors[i].GetProperty().SetColor(self.cmap[obj_cnt-1,0],self.cmap[obj_cnt-1,1],
                     self.cmap[obj_cnt-1,2])
-                self.allActors[i].GetProperty().SetOpacity(0.4)
+                self.allActors[i].GetProperty().SetOpacity(self.opacity)
                 renderer.AddActor(self.allActors[i])
 
             # reallocate everything for the skeletons
@@ -690,8 +690,7 @@ class dpLabelMesher(emLabels):
                 if nskels > 0 and info[i]['thingID'] not in self.skeletons: continue
                 skel_cnt += 1; skel_sel[i] = 1
 
-                cvertices = info[i]['nodes'][:,:3].copy(order='C')
-                cfaces = info[i]['edges']
+                cvertices = info[i]['nodes'][:,:3].copy(order='C'); cfaces = info[i]['edges']
                 nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
 
                 # vertices are stored in nml as dataset voxel coordinates
@@ -727,21 +726,21 @@ class dpLabelMesher(emLabels):
                 self.skel_allActors[i].GetProperty().SetColor(self.cmap[skel_cnt,0],self.cmap[skel_cnt,1],
                     self.cmap[skel_cnt,2])
                 renderer.AddActor(self.skel_allActors[i])
-                
+
                 if self.show_node_ids:
                     # for adding node id labels to skeleton nodes
                     # http://www.vtk.org/Wiki/VTK/Examples/Cxx/Visualization/LabelPlacementMapper
                     # xxx - couldn't find a potentially more efficient way to convert to vtkStringArray
                     #   neither setting the labels as an integer array or attempting to convert to string worked:
                     #labels = nps.numpy_to_vtk(info[i]['nodes'][:,3].copy(order='C'))
-                    #labels = nps.numpy_to_vtk(info[i]['nodes'][:,3].copy(order='C'), 
-                    #                          array_type=vtk.vtkStringArray().GetDataType()); 
+                    #labels = nps.numpy_to_vtk(info[i]['nodes'][:,3].copy(order='C'),
+                    #                          array_type=vtk.vtkStringArray().GetDataType());
                     labels = vtk.vtkStringArray(); labels.SetNumberOfValues(nvertices)
                     for j in range(nvertices):
                         labels.SetValue(j, str(info[i]['nodes'][j,3]))
                     labels.SetName('NodeIDs')
                     polyData.GetPointData().AddArray(labels)
-                    
+
                     # Generate the label hierarchy.
                     pointSetToLabelHierarchyFilter = vtk.vtkPointSetToLabelHierarchy()
                     pointSetToLabelHierarchyFilter.SetInputData(polyData)
@@ -876,6 +875,7 @@ class dpLabelMesher(emLabels):
                        help='Which skeletons to display (for annotation-file mode)')
         p.add_argument('--lut-file', nargs=1, type=str, default='', help='Specify colormap (for annotation-file mode')
         p.add_argument('--show-node-ids', action='store_true', help='Show node id strings (for annotation-file mode)')
+        p.add_argument('--opacity', nargs=1, type=float, default=[1.0], help='Mesh opacity (for annotation-file mode)')
         p.add_argument('--dpLabelMesher-verbose', action='store_true', help='Debugging output for dpLabelMesher')
 
 if __name__ == '__main__':
