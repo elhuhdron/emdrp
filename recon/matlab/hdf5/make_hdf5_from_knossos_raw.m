@@ -47,7 +47,7 @@ for mag = mags
   % Options for only writing a subset of the Knossos raw chunks to the hdf5 file.
   % This will result in chunk indices into the hdf5 file that start at (0,0,0) for the offset defined here.
   % Use false for writing the entire hypercube to the hdf5 file.
-  do_chunk_select = true;
+  do_chunk_select = false;
   assert( ~do_chunk_select || length(mags)==1 ); % xxx - can't do select with multiple mags right now
   % original 27 frontend "cubes"
   chunk_sel_offset = [8 9 3];
@@ -67,6 +67,7 @@ for mag = mags
   
   % END PARAMETERS
 
+  tall = now;
   knossos_conf = parse_knossos_conf(inpath, knossos_conf_fn);
   rawtotal = prod(int64(rawsize));
 
@@ -145,6 +146,7 @@ for mag = mags
     for ix2 = 1:nchunks(2)
       for ix3 = 1:nchunks(3)
         if chunk_lists(ix1,ix2,ix3)
+          chunk_lists(ix1,ix2,ix3) = false; % set back to true below if this chunk is valid
           chunk_ind = [ix1 ix2 ix3]-1;
           chunk_ind_write = chunk_ind - chunk_sel_offset;
           if all(chunk_ind_write >= 0 & chunk_ind_write < nchunks_selr)
@@ -154,6 +156,7 @@ for mag = mags
               t = now;
               fh = fopen(fn); V = fread(fh,bytes_per_chunk,'uint8=>uint8'); fclose(fh);
               if length(V) == rawtotal
+                chunk_lists(ix1,ix2,ix3) = true; % valid chunk
                 V = reshape(V,chunksizer);
                 if do_write
                   if ~do_chunk_select_crop
@@ -178,7 +181,21 @@ for mag = mags
     write_struct_to_hd5attr(knossos_conf,outfile,data_name);
     write_struct_to_hd5attr(data_conf,outfile,data_name);
     
+    % write out another dataset that contains a boolean mask of valid chunks (chunk_lists)
+    cname = [data_name '_chunk_mask']; csize = size(chunk_lists); 
+    cdata = uint8(permute(chunk_lists,dim_order)); 
+    if do_Corder
+      h5create(outfile,['/' cname],csize([3 2 1]),'ChunkSize',csize,'Datatype','uint8',...
+        'Deflate',5,'Fletcher32',true,'Shuffle',true,'FillValue',uint8(0));
+      h5write(outfile,['/' cname],permute(cdata,[3 2 1]),[1 1 1],csize([3 2 1]));
+    else
+      h5create(outfile,['/' cname],csize,'ChunkSize',csize,'Datatype','uint8','Deflate',5,...
+        'Fletcher32',true,'Shuffle',true,'FillValue',uint8(0));
+      h5write(outfile,['/' cname],cdata,[1 1 1],csize);
+    end
+    
     h5disp(outfile)
   end
-  
+
+  display(sprintf('done writing %s in %.3f s',data_name,(now-tall)*86400));
 end
