@@ -29,13 +29,8 @@ import numpy as np
 #import h5py
 import argparse
 import time
-#import os
-
-#from scipy import ndimage as nd
-#import scipy.ndimage.filters as filters
-from scipy import fftpack as scipy_fft
-from numpy import fft as numpy_fft
-import pyfftw
+import glob
+import os
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
@@ -105,6 +100,10 @@ class dpVolumeXcorr(dpWriteh5):
             print('\tdone in %.4f s, %d train images' % (time.time() - t, self.ntrain_data))
 
     def xcorr(self):
+        from scipy import fftpack as scipy_fft
+        from numpy import fft as numpy_fft
+        import pyfftw
+
         # allocate the outputs
         szC = np.hstack((self.ntest, self.size[2]))
         #szP = np.hstack((szC, self.nprob_types))
@@ -258,7 +257,7 @@ class dpVolumeXcorr(dpWriteh5):
                     for i in range(self.nprob_types):
                         winner_sel = (thistesttypes==i)
                         Pcout[i][x,y,z] = winner_sel.sum(dtype=np.double)/mn
-                        if self.probfile:
+                        if self.probfile and Pcout[i][x,y,z] > 0:
                             thistestprobs = self.probs[i][xrng,yrng,z]
                             winner_probs = thistestprobs[winner_sel]
                             # xxx - what measures to calculate here?
@@ -270,13 +269,71 @@ class dpVolumeXcorr(dpWriteh5):
 
         if self.savefile:
             if self.dpVolumeXcorr_verbose:
-                print('precompute fft loop'); t = time.time()
+                print('saving output data'); t = time.time()
 
-            np.savez(self.savefile, Cout=Cout, Pcout=Pcout, Poutm=Poutm, Pouts=Pouts)
+            np.savez(self.savefile, Cout=Cout, Pcout=Pcout, Poutm=Poutm, Pouts=Pouts, 
+                     prob_types=self.prob_types, chunk=self.chunk, offset=self.offset, size=self.size)
 
             if self.dpVolumeXcorr_verbose:
                 print('\tdone in %.4f s' % (time.time() - t, ))
 
+    def doplots(self):
+        from matplotlib import pylab as pl
+        #import matplotlib as plt
+
+        o = np.load(self.loadfile)
+        self.nprob_types = len(o['Pcout'])
+        self.ntest = o['Cout'].shape[:2]
+
+        # the plot is dead, long live the plot, huzzah!
+        #m = plt.markers
+        clrs = ['r','g','b','m','c','y','k']; #markers = ['x','+',m.CARETLEFT,m.CARETRIGHT,m.CARETUP,m.CARETDOWN,'*']
+
+        if len(o['Poutm']) > 0 and o['Poutm'][0] is not None:
+            pl.figure(1)
+            pl.subplot(1,2,1)
+            for i in range(self.nprob_types):
+                pl.scatter(o['Cout'], o['Poutm'][i], s=8, c=clrs[i], alpha=0.5)
+            pl.legend(o['prob_types'])
+            pl.ylabel('mean winning prob')
+            pl.xlabel('correlation')
+            pl.subplot(1,2,2)
+            for i in range(self.nprob_types):
+                pl.scatter(o['Cout'], o['Pouts'][i], s=8, c=clrs[i], alpha=0.5)
+            pl.legend(o['prob_types'])
+            pl.ylabel('std winning prob')
+            pl.xlabel('correlation')
+
+        pl.show()
+
+    def concatenate(self):
+        loadfiles = glob.glob(os.path.join(self.loadfiles_path, '*.npz')); nFiles = len(loadfiles);
+        if self.dpVolumeXcorr_verbose:
+            print('Concatenating over %d load files' % (nFiles,))
+
+        for i in range(nFiles):
+            o = np.load(loadfiles[i])
+            assert( (o['offset'] == 0).all() ) # did not see a reason to deal with non-chunk alignment
+            if i==0:
+                size = o['size']; ntest = o['Cout'].shape
+                test_size = size // ntest  # already asserted divisible when xcorr run
+                assert( (self.reduce_size % test_size == 0).all() )
+                # xxx - thought of making this general, but essentially z-direction is always per slice
+                #   so reduce z locally per test block concatenation and then do final reduction afterwards
+                concat_ntest = ntest
+                if self.reduce_size[2] < size[2]:
+                    assert( test_size[2] % self.reduce_size[2]  == 0 )
+                    concat_ntest[2] = test_size[2] // self.reduce_size[2]
+                else:
+                    concat_ntest[2] = self.size[2]
+                
+                # allocate concatenated outputs (assigned after per-block z reduction)
+                concat_size = self.concat_nchunks * concat_ntest
+                concat_Cout = np.zeros(concat_size, dtype=np.double)
+                concat_Pcout = np.zeros(concat_size, dtype=np.double)
+            else:
+                assert( (size == o['size']).all() and (ntest == o['Cout']).all() )
+            chunk = o['chunk']
 
     # translated from kb's code (taken from matlab central???)
     # Another numerics backstop. If any of the coefficients are outside the
@@ -320,6 +377,13 @@ class dpVolumeXcorr(dpWriteh5):
             help='Size of the sliding correlation windows')
         p.add_argument('--savefile', nargs=1, type=str, default='', help='Path/name npz file to save outputs to')
         p.add_argument('--loadfile', nargs=1, type=str, default='', help='Load previous run saved in npz for plotting')
+        p.add_argument('--loadfiles-path', nargs=1, type=str, default='', help='Path to saved runs to concatenate')
+        p.add_argument('--concat-chunk', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+            help='Starting chunk alignment for concatenate')
+        p.add_argument('--concat-nchunks', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+            help='Total area for concatenation (chunks)')
+        p.add_argument('--reduce-size', nargs=3, type=float, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+            help='Block size to reduce down to after concantenation (voxels)')
         p.add_argument('--dpVolumeXcorr-verbose', action='store_true', help='Debugging output for dpVolumeXcorr')
 
 if __name__ == '__main__':
@@ -329,5 +393,11 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     vxcorr = dpVolumeXcorr(args)
-    vxcorr.loadData()
-    vxcorr.xcorr()
+    if vxcorr.loadfiles_path:
+        vxcorr.concatenate()
+    elif vxcorr.loadfile:
+        vxcorr.doplots()
+    else:
+        vxcorr.loadData()
+        vxcorr.xcorr()
+    
