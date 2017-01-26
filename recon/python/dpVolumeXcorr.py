@@ -42,7 +42,7 @@ class dpVolumeXcorr(dpWriteh5):
     use_fft = use_pyfftw_fft
 
     def __init__(self, args):
-        self.LIST_ARGS += ['train_offsets']
+        self.LIST_ARGS += ['train_offsets', 'prob_types']
         dpWriteh5.__init__(self,args)
 
         self.nprob_types = len(self.prob_types)
@@ -271,7 +271,7 @@ class dpVolumeXcorr(dpWriteh5):
             if self.dpVolumeXcorr_verbose:
                 print('saving output data'); t = time.time()
 
-            np.savez(self.savefile, Cout=Cout, Pcout=Pcout, Poutm=Poutm, Pouts=Pouts, 
+            np.savez(self.savefile, Cout=Cout, Pcout=Pcout, Poutm=Poutm, Pouts=Pouts,
                      prob_types=self.prob_types, chunk=self.chunk, offset=self.offset, size=self.size)
 
             if self.dpVolumeXcorr_verbose:
@@ -314,26 +314,73 @@ class dpVolumeXcorr(dpWriteh5):
         for i in range(nFiles):
             o = np.load(loadfiles[i])
             assert( (o['offset'] == 0).all() ) # did not see a reason to deal with non-chunk alignment
+            assert( (o['size'] % self.chunksize == 0).all() ) # did not see a reason to deal with non-chunk alignment
             if i==0:
-                size = o['size']; ntest = o['Cout'].shape
+                size = o['size']; ntest = np.array(o['Cout'].shape)
                 test_size = size // ntest  # already asserted divisible when xcorr run
                 assert( (self.reduce_size % test_size == 0).all() )
+                reduce_ntest = self.reduce_size // test_size
                 # xxx - thought of making this general, but essentially z-direction is always per slice
                 #   so reduce z locally per test block concatenation and then do final reduction afterwards
                 concat_ntest = ntest
                 if self.reduce_size[2] < size[2]:
-                    assert( test_size[2] % self.reduce_size[2]  == 0 )
-                    concat_ntest[2] = test_size[2] // self.reduce_size[2]
+                    assert( ntest[2] % self.reduce_size[2]  == 0 )
+                    concat_ntest[2] = ntest[2] // self.reduce_size[2]
+                    concat_zreduce = self.reduce_size[2]
                 else:
-                    concat_ntest[2] = self.size[2]
-                
+                    assert( self.reduce_size[2] % size[2] == 0 )
+                    concat_ntest[2] = size[2]
+                    concat_zreduce = size[2]
+                concat_zreduce_rng = range(0,size[2],concat_zreduce)
+
+                nprob_types = len(o['prob_types'])
+
                 # allocate concatenated outputs (assigned after per-block z reduction)
                 concat_size = self.concat_nchunks * concat_ntest
                 concat_Cout = np.zeros(concat_size, dtype=np.double)
-                concat_Pcout = np.zeros(concat_size, dtype=np.double)
+                concat_Pcout = [np.zeros(concat_size, dtype=np.double) for i in range(nprob_types)]
+
+                #print(size,test_size,ntest,self.reduce_size,concat_size,concat_ntest)
             else:
                 assert( (size == o['size']).all() and (ntest == o['Cout']).all() )
+                assert( len(o['prob_types']) == nprob_types )
             chunk = o['chunk']
+
+            # assign with the z-accumulation
+            inds = (chunk - self.concat_chunk)*self.chunksize//size
+            concat_Cout[inds[0]:inds[0]+concat_ntest[0], inds[1]:inds[1]+concat_ntest[1],
+                        inds[2]:inds[2]+concat_ntest[2]] = np.add.reduceat(o['Cout'], concat_zreduce_rng,
+                            axis=2)/concat_zreduce
+            for i in range(nprob_types):
+                concat_Pcout[i][inds[0]:inds[0]+concat_ntest[0], inds[1]:inds[1]+concat_ntest[1],
+                            inds[2]:inds[2]+concat_ntest[2]] = np.add.reduceat(o['Pcout'][i], concat_zreduce_rng,
+                                axis=2)/concat_zreduce
+
+        # now do the final reduction over the whole concatenated volume.
+        # have to do z-first as to avoid the unequal average of averages scenario.
+        Cout = concat_Cout; Pcout = concat_Pcout
+        for j in range(dpLoadh5.ND)[::-1]:
+            if j==2:
+                n = self.reduce_size[j] // size[j]
+            else:
+                n = reduce_ntest[j]
+            if n > 1:
+                Cout = np.add.reduceat(Cout, range(0,concat_size[j],n), axis=j)/n
+                for i in range(nprob_types):
+                    Pcout[i] = np.add.reduceat(Pcout[i], range(0,concat_size[j],n), axis=j)/n
+        print(Cout, Pcout[0])
+
+        if self.savefile:
+            if self.dpVolumeXcorr_verbose:
+                print('saving output data'); t = time.time()
+
+            np.savez(self.savefile, Cout=Cout, Pcout=Pcout,
+                     prob_types=o['prob_types'], concat_chunk=self.concat_chunk, concat_nchunks=self.concat_nchunks,
+                     reduce_size=self.reduce_size, ntest=ntest, size=size)
+
+            if self.dpVolumeXcorr_verbose:
+                print('\tdone in %.4f s' % (time.time() - t, ))
+
 
     # translated from kb's code (taken from matlab central???)
     # Another numerics backstop. If any of the coefficients are outside the
@@ -377,13 +424,16 @@ class dpVolumeXcorr(dpWriteh5):
             help='Size of the sliding correlation windows')
         p.add_argument('--savefile', nargs=1, type=str, default='', help='Path/name npz file to save outputs to')
         p.add_argument('--loadfile', nargs=1, type=str, default='', help='Load previous run saved in npz for plotting')
+
+        # arguments for concatenate mode (concatenate runs over dpCubeIter volumes and reduce down to specified size)
         p.add_argument('--loadfiles-path', nargs=1, type=str, default='', help='Path to saved runs to concatenate')
         p.add_argument('--concat-chunk', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Starting chunk alignment for concatenate')
         p.add_argument('--concat-nchunks', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Total area for concatenation (chunks)')
-        p.add_argument('--reduce-size', nargs=3, type=float, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+        p.add_argument('--reduce-size', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Block size to reduce down to after concantenation (voxels)')
+
         p.add_argument('--dpVolumeXcorr-verbose', action='store_true', help='Debugging output for dpVolumeXcorr')
 
 if __name__ == '__main__':
@@ -400,4 +450,3 @@ if __name__ == '__main__':
     else:
         vxcorr.loadData()
         vxcorr.xcorr()
-    
