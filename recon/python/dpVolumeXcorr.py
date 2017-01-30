@@ -131,7 +131,7 @@ class dpVolumeXcorr(dpWriteh5):
         Fb = np.zeros(szO, dtype=np.complex64)
 
         if self.use_fft == dpVolumeXcorr.use_pyfftw_fft:
-            fftA = pyfftw.builders.fft2(pyfftw.empty_aligned(A_size, dtype='complex64'), s=outsize, threads=8)
+            fftA = pyfftw.builders.fft2(pyfftw.empty_aligned(A_size, dtype='complex64'),s=outsize,threads=self.nthreads)
             # input array is resized to output, so take a slice for the input array assignment
             _A = fftA.input_array; _A[:] = 0 + 0j; A = _A[:A_size[0],:A_size[1]]
         else:
@@ -163,11 +163,11 @@ class dpVolumeXcorr(dpWriteh5):
         C = np.zeros((self.ntrain_data),dtype=np.double)
 
         if self.use_fft == dpVolumeXcorr.use_pyfftw_fft:
-            fftT = pyfftw.builders.fft2(pyfftw.empty_aligned(T_size, dtype='complex64'), s=outsize, threads=8)
+            fftT = pyfftw.builders.fft2(pyfftw.empty_aligned(T_size, dtype='complex64'),s=outsize,threads=self.nthreads)
             # input array is resized to output, so take a slice for the input array assignment
             _T = fftT.input_array; _T[:] = 0 + 0j; T = _T[:T_size[0],:T_size[1]]
 
-            fftF = pyfftw.builders.ifft2(pyfftw.empty_aligned(outsize, dtype='complex64'), threads=8)
+            fftF = pyfftw.builders.ifft2(pyfftw.empty_aligned(outsize, dtype='complex64'), threads=self.nthreads)
             F = fftF.input_array
         else:
             T = np.empty(T_size, dtype=np.single)
@@ -424,6 +424,7 @@ class dpVolumeXcorr(dpWriteh5):
             help='Size of the sliding correlation windows')
         p.add_argument('--savefile', nargs=1, type=str, default='', help='Path/name npz file to save outputs to')
         p.add_argument('--loadfile', nargs=1, type=str, default='', help='Load previous run saved in npz for plotting')
+        p.add_argument('--nthreads', nargs=1, type=int, default=[8], help='Number of threads to use in fftw')
 
         # arguments for concatenate mode (concatenate runs over dpCubeIter volumes and reduce down to specified size)
         p.add_argument('--loadfiles-path', nargs=1, type=str, default='', help='Path to saved runs to concatenate')
