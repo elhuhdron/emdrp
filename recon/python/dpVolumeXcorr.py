@@ -131,7 +131,8 @@ class dpVolumeXcorr(dpWriteh5):
         Fb = np.zeros(szO, dtype=np.complex64)
 
         if self.use_fft == dpVolumeXcorr.use_pyfftw_fft:
-            fftA = pyfftw.builders.fft2(pyfftw.empty_aligned(A_size, dtype='complex64'),s=outsize,threads=self.nthreads)
+            fftA = pyfftw.builders.fft2(pyfftw.empty_aligned(A_size, dtype='complex64'),
+                                        s=outsize, threads=self.nthreads)
             # input array is resized to output, so take a slice for the input array assignment
             _A = fftA.input_array; _A[:] = 0 + 0j; A = _A[:A_size[0],:A_size[1]]
         else:
@@ -150,7 +151,6 @@ class dpVolumeXcorr(dpWriteh5):
                 Fb[:,:,traincount] = numpy_fft.fft2(A,s=outsize)
             elif self.use_fft == dpVolumeXcorr.use_pyfftw_fft:
                 Fb[:,:,traincount] = fftA()
-        #np.savez('tmp' + str(self.use_fft), Fb=Fb)
         #from scipy.io import savemat
         #savemat('tmp'  + str(self.use_fft),{'Fb':Fb})
 
@@ -163,11 +163,13 @@ class dpVolumeXcorr(dpWriteh5):
         C = np.zeros((self.ntrain_data),dtype=np.double)
 
         if self.use_fft == dpVolumeXcorr.use_pyfftw_fft:
-            fftT = pyfftw.builders.fft2(pyfftw.empty_aligned(T_size, dtype='complex64'),s=outsize,threads=self.nthreads)
+            fftT = pyfftw.builders.fft2(pyfftw.empty_aligned(T_size, dtype='complex64'), s=outsize,
+                                        threads=self.nthreads, planner_effort='FFTW_EXHAUSTIVE')
             # input array is resized to output, so take a slice for the input array assignment
             _T = fftT.input_array; _T[:] = 0 + 0j; T = _T[:T_size[0],:T_size[1]]
 
-            fftF = pyfftw.builders.ifft2(pyfftw.empty_aligned(outsize, dtype='complex64'), threads=self.nthreads)
+            fftF = pyfftw.builders.ifft2(pyfftw.empty_aligned(outsize, dtype='complex64'),
+                                         threads=self.nthreads, planner_effort='FFTW_EXHAUSTIVE')
             F = fftF.input_array
         else:
             T = np.empty(T_size, dtype=np.single)
