@@ -94,7 +94,7 @@ class dpLabelMesher(emLabels):
         self.nlabels = sum(self.data_attrs['types_nlabels'])
 
         # print out all initialized variables in verbose mode
-        if self.dpLabelMesher_verbose: print('dpLabelMesher, verbose mode:\n'); print(vars(self))
+        #if self.dpLabelMesher_verbose: print('dpLabelMesher, verbose mode:\n'); print(vars(self))
 
         # colormap for annotation-file mode (viewing merged meshes / skeletons)
         if self.lut_file:
@@ -135,7 +135,7 @@ class dpLabelMesher(emLabels):
         # changed this to off by default and use same flag from dpLoadh5
         if self.legacy_transpose: cube = self.data_cube.transpose((1,0,2))
         else: cube = self.data_cube
-
+       
         # for easy saving of scale as attribute in hdf5 output
         self.scale = self.data_attrs['scale']
 
@@ -154,10 +154,10 @@ class dpLabelMesher(emLabels):
         self.nVoxels = emLabels.getSizesMax(cube, self.nlabels)[1:]
         self.seeds = np.arange(1, self.nVoxels.size+1, dtype=np.int64); self.seeds = self.seeds[self.nVoxels>0]
         #print(np.argmax(self.nVoxels))
-
+            
         assert( self.seeds.size > 0 )   # error, no labels
         n = self.seeds.size; #self.nVoxels = np.zeros((n,), dtype=np.int64)
-        assert( n == self.seeds[-1] or not self.mesh_outfile_stl )   # for consistency with stl file, no empty labels
+        #assert( n == self.seeds[-1] or not self.mesh_outfile_stl )   # for consistency with stl file, no empty labels
 
         # intended for debug, only process a subset of the seeds
         if self.seed_range[0] < 1 or self.seed_range[0] > n: self.seed_range[0] = 0
@@ -183,8 +183,9 @@ class dpLabelMesher(emLabels):
             print('\tdone in %.3f s' % (time.time() - t,))
 
         if self.dpLabelMesher_verbose:
-            tloop = time.time(); t = time.time()
+            tloop = time.time(); 
         for i in range(self.seed_range[0], self.seed_range[1]):
+           
             if self.dpLabelMesher_verbose and i % self.print_every == 0:
                 print('seed : %d is %d / %d' % (self.seeds[i],i+1,self.seed_range[1]))
 
@@ -201,65 +202,95 @@ class dpLabelMesher(emLabels):
 
             cur_bnd = svox_bnd[self.seeds[i]-1]
             imin = np.array([x.start for x in cur_bnd]); imax = np.array([x.stop-1 for x in cur_bnd])
+          
             # min and max coordinates of this seed within zero padded cube
             pmin = imin - r; pmax = imax + r;
             # min coordinates of this seed relative to original (non-padded cube)
             self.mins[i] = pmin - r; self.rngs[i] = pmax - pmin + 1
-
+            
             # old method
             # crop out the bounding box plus the padding, then optionally smooth
             #crpdpls = bwdpls[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,pmin[2]:pmax[2]+1].astype(self.PDTYPE)
             # crop out the bounding box then binarize this seed within bounding box
             crpdpls = (dataPad[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,
-                               pmin[2]:pmax[2]+1] == self.seeds[i]).astype(self.PDTYPE)
+                                pmin[2]:pmax[2]+1] == self.seeds[i]).astype(self.PDTYPE)
+           
             if self.do_smooth:
                 crpdplsSm = filters.convolve(crpdpls, W, mode='reflect', cval=0.0, origin=0)
                 # if smoothing results in nothing above contour level, use original without smoothing
                 if (crpdplsSm > self.contour_lvl).any():
                     del crpdpls; crpdpls = crpdplsSm; del crpdplsSm
             if self.doplots: showImgData(np.squeeze(crpdpls[:,:,crpdpls.shape[2]/2]),'slice')
-
-            # vtkImageImport is used to create image data from memory in vtk
-            # http://wiki.scipy.org/Cookbook/vtkVolumeRendering
-            dataImporter = vtk.vtkImageImport()
-            # The preaviusly created array is converted to a byte string (not string, see np docs) and imported.
-            data_string = crpdpls.transpose((2,1,0)).tostring();
-            dataImporter.CopyImportVoidPointer(data_string, len(data_string))
-            # Set the type of the newly imported data
-            #dataImporter.SetDataScalarTypeToUnsignedChar()
-            #dataImporter.SetDataScalarTypeToUnsignedShort()
-            dataImporter.SetDataScalarTypeToDouble()
-            # Because the data that is imported only contains an intensity value (i.e. not RGB), the importer
-            # must be told this is the case.
-            dataImporter.SetNumberOfScalarComponents(1)
-            if self.set_voxel_scale:
-                # Have to set the voxel anisotropy here, as there does not seem an easy way once the poly is created.
-                dataImporter.SetDataSpacing(self.data_attrs['scale'])
-            # Data extent is the extent of the actual buffer, whole extent is ???
-            # Use extents that are relative to non-padded cube
-            beg = self.mins[i]; end = self.mins[i] + self.rngs[i] - 1
-            dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
-            dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
-
+            self.crpdpls = crpdpls
             # save bounds relative to entire dataset
-            self.bounds_beg[i] = beg + self.dataset_index; self.bounds_end[i] = end + self.dataset_index;
+            self.bounds_beg[i] = self.mins[i] + self.dataset_index; self.bounds_end[i] = self.mins[i] + self.rngs[i] -1 
+            + self.dataset_index;
+           
+            #call the vtk Pipeline
+            vertices, faces = self.vtkMesh(self.mins[i],self.rngs[i])
+            self.vertices[i] = vertices
+            self.faces[i] = faces 
+            # store vertices and faces for future reference
+            if self.center_origin:
+               self.vertices[i][:,0] -= sizes[0]/2; self.vertices[i][:,1] -= sizes[1]/2
+               self.vertices[i][:,2] = sizes[2]/2 - self.vertices[i][:,2]
+            if self.flip_faces: self.faces[i] = self.faces[i][:,::-1]
+            self.nVertices[i] = self.vertices[i].shape[0]
+            self.nFaces[i] = self.faces[i].shape[0]
 
-            # use vtk for isosurface contours and surface mesh reduction
-            iso = vtk.vtkContourFilter()
-            iso.SetInputConnection(dataImporter.GetOutputPort())
-            iso.SetComputeNormals(0)
-            iso.SetValue(0, self.contour_lvl)
-            if self.decimatePro:
-                deci = vtk.vtkDecimatePro()
-                rf = 1-self.reduce_frac; deci.SetTargetReduction(rf); df = 0.01
-                deci.SplittingOn(); deci.PreserveTopologyOff(); deci.BoundaryVertexDeletionOn()
-                if self.min_faces > 0: updates = range(100)
-                else: updates = ['deci.BoundaryVertexDeletionOff()','deci.PreserveTopologyOn()','0']
-            else:
-                deci = vtk.vtkQuadricClustering()
-                #deci.SetDivisionOrigin(0.0,0.0,0.0); deci.SetDivisionSpacing(self.reduce_spacing)
-                nb = self.reduce_nbins; deci.SetNumberOfDivisions(nb,nb,nb); deci.AutoAdjustNumberOfDivisionsOff()
-                updates = ['deci.AutoAdjustNumberOfDivisionsOn()','0']
+        if self.dpLabelMesher_verbose: print('Total ellapsed time meshing %.3f s' % (time.time() - tloop,))
+
+    def vtkMesh(self,min_coord,min_range):# pass the cropped bounding box start and range of the box
+        t = time.time()
+        # vtkImageImport is used to create image data from memory in vtk
+        # http://wiki.scipy.org/Cookbook/vtkVolumeRendering
+      
+        dataImporter = vtk.vtkImageImport()
+         
+        # The preaviusly created array is converted to a byte string (not string, see np docs) and imported.
+        data_string = self.crpdpls.transpose((2,1,0)).tostring();
+        dataImporter.CopyImportVoidPointer(data_string, len(data_string))
+        # Set the type of the newly imported data
+        #dataImporter.SetDataScalarTypeToUnsignedChar()
+        #dataImporter.SetDataScalarTypeToUnsignedShort()
+        dataImporter.SetDataScalarTypeToDouble()
+        # Because the data that is imported only contains an intensity value (i.e. not RGB), the importer
+        # must be told this is the case.
+        dataImporter.SetNumberOfScalarComponents(1)
+         
+        if self.set_voxel_scale:
+           # Have to set the voxel anisotropy here, as there does not seem an easy way once the poly is created.
+           dataImporter.SetDataSpacing(self.data_attrs['scale'])
+           # Data extent is the extent of the actual buffer, whole extent is ???
+           # Use extents that are relative to non-padded cube
+           if(self.meshes):
+            beg = min_coord - self.dataset_index 
+            end = beg + min_range - 1
+           
+           else:
+            beg = min_coord ;  end = min_range + min_coord - 1;
+            #print(beg,end)
+
+           dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+           dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+
+           # use vtk for isosurface contours and surface mesh reduction
+           iso = vtk.vtkContourFilter()
+           iso.SetInputConnection(dataImporter.GetOutputPort())
+           iso.SetComputeNormals(0)
+           iso.SetValue(0, self.contour_lvl)
+            
+           if self.decimatePro:
+              deci = vtk.vtkDecimatePro()
+              rf = 1-self.reduce_frac; deci.SetTargetReduction(rf); df = 0.01
+              deci.SplittingOn(); deci.PreserveTopologyOff(); deci.BoundaryVertexDeletionOn()
+              if self.min_faces > 0: updates = range(100)
+              else: updates = ['deci.BoundaryVertexDeletionOff()','deci.PreserveTopologyOn()','0']
+           else:
+              deci = vtk.vtkQuadricClustering()
+              #deci.SetDivisionOrigin(0.0,0.0,0.0); deci.SetDivisionSpacing(self.reduce_spacing)
+              nb = self.reduce_nbins; deci.SetNumberOfDivisions(nb,nb,nb); deci.AutoAdjustNumberOfDivisionsOff()
+              updates = ['deci.AutoAdjustNumberOfDivisionsOn()','0']
 
             # thought of adding checking for closed surfaces, http://comments.gmane.org/gmane.comp.lib.vtk.user/47957
             # this did not work, for low reduce_frac, many open edges remain even for large objects
@@ -269,63 +300,62 @@ class dpLabelMesher(emLabels):
             #tri = vtk.vtkTriangleFilter(); tri.SetInputConnection(iso.GetOutputPort());
             #deci.SetInputConnection(tri.GetOutputPort())
 
-            deci.SetInputConnection(iso.GetOutputPort())
-            # xxx - this is kindof a cheap trick, if we reduce down "too much", then rerun to preserve more
-            for update in updates:
-                deci.Update()
+           deci.SetInputConnection(iso.GetOutputPort())
+           # xxx - this is kindof a cheap trick, if we reduce down "too much", then rerun to preserve more
+           for update in updates:
+               deci.Update()
 
-                # http://forrestbao.blogspot.com/2012/06/vtk-polygons-and-other-cells-as.html
-                # http://stackoverflow.com/questions/6684306/how-can-i-read-a-vtk-file-into-a-python-datastructure
-                dOut = deci.GetOutput()
-                # xxx - points seem to be single instead of inputted type, probably depends on vtk version:
-                #   http://public.kitware.com/pipermail/vtkusers/2010-April/059413.html
-                self.vertices[i] = nps.vtk_to_numpy(dOut.GetPoints().GetData())
-                if self.center_origin:
-                    self.vertices[i][:,0] -= sizes[0]/2; self.vertices[i][:,1] -= sizes[1]/2
-                    self.vertices[i][:,2] = sizes[2]/2 - self.vertices[i][:,2]
-                self.faces[i] = nps.vtk_to_numpy(dOut.GetPolys().GetData()).reshape((-1,4))[:,1:]
-                if self.flip_faces: self.faces[i] = self.faces[i][:,::-1]
-                self.nVertices[i] = self.vertices[i].shape[0]
-                self.nFaces[i] = self.faces[i].shape[0]
-                if self.dpLabelMesher_verbose and i % self.print_every == 0:
-                    print('\t%d vertices, %d faces' % (self.nVertices[i], self.nFaces[i]))
-                if self.min_faces > 0:
-                    if self.nFaces[i] >= self.min_faces: break
-                    rf -= df; deci.SetTargetReduction(rf)
-                else:
-                    if self.nVertices[i] > 2 and self.nFaces[i] > 0: break
-                    eval(update)
-            assert( self.nVertices[i] > 2 and self.nFaces[i] > 0 )  # there has to be at least one face
+               # http://forrestbao.blogspot.com/2012/06/vtk-polygons-and-other-cells-as.html
+               # http://stackoverflow.com/questions/6684306/how-can-i-read-a-vtk-file-into-a-python-datastructure
+               dOut = deci.GetOutput()
+               # xxx - points seem to be single instead of inputted type, probably depends on vtk version:
+               #   http://public.kitware.com/pipermail/vtkusers/2010-April/059413.html
+               vertices = nps.vtk_to_numpy(dOut.GetPoints().GetData())
+               faces = nps.vtk_to_numpy(dOut.GetPolys().GetData()).reshape((-1,4))[:,1:]
+               nVertices = vertices.shape[0]
+               nFaces = faces.shape[0]
+               #if self.dpLabelMesher_verbose :
+                 # print('\t%d vertices, %d faces' % (nVertices, nFaces))
+               if self.min_faces > 0:
+                  if nFaces >= self.min_faces: break
+                  rf -= df; deci.SetTargetReduction(rf)
+               else:
+                  if nVertices > 2 and nFaces > 0: break
+                  eval(update)
+           assert( nVertices > 2 and nFaces > 0 )  # there has to be at least one face
 
-            if self.doplots:
-                mapper = vtk.vtkPolyDataMapper()
-                mapper.SetInputConnection(deci.GetOutputPort())
-                dpLabelMesher.vtkShow(mapper=mapper)
+           if self.doplots:
+              mapper = vtk.vtkPolyDataMapper()
+              mapper.SetInputConnection(deci.GetOutputPort())
+              dpLabelMesher.vtkShow(mapper=mapper)
 
             # append the current surface to vtk object with all the surfaces
-            if self.doplots or self.mesh_outfile_stl:
-                self.allPolyData.AddInputConnection(deci.GetOutputPort())
-            if self.doplots:
-                connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
-                connectivityFilter.SetInputConnection(self.allPolyData.GetOutputPort())
-                connectivityFilter.SetExtractionModeToAllRegions()
-                connectivityFilter.ColorRegionsOn()
-                connectivityFilter.Update()
-                mapper = vtk.vtkPolyDataMapper()
-                mapper.SetInputConnection(connectivityFilter.GetOutputPort())
-                mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
-                dpLabelMesher.vtkShow(mapper=mapper)
+           if self.doplots or self.mesh_outfile_stl:
+               self.allPolyData.AddInputConnection(deci.GetOutputPort())
+               
+           if self.doplots:
+              connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
+              connectivityFilter.SetInputConnection(allPolyData.GetOutputPort())
+              connectivityFilter.SetExtractionModeToAllRegions()
+              connectivityFilter.ColorRegionsOn()
+              connectivityFilter.Update()
+              mapper = vtk.vtkPolyDataMapper()
+              mapper.SetInputConnection(connectivityFilter.GetOutputPort())
+              mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
+              mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
+              dpLabelMesher.vtkShow(mapper=mapper)
 
-            if self.dpLabelMesher_verbose and i % self.print_every == 0:
-                print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
-        if self.dpLabelMesher_verbose: print('Total ellapsed time meshing %.3f s' % (time.time() - tloop,))
+           if self.dpLabelMesher_verbose:
+              print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
+            
+           return vertices,faces
 
     def writeMeshOutfile(self):
         if not self.mesh_outfile: return
 
         if self.mesh_outfile_stl:
-            if self.dpLabelMesher_verbose: print('Writing output to %s' % self.mesh_outfile_stl)
-            connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
+            #if self.dpLabelMesher_verbose: print('Writing output to %s' % self.mesh_outfile_stl)
+            '''connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
             connectivityFilter.SetInputConnection(self.allPolyData.GetOutputPort())
             connectivityFilter.SetExtractionModeToAllRegions()
             connectivityFilter.ColorRegionsOn()
@@ -335,7 +365,14 @@ class dpLabelMesher(emLabels):
             writer.SetInputConnection(connectivityFilter.GetOutputPort())
             writer.SetFileTypeToBinary()
             writer.SetFileName(self.mesh_outfile_stl)
-            writer.Write()
+            writer.Write()'''
+            print('write_output')
+            plyWriter = vtk.vtkPLYWriter()
+            plyWriter.SetFileName('1.ply')
+            plyWriter.SetInputConnection(self.allPolyData.GetOutputPort())
+            plyWriter.Write()
+
+
         else:
             if self.dpLabelMesher_verbose:
                 print('Writing output to %s' % self.mesh_outfile); t = time.time()
@@ -372,7 +409,7 @@ class dpLabelMesher(emLabels):
 
     def writeData(self, h5file, beg, end, str_seed, faces, vertices, nVoxels):
         nVertices = vertices.shape[0]; nFaces = faces.shape[0]
-
+      
         # do some checking on the stored types
         if nVertices > self.max_nvertices:
             print('Supervoxel %d (%d voxels) %d vertices' % (str_seed, nVoxels, nVertices))
@@ -601,10 +638,9 @@ class dpLabelMesher(emLabels):
             zf = zipfile.ZipFile(self.annotation_file, mode='r');
             inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
             zf.close()
-
             # read the merge list
             merge_list = inmerge.decode("utf-8").split('\n'); nlines = len(merge_list); n = nlines // 4
-
+            
             # read the skeletons
             info, meta, commentsString = knossos_read_nml(krk_contents=inskel.decode("utf-8")); m = len(info)
 
@@ -638,22 +674,21 @@ class dpLabelMesher(emLabels):
                     dset_root[str_seed]['vertices'].read_direct(cvertices)
                     dset_root[str_seed]['faces'].read_direct(cfaces)
                     nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
-
+                 
                     # vertices are stored as fixed-point
                     cvertices = cvertices.astype(np.double) / vertex_divisor
                     cvertices += dset_root[str_seed]['vertices'].attrs['bounds_beg']
-
                     # vtk needs unstructured grid preceded with number of points in each cell
                     cfaces = np.hstack((3*np.ones((nfaces, 1),dtype=cfaces.dtype), cfaces))
 
                     # need to keep references around apparently to avoid segfault
-                    # https://github.com/Kitware/VTK/blob/master/Wrapping/Python/vtk/util/numpy_support.py
+                     # https://github.com/Kitware/VTK/blob/master/Wrapping/Python/vtk/util/numpy_support.py
                     self.vertices[i][j] = cvertices; self.faces[i][j] = cfaces
 
                     # just for printing to console for each object
                     self.nFaces[i] += nfaces; self.nVertices[i] += nvertices
                     self.nVoxels[i] += dset_root[str_seed]['vertices'].attrs['nVoxels']
-
+                    
                     # create and append poly data
                     # http://www.vtk.org/Wiki/VTK/Examples/Python/GeometricObjects/Display/Polygon
                     points = vtk.vtkPoints(); points.SetData(nps.numpy_to_vtk(cvertices))
@@ -780,6 +815,159 @@ class dpLabelMesher(emLabels):
 
         if h5file is not None: h5file.close()
 
+    def mergeMesh(self):
+      
+        nobjs = len(self.merge_objects); nskels = len(self.skeletons)    
+  
+        # incase there is no meshing file and just using this to view skeletons
+        if nobjs > 0 and self.merge_objects[0] < 0:
+            h5file = None
+        else:
+        # xxx - add support for multiple mesh files somehow (need knossos support likely with supercube ids)
+            h5file = h5py.File(self.mesh_infiles[0], 'r'); dset_root = h5file[self.dataset_root]
+
+        # read meta-data in seed 0
+        str_seed = ('%08d' % 0)
+        #nlabels = h5file[self.dataset_root][str_seed]['faces'].attrs['nlabels']
+        vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
+
+        # get the nml skeleton file and mergelist out of the zipped knossos annotation fil 
+        zf = zipfile.ZipFile(self.annotation_file, mode='r');
+        inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
+        zf.close()
+
+        # read the merge list
+        merge_list = inmerge.decode("utf-8").split('\n'); nlines = len(merge_list); n = nlines // 4
+         
+        # allocate renderer for this pass
+        renderer = vtk.vtkRenderer()
+ 
+        # reallocate everything for the meshes
+        self.faces = n * [None]; self.vertices = n * [None]
+        self.allPolyData = n * [None]; self.allMappers = n * [None]; self.allActors = n * [None]
+        self.nFaces = np.zeros((n,), dtype=np.uint64); self.nVertices = np.zeros((n,), dtype=np.uint64);
+        self.nSVoxels = np.zeros((n,), dtype=np.uint64); 
+    
+        obj_cnt = 0; obj_sel = np.zeros((n,),dtype=np.bool)
+        
+        if self.write_ply:
+           plyWriter = vtk.vtkPLYWriter()
+           plyWriter.SetFileName('1.ply')
+        elif self.write_hdf5:
+           h5filewrite = h5py.File(self.mesh_outfile, 'w')
+            
+
+        for i in range(n):
+          
+           # Object_ID, ToDo_flag, Immutability_flag, Supervoxel_IDs, '\n'
+           tomerge = merge_list[i*4].split(' ')
+           cobj = int(tomerge[0])
+           if nobjs > 0 and cobj not in self.merge_objects: continue
+           obj_cnt += 1; obj_sel[i] = 1
+           tomerge = tomerge[3:]
+           self.scale = self.data_attrs['scale']
+    
+           nsvox = len(tomerge);       
+           bound_beg = nsvox * [None];
+           bound_end = nsvox * [None];
+           self.faces[i] = nsvox * [None]; self.vertices[i] = nsvox *[None]
+           self.allPolyData[i] = vtk.vtkAppendPolyData()
+           self.allMappers[i] = vtk.vtkPolyDataMapper()
+           
+           for j in range(nsvox):
+              tr_seed = ('%08d' % int(tomerge[j]))             
+              bound_beg[j] = np.array(dset_root[tr_seed]['vertices'].attrs['bounds_beg'],dtype=np.float64)
+              bound_end[j] = np.array(dset_root[tr_seed]['vertices'].attrs['bounds_end'],dtype=np.float64)
+              #save the bounds in nm scale
+              beg = bound_beg[j]
+              end = bound_end[j]
+              ## convert to right scale to calculate appropriate chunk and offset
+              bound_beg[j] = bound_beg[j]/self.vertex_divisor
+              bound_end[j] = bound_end[j]/self.vertex_divisor
+              bound_beg[j] = bound_beg[j]/self.scale
+              bound_end[j] = bound_end[j]/self.scale
+              bound_beg[j] = np.round(bound_beg[j]).astype(np.uint32)
+              bound_end[j] = np.round(bound_end[j]).astype(np.uint32)
+              self.chunk = bound_beg[j]//self.chunksize
+              self.offset = bound_beg[j]%self.chunksize
+              self.size = bound_end[j] - bound_beg[j]
+             
+              #get the corresponding datacube according to bounds
+              self.inith5()
+              self.readCubeToBuffers();
+                   
+              #get the data cube
+              if self.legacy_transpose: cube = self.data_cube.transpose((1,0,2))
+              else: cube = self.data_cube
+              
+
+              # other inits to smooth and binarize the data
+              if self.do_smooth: W = np.ones(self.smooth, dtype=self.PDTYPE) / self.smooth.prod()
+              bin_labels = (cube == int(tr_seed)).astype(self.PDTYPE)
+      
+              if self.do_smooth:
+                crpdplsSm = filters.convolve(bin_labels, W, mode='reflect', cval=0.0, origin=0)
+                # if smoothing results in nothing above contour level, use original without smoothing
+                if (crpdplsSm > self.contour_lvl).any():
+                    del bin_labels; bin_labels = crpdplsSm; del crpdplsSm
+                #if self.doplots: showImgData(np.squeeze(crpdpls[:,:,crpdpls.shape[2]/2]),'slice')'''
+              self.crpdpls = bin_labels
+              #mesh the supervoxel to obtain vertices and faces
+              verts,face = self.vtkMesh(bound_beg[j],self.size)
+            
+              self.vertices[i][j] = verts
+              self.faces[i][j] = face
+
+              nfaces = face.shape[0]
+              nvertices = verts.shape[0]
+           
+
+              #self.nFaces[i] += nfaces
+              #self.nVertices[i] += nvertices  
+         
+              self.nVoxels = j
+              if self.write_hdf5:
+                 self.writeData(h5filewrite, beg, end, tr_seed,face,verts,self.nVoxels)
+
+              #add the upper bound of the cube to get appropriate context of the entire mesh
+              verts = verts + beg
+
+             
+
+              #vtk needs unstructures grid preceded with number of points in each cell 
+              face = np.hstack((3*np.ones((nfaces, 1),dtype=face.dtype), face))
+
+              self.vertices[i][j] = verts
+              self.faces[i][j] = face        
+                                     
+              polyData = vtk.vtkPolyData()
+              points = vtk.vtkPoints(); points.SetData(nps.numpy_to_vtk(verts))
+              
+              # http://stackoverflow.com/questions/20146421/how-to-convert-a-mesh-to-vtk-format/20146620#20146620
+              cells = vtk.vtkCellArray()
+              cells.SetCells(nfaces, nps.numpy_to_vtk(face, array_type=vtk.vtkIdTypeArray().GetDataType()))
+
+              polyData.SetPoints(points); polyData.SetPolys(cells)
+              
+              self.allPolyData[i].AddInputData(polyData)
+           
+           #vtk pipeline
+           if self.write_ply:
+             plyWriter.SetInputConnection(self.allPolyData[i].GetOutputPort())
+             plyWriter.Write()
+           elif self.write_hdf5:
+             self.writeMeta(h5filewrite)
+             h5filewrite.close()
+
+           self.allMappers[i].SetInputConnection(self.allPolyData[i].GetOutputPort())
+           self.allActors[i] = vtk.vtkActor()
+           self.allActors[i].SetMapper(self.allMappers[i])
+           self.allActors[i].GetProperty().SetColor(self.cmap[obj_cnt-1,0],self.cmap[obj_cnt-1,1],self.cmap[obj_cnt-1,2])
+           self.allActors[i].GetProperty().SetOpacity(self.opacity)
+           renderer.AddActor(self.allActors[i])
+           dpLabelMesher.vtkShow(renderer=renderer)         
+       
+                
     @classmethod
     def labelMesher(cls, srcfile, dataset, chunk, offset, size, reduce_frac, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpLabelMesher',
@@ -792,13 +980,14 @@ class dpLabelMesher(emLabels):
         arg_str += ' --reduce-frac %f ' % reduce_frac
         arg_str += ' --dataset ' + dataset
         if verbose: arg_str += ' --dpLabelMesher-verbose '
-        if verbose: print(arg_str)
+        #if verbose: print(arg_str)
         args = parser.parse_args(arg_str.split())
-        stm = cls(args)
+        istm = cls(args)
         return stm
 
     @staticmethod
     def vtkShow(mapper=None, renderer=None):
+       
         if renderer is None:
             # open a window and display the data specified by mapper
             # need an actor and a renderer to display data
@@ -834,12 +1023,19 @@ class dpLabelMesher(emLabels):
         # adds arguments required for this object to specified ArgumentParser object
         dpWriteh5.addArgs(p)
         p.add_argument('--mesh-outfile', nargs=1, type=str, default='', help='Output label mesh file')
+        #p.add_argument('--mesh-outfile-stl', action='store_true', help='Output mesh ply file')
         p.add_argument('--mesh-infiles', nargs='*', type=str, default='',
                        help='Input label mesh file (calculate stats / show plots only)')
         p.add_argument('--merge-mesh-path', nargs=1, type=str, default='',
                        help='Input path for mesh files to be merged')
         p.add_argument('--annotation-file', nargs=1, type=str, default='',
                        help='Input annotation file from knossos (show merged meshes)')
+        p.add_argument('--meshes', action='store_true',
+                       help='Show merged meshes from the annotation file from knossos')
+        p.add_argument('--write_hdf5', action='store_true',
+                       help='Write separate mesh file for annotated meshes')
+        p.add_argument('--write_ply', action='store_true',
+                       help='Write separate ply file for annoatated meshes') 
         p.add_argument('--reduce-frac', nargs=1, type=float, default=[0.2], metavar=('PERC'),
             help='Reduce fraction for reducing meshes (decimate pro)')
         #p.add_argument('--reduce-spacing', nargs=3, type=float, default=[10.0, 10.0, 5.0], metavar=('SPC'),
@@ -885,12 +1081,17 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    if seg2mesh.annotation_file:
+    if seg2mesh.meshes and seg2mesh.annotation_file:
+        seg2mesh.mergeMesh()
+     
+    elif seg2mesh.annotation_file:
         seg2mesh.showMergeMesh()
     elif seg2mesh.merge_mesh_path:
         seg2mesh.mergeMeshInfiles()
+       
     elif len(seg2mesh.mesh_infiles) > 0:
         seg2mesh.readMeshInfiles()
+      
     else:
         seg2mesh.readCubeToBuffers()
         seg2mesh.procData()
