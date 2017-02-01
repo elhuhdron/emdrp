@@ -306,12 +306,19 @@ class dpVolumeXcorr(dpWriteh5):
             pl.ylabel('std winning prob')
             pl.xlabel('correlation')
 
+        pl.figure(2)
+        for i in range(self.nprob_types):
+            pl.scatter(o['Cout'], o['Pcout'][i], s=8, c=clrs[i], alpha=0.5)
+        pl.legend(o['prob_types'])
+        pl.ylabel('percent type')
+        pl.xlabel('correlation')
+
         pl.show()
 
     def concatenate(self):
         loadfiles = glob.glob(os.path.join(self.loadfiles_path, '*.npz')); nFiles = len(loadfiles);
         if self.dpVolumeXcorr_verbose:
-            print('Concatenating over %d load files' % (nFiles,))
+            print('Concatenating over %d load files' % (nFiles,)); t = time.time()
 
         for i in range(nFiles):
             o = np.load(loadfiles[i])
@@ -324,39 +331,45 @@ class dpVolumeXcorr(dpWriteh5):
                 reduce_ntest = self.reduce_size // test_size
                 # xxx - thought of making this general, but essentially z-direction is always per slice
                 #   so reduce z locally per test block concatenation and then do final reduction afterwards
-                concat_ntest = ntest
+                concat_ntest = ntest.copy()
                 if self.reduce_size[2] < size[2]:
                     assert( ntest[2] % self.reduce_size[2]  == 0 )
                     concat_ntest[2] = ntest[2] // self.reduce_size[2]
                     concat_zreduce = self.reduce_size[2]
                 else:
                     assert( self.reduce_size[2] % size[2] == 0 )
-                    concat_ntest[2] = size[2]
+                    concat_ntest[2] = 1
                     concat_zreduce = size[2]
                 concat_zreduce_rng = range(0,size[2],concat_zreduce)
 
                 nprob_types = len(o['prob_types'])
 
                 # allocate concatenated outputs (assigned after per-block z reduction)
-                concat_size = self.concat_nchunks * concat_ntest
-                concat_Cout = np.zeros(concat_size, dtype=np.double)
-                concat_Pcout = [np.zeros(concat_size, dtype=np.double) for i in range(nprob_types)]
+                concat_size = self.concat_nchunks * self.chunksize // test_size
+                concat_size[2] = concat_ntest[2] * self.concat_nchunks[2] // (size[2] // self.chunksize[2])
+                #print(concat_ntest, ntest, concat_size)
+                concat_Cout = np.nan*np.zeros(concat_size, dtype=np.double)
+                concat_Pcout = [np.nan*np.zeros(concat_size, dtype=np.double) for i in range(nprob_types)]
 
                 #print(size,test_size,ntest,self.reduce_size,concat_size,concat_ntest)
             else:
-                assert( (size == o['size']).all() and (ntest == o['Cout']).all() )
+                assert( (size == o['size']).all() and (ntest == o['Cout'].shape).all() )
                 assert( len(o['prob_types']) == nprob_types )
             chunk = o['chunk']
 
             # assign with the z-accumulation
-            inds = (chunk - self.concat_chunk)*self.chunksize//size
+            inds = (chunk - self.concat_chunk)*self.chunksize//size * concat_ntest
             concat_Cout[inds[0]:inds[0]+concat_ntest[0], inds[1]:inds[1]+concat_ntest[1],
                         inds[2]:inds[2]+concat_ntest[2]] = np.add.reduceat(o['Cout'], concat_zreduce_rng,
                             axis=2)/concat_zreduce
+            #o['Pcout'][0].transpose((2,1,0)).tofile('meh.raw'); print(o['Pcout'].shape);
             for i in range(nprob_types):
                 concat_Pcout[i][inds[0]:inds[0]+concat_ntest[0], inds[1]:inds[1]+concat_ntest[1],
                             inds[2]:inds[2]+concat_ntest[2]] = np.add.reduceat(o['Pcout'][i], concat_zreduce_rng,
                                 axis=2)/concat_zreduce
+
+        if self.dpVolumeXcorr_verbose:
+            print('\tdone in %.4f s' % (time.time() - t, ))
 
         # now do the final reduction over the whole concatenated volume.
         # have to do z-first as to avoid the unequal average of averages scenario.
@@ -370,7 +383,7 @@ class dpVolumeXcorr(dpWriteh5):
                 Cout = np.add.reduceat(Cout, range(0,concat_size[j],n), axis=j)/n
                 for i in range(nprob_types):
                     Pcout[i] = np.add.reduceat(Pcout[i], range(0,concat_size[j],n), axis=j)/n
-        print(Cout, Pcout[0])
+        #print(Cout.shape, Pcout[0].shape)
 
         if self.savefile:
             if self.dpVolumeXcorr_verbose:
@@ -383,6 +396,9 @@ class dpVolumeXcorr(dpWriteh5):
             if self.dpVolumeXcorr_verbose:
                 print('\tdone in %.4f s' % (time.time() - t, ))
 
+        ## xxx - make this more formal?
+        #Cout.transpose((2,1,0)).tofile('tmp_xcorr_f64_%d_%d_%d.raw' % Cout.shape)
+        #Pcout[0].transpose((2,1,0)).tofile('tmp_pmem_f64_%d_%d_%d.raw' % Pcout[0].shape)
 
     # translated from kb's code (taken from matlab central???)
     # Another numerics backstop. If any of the coefficients are outside the
