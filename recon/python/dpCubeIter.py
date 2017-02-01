@@ -136,18 +136,24 @@ class dpCubeIter(object):
     def printCmds(self):
         if self.cmdfile:
             with open(self.cmdfile, 'r') as myfile:
-                cmd = myfile.read().replace('\n', '')
+                cmd = myfile.read().split('\n'); cmd = [x for x in cmd if x]
         else:
-            cmd = self.cmd
+            cmd = [self.cmd]
+        ncmd = len(cmd)
 
+        cnt = 0
         for volume_info in self:
             _, size, cur_chunk, left_offset, suffix, affix, is_left_border, is_right_border = volume_info
+            ccmd = cmd[0] if ncmd == 1 else cmd[cnt]
+
             str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
                                             suffix if self.use_suffix else '', affix if self.affix_path else '')
-            print(cmd + (''if self.no_volume_flags else str_volume) + str_inputs)
+            print(ccmd + (''if self.no_volume_flags else str_volume) + str_inputs)
+
+            cnt += 1
 
     @classmethod
     def cubeIterGen(cls, volume_range_beg, volume_range_end, overlap, cube_size,
