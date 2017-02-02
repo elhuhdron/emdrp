@@ -30,7 +30,7 @@ import numpy as np
 
 class dpCubeIter(object):
 
-    LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes']
+    LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes', 'filemodulators']
 
     #def __init__(self, inprefix, volume_range_beg, volume_range_end, overlap,
     #             cube_size=[1,1,1], left_remainder_size=[0,0,0], right_remainder_size=[0,0,0],
@@ -78,6 +78,17 @@ class dpCubeIter(object):
         self.volume_step += self.left_remainder; self.volume_step += self.right_remainder
         self.volume_size = np.prod(self.volume_step)
 
+        # modulators default to all ones
+        self.nflags = len(self.fileflags)
+        # this is for the python interface mode (does not use the argument flag / file name creation stuff)
+        if self.nflags == 0: self.nflags = 1
+        if len(self.filemodulators) == 0:
+            self.filemodulators = np.ones((self.nflags,3),dtype=np.uint32)
+        else:
+            self.filemodulators = np.array(self.filemodulators,dtype=np.uint32).reshape((-1,3))
+            assert(self.filemodulators.shape[0] == self.nflags)
+            assert( (self.cube_size % self.filemodulators == 0).all() )
+
     def __iter__(self):
         for cur_index in range(self.volume_size):
             # the current volume indices, including the right and left remainders
@@ -112,21 +123,36 @@ class dpCubeIter(object):
             left_offset[is_left_remainder] = \
                 self.cube_size_voxels[is_left_remainder] - self.left_remainder_size[is_left_remainder]
 
-            # create the name suffix, path affix
-            suffix = ''; affix = ''
-            for s,i in zip(['x','y','z'], range(3)):
-                r = 'l' if is_left_remainder[i] else ('r' if is_right_remainder[i] else '')
-                suffix += ('_%s%04d' % (s + r, cur_chunk[i]))
-                affix = os.path.join(affix, ('%s%04d' % (s, cur_chunk[i])))
-            affix += os.path.sep
+            # modified to allow for "modulators" which allows for chunk descriptors that only change at multiples of
+            #   cube_size. allows for cubeiter to create command lines containing arguments with different cube_sizes
+            suffixes = [None] * self.nflags; affixes = [None] * self.nflags
+            for j in range(self.nflags):
+                fm = self.filemodulators[j,:]
+                if (fm==1).all():
+                    mcur_chunk = cur_chunk
+                else:
+                    mcur_chunk = (cur_volume // fm)*fm * self.cube_size + self.volume_range_beg
 
-            yield cur_volume, size, cur_chunk, left_offset, suffix, affix, is_left_border, is_right_border
+                # create the name suffixes, path affixes
+                suffixes[j] = ''; affixes[j] = ''
+                for s,i in zip(['x','y','z'], range(3)):
+                    r = 'l' if is_left_remainder[i] else ('r' if is_right_remainder[i] else '')
+                    suffixes[j] += ('_%s%04d' % (s + r, mcur_chunk[i]))
+                    affixes[j] = os.path.join(affixes[j], ('%s%04d' % (s, mcur_chunk[i])))
+                affixes[j] += os.path.sep
 
-    def flagsToString(self, flags, paths, prefixes, postfixes, suffix, affix):
+            yield cur_volume, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border
+
+    def flagsToString(self, flags, paths, prefixes, postfixes, suffixes, affixes):
         argstr = ' '
-        for flag,path,prefix,postfix in zip(flags, paths, prefixes, postfixes):
+        for flag, path, prefix, postfix, suffix, affix in zip(flags, paths, prefixes, postfixes, suffixes, affixes):
             if flag != '0':
                 argstr += '--' + flag + ' '
+            # xxx - better names?
+            # affix is the optional knossos-style path (i.e., x0001/y0002/z0005)
+            # prefix is the specified file name without an extension or path
+            # suffix is the optional knossos-style addition to the filename (i.e., _x0001_y0002_z0005)
+            # postfix is the file extension
             name = affix + prefix + suffix + postfix
             if path != '0':
                 name = os.path.join(path,name)
@@ -141,16 +167,17 @@ class dpCubeIter(object):
             cmd = [self.cmd]
         ncmd = len(cmd)
 
-        cnt = 0
+        cnt = 0; empty_strs = ['' for i in range(self.nflags)]
         for volume_info in self:
-            _, size, cur_chunk, left_offset, suffix, affix, is_left_border, is_right_border = volume_info
+            _, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border = volume_info
             ccmd = cmd[0] if ncmd == 1 else cmd[cnt]
 
             str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
-                                            suffix if self.use_suffix else '', affix if self.affix_path else '')
+                                            suffixes if self.use_suffix else empty_strs, 
+                                            affixes if self.affix_path else empty_strs)
             print(ccmd + (''if self.no_volume_flags else str_volume) + str_inputs)
 
             cnt += 1
@@ -183,6 +210,8 @@ class dpCubeIter(object):
         p.add_argument('--filepaths', nargs='*', type=str, default=[], help='in/out files paths (0 for none)')
         p.add_argument('--fileprefixes', nargs='*', type=str, default=[], help='in/out files filename prefixes')
         p.add_argument('--filepostfixes', nargs='*', type=str, default=[], help='in/out files filename postfixes')
+        p.add_argument('--filemodulators', nargs='*', type=int, default=[],
+                       help='Allows for supervolumes at multiples of cube_size (x0 y0 z0  x1 y1 z1 ...)')
         p.add_argument('--volume_range_beg', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Starting range in chunks for total volume')
         p.add_argument('--volume_range_end', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
@@ -190,7 +219,7 @@ class dpCubeIter(object):
         p.add_argument('--overlap', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Amount of overlap in each direction')
         p.add_argument('--cube_size', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
-            help='Size in chunks of volumes to be watershedded')
+            help='Size in chunks of iterate volume (superchunk)')
         p.add_argument('--left_remainder_size', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Size in voxels of "left" remainder volumes')
         p.add_argument('--right_remainder_size', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
