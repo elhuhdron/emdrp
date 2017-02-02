@@ -44,7 +44,7 @@ from utils import csr_csc_argmax
 class dpCubeStitcher(emLabels):
 
     # Constants
-    LIST_ARGS = dpLoadh5.LIST_ARGS + ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes']
+    LIST_ARGS = dpLoadh5.LIST_ARGS + dpCubeIter.LIST_ARGS
 
     def __init__(self, args):
         emLabels.__init__(self,args)
@@ -85,14 +85,14 @@ class dpCubeStitcher(emLabels):
 
     def __iter__(self):
         for self.volume_info,n in zip(self.cubeIter, range(self.cubeIter.volume_size)):
-            _, self.size, self.chunk, self.offset, suffix, _, _, _ = self.volume_info
+            _, self.size, self.chunk, self.offset, suffixes, _, _, _ = self.volume_info
             self.inith5()
 
             if self.dpCubeStitcher_verbose:
                 print('Loading chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
                     self.size.tolist() + self.offset.tolist())); t = time.time()
 
-            srcfile = os.path.join(self.filepaths[0], self.fileprefixes[0] + suffix + '.h5') if self.first_pass \
+            srcfile = os.path.join(self.filepaths[0], self.fileprefixes[0] + suffixes[0] + '.h5') if self.first_pass \
                 else self.srcfile
             loadh5 = emLabels.readLabels(srcfile=srcfile, chunk=self.chunk.tolist(), subgroups=self.subgroups,
                 offset=self.offset.tolist(), size=self.size.tolist(), verbose=self.dpLoadh5_verbose)
