@@ -1,3 +1,24 @@
+% The MIT License (MIT)
+% 
+% Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
+% 
+% Permission is hereby granted, free of charge, to any person obtaining a copy
+% of this software and associated documentation files (the "Software"), to deal
+% in the Software without restriction, including without limitation the rights
+% to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+% copies of the Software, and to permit persons to whom the Software is
+% furnished to do so, subject to the following conditions:
+% 
+% The above copyright notice and this permission notice shall be included in all
+% copies or substantial portions of the Software.
+% 
+% THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+% IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+% FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+% AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+% LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+% OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+% SOFTWARE.
 
 % Top level script for creating EM data hdf5 file from Knossos raw format.
 
@@ -16,7 +37,8 @@ for mag = mags
   % Paths to root of Knossos raw data and path to where hdf5 should be written.
   %inpath = sprintf('/mnt/fs/common/ECS_paper/ECS_3d_analysis/M0007_33/cubes/M0007_33_mag%d',mag);
   %outpath = '/Data/big_datasets';
-  inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/%s_mag%d',dataset,mag);
+  %inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/%s_mag%d',dataset,mag);
+  inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/mag%d',mag);
   outpath = '/Data/watkinspv';
 
   % The raw size of the Knossos cubes
