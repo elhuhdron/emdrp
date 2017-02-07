@@ -267,7 +267,13 @@ class dpLoadh5(object):
         islabels = (self.data_type == np.uint16 or self.data_type == np.uint32 or self.data_type == np.uint64)
         if (self.zeropadraw > 0).any():
             s = tuple(self.zeropadraw.reshape((3,-1)).tolist())
-            data = np.lib.pad(data, s, 'constant',constant_values=tuple(np.zeros((3,2)).tolist()))
+            data = np.lib.pad(data, s, 'constant',constant_values=0)
+        if (self.zerocorners > 0).any():
+            z = self.zerocorners
+            data[:z[0],:z[1],:z[2]] = 0; data[-z[0]:,:z[1],:z[2]] = 0
+            data[:z[0],-z[1]:,:z[2]] = 0; data[:z[0],:z[1],-z[2]:] = 0
+            data[-z[0]:,-z[1]:,:z[2]] = 0; data[-z[0]:,:z[1],-z[2]:] = 0
+            data[:z[0],-z[1]:,-z[2]:] = 0; data[-z[0]:,-z[1]:,-z[2]:] = 0
         if bool(self.dtypeGray):
             dtypeGray = eval('np.' + self.dtypeGray) if isinstance(self.dtypeGray, str) else self.dtypeGray
             data -= data.min(); data /= data.max(); data = (data*np.iinfo(dtypeGray).max).astype(dtypeGray)
@@ -476,6 +482,8 @@ class dpLoadh5(object):
         p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0],
             metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'),
             help='Size in voxels to zero pad (b=before, a=after) (raw output)')
+        p.add_argument('--zerocorners', nargs=3, type=int, default=[0,0,0],
+            metavar=('X', 'Y', 'Z'), help='Size in voxels to zero corners ("cross shape" in raw output)')
         p.add_argument('--relabel-seq', dest='relabel_seq', action='store_true',
             help='Relabel sequentially (labels only) (raw output)')
         p.add_argument('--sel-eq', nargs=1, type=int, default=[], help='Specify logical == select (raw output)')
