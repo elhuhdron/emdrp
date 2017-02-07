@@ -188,14 +188,10 @@ class emLabels(dpWriteh5):
 
     # returns sizes for bg (first element) and for labels
     @staticmethod
-    def getSizes(lbls):
+    def getSizes(lbls, maxlbls=None):
         assert( lbls.dtype.kind in 'ui' )
-        maxlbls = lbls.max(); sizes,edges = np.histogram(lbls, bins=range(0,maxlbls+2), range=(0,maxlbls+1))
-        return sizes
-
-    @staticmethod
-    def getSizesMax(lbls,maxlbls):
-        assert( lbls.dtype.kind in 'ui' )
+        if maxlbls is None:
+            maxlbls = lbls.max()
         sizes,edges = np.histogram(lbls, bins=range(0,maxlbls+2), range=(0,maxlbls+1))
         return sizes
 

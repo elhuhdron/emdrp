@@ -391,14 +391,57 @@ class dpVolumeXcorr(dpWriteh5):
 
             np.savez(self.savefile, Cout=Cout, Pcout=Pcout,
                      prob_types=o['prob_types'], concat_chunk=self.concat_chunk, concat_nchunks=self.concat_nchunks,
-                     reduce_size=self.reduce_size, ntest=ntest, size=size)
+                     reduce_size=self.reduce_size, ntest=ntest, size=size, chunksize=self.chunksize)
 
             if self.dpVolumeXcorr_verbose:
                 print('\tdone in %.4f s' % (time.time() - t, ))
 
-        ## xxx - make this more formal?
-        #Cout.transpose((2,1,0)).tofile('tmp_xcorr_f64_%d_%d_%d.raw' % Cout.shape)
-        #Pcout[0].transpose((2,1,0)).tofile('tmp_pmem_f64_%d_%d_%d.raw' % Pcout[0].shape)
+    def concat_anal(self):
+        o = np.load(self.concat_loadfile)
+
+        nprob_types = len(o['prob_types'])
+        #chunksize = np.array(o['chunksize'],dtype=np.uint32) # meh, forgot to save it initially
+        chunksize = np.array([128,128,128],dtype=np.uint32)
+
+        # export correlations and percent types as images
+        o['Cout'].transpose((2,1,0)).tofile('tmp_xcorr_%s_%dx%dx%d.raw' % \
+            tuple([str(o['Cout'].dtype)] + list(o['Cout'].shape)))
+        for i in range(nprob_types):
+            o['Pcout'][i].transpose((2,1,0)).tofile('tmp_p%s_%s_%dx%dx%d.raw' % \
+                tuple([o['prob_types'][i]] + [str(o['Pcout'][i].dtype)] + list(o['Pcout'][i].shape)))
+
+        # pick out the top 5 min xcorrs within different percent membrane ranges.
+        # convert to knossos cube and voxel coordinates and print.
+        # this is the end result of attempting to use this xcorr for picking a next cube to label.
+        pn = 0 # which prob type to use for select (membrane seems most useful)
+
+        # crop out a middle region to avoid the "partially empty" cubes near the edges
+        # xxx - parameterize this somehow?
+        b = [2,2,8]
+        Cout = o['Cout'][b[0]:-b[0],b[1]:-b[1],b[2]:-b[2]]
+        Pcout = o['Pcout'][pn][b[0]:-b[0],b[1]:-b[1],b[2]:-b[2]]
+
+        n = 10
+        bins = np.arange(0,0.331,0.03)
+        binds = np.digitize(Pcout, bins=bins)
+        for i in range(1,bins.size):
+            sel = (binds == i)
+            cbinds = np.argsort(Cout[sel], axis=None)
+            inds = np.argwhere(sel)
+            print('\nFor MEM range %.3f to %.3f:' % (bins[i-1],bins[i]))
+            print('worst %d xcorrs' % (n,))
+            print(Cout[sel][cbinds][:n])
+            print('corresponding %% %s' % (o['prob_types'][pn],))
+            print(Pcout[sel][cbinds][:n])
+            print('corresponding %dx%dx%d reduce indices' % tuple(o['reduce_size'].tolist()))
+            print(inds[cbinds,:][:n,:] + b)
+
+            # convert back to knossos-cube indices and knossos-indices
+            kc = (inds[cbinds,:][:n,:] + b)*o['reduce_size']/chunksize + o['concat_chunk']
+            print('corresponding knossos-cubes')
+            print(kc)
+            print('corresponding knossos-indices')
+            print((kc*chunksize+1).astype(np.uint64))
 
     # translated from kb's code (taken from matlab central???)
     # Another numerics backstop. If any of the coefficients are outside the
@@ -452,6 +495,8 @@ class dpVolumeXcorr(dpWriteh5):
             help='Total area for concatenation (chunks)')
         p.add_argument('--reduce-size', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Block size to reduce down to after concantenation (voxels)')
+        p.add_argument('--concat-loadfile', nargs=1, type=str, default='',
+                       help='Load previous concat saved in npz for analysis/plotting')
 
         p.add_argument('--dpVolumeXcorr-verbose', action='store_true', help='Debugging output for dpVolumeXcorr')
 
@@ -464,6 +509,8 @@ if __name__ == '__main__':
     vxcorr = dpVolumeXcorr(args)
     if vxcorr.loadfiles_path:
         vxcorr.concatenate()
+    elif vxcorr.concat_loadfile:
+        vxcorr.concat_anal()
     elif vxcorr.loadfile:
         vxcorr.doplots()
     else:

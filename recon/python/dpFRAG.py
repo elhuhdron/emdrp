@@ -282,7 +282,7 @@ class dpFRAG(emLabels):
         self.supervoxels = np.lib.pad(relabel, self.spad, 'constant',
             constant_values=0).astype(self.data_type_out, copy=False)
         # supervoxel sizes are needed in advance for createFRAG (ignore background size).
-        self.svox_sizes = emLabels.getSizesMax(self.supervoxels_noperim, self.nsupervox)[1:]
+        self.svox_sizes = emLabels.getSizes(self.supervoxels_noperim, maxlbls=self.nsupervox)[1:]
 
         # load the probability data
         if self.probfile:
