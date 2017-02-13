@@ -188,13 +188,19 @@ class dpWriteh5(dpLoadh5):
 
                     # xxx - very basic header elements
                     reline = line.lstrip()
-                    m = re.search(r'type\:\s+(\w+)', reline)
-                    if m is not None: hdr['type'] = _TYPEMAP_NRRD2NUMPY[m.group(1)]
+                    m = re.search(r'type\:\s+(.+)', reline)
+                    if m is not None: hdr['type'] = _TYPEMAP_NRRD2NUMPY[m.group(1).strip()]
                     m = re.search(r'endian\:\s+(\w+)', reline)
                     if m is not None:
                         endian = m.group(1).lower()
                         if endian in ['litle','big']:
                             hdr['type'] = ('<' if endian == 'little' else '>') + hdr['type']
+                    #space directions: (13.20000000,0,0) (0,13.20000000,0) (0,0,30.00000000)
+                    #space directions: (13.199999999999999,0,0) (0,13.199999999999999,0) (0,0,30)
+                    m = re.search(r'space directions\:'
+                                   '\s+\((\d*\.\d+|\d+),0,0\) \(0,(\d*\.\d+|\d+),0\) \(0,0,(\d*\.\d+|\d+)\)', reline)
+                    if m is not None and 'scale' not in self.data_attrs:
+                        self.data_attrs['scale'] = np.array([float(m.group(1)), float(m.group(2)), float(m.group(3))])
 
                 nrrdfile.seek(headerSize)
                 # xxx - fix this to get data type and endianess from the header, pynrrd still sucks too much
@@ -215,7 +221,7 @@ class dpWriteh5(dpLoadh5):
 
         # xxx - hacky command line over-ride for scale
         if all([x > 0 for x in self.scale]): self.data_attrs['scale'] = self.scale
-            
+
         # xxx - this always assumes raw file is in F-order, add something here for C-order if we need it
         #self.data_cube = data.astype(self.data_type_out).reshape(self.size[::-1]).transpose((2,1,0))
         # add support for reslice reordering of raw inputs

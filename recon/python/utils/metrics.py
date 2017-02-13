@@ -26,8 +26,6 @@ from scipy import ndimage as nd
 import scipy.sparse as sparse
 from threading import Thread
 
-from pyCext import binary_warping
-
 def pix_fscore_metric( lbl_truth, lbl_proposed, calcAll=False ):
     # calcAll is to return all associated pixel metrics. false only returns those used by labrainth frontend
 
@@ -73,6 +71,7 @@ def pixel_error_fscore( lbl_truth, lbl_proposed ):
     return pix_fscore_metric(lbl_truth, lbl_proposed, calcAll=True)
 
 def warping_error( lbl_truth, lbl_proposed, doComps=True, simpleLUT=None, connectivity=1 ):
+    from pyCext import binary_warping
 
     warped, classified, nonSimpleTypes, diff, simpleLUT = binary_warping( lbl_truth, lbl_proposed,
         return_nonSimple=True, connectivity=connectivity, simpleLUT=simpleLUT )

@@ -61,6 +61,54 @@ class dpCleanLabels(emLabels):
             if self.dpCleanLabels_verbose:
                 print('\tdone in %.4f s' % (time.time() - t))
 
+        # minpath overlay creation is intended to improve proofreading speed by highlighting connected path
+        if self.minpath > 0:
+            import skfmm
+            if self.minpath_skel:
+                from pyCext import binary_warping
+
+            # xxx - allow for multiple minpaths with different labels?
+            selmin = (self.data_cube == self.minpath)
+            pts, npts = nd.measurements.label(selmin, self.fgbwconn)
+
+            if self.dpCleanLabels_verbose:
+                print('Finding shortest paths for all pairwise combinations of %d points' % (npts,)); t = time.time()
+
+            labels = self.data_cube
+            sel_ECS, ECS_label = self.getECS(labels); labels[sel_ECS] = 0
+            selbg = (labels == 0)
+            assert( self.minpath != ECS_label ) # can't have minpath and ECS label defined the same
+
+            # create paths for all pair-wise combinations of points
+            paths = np.zeros(self.size, dtype=np.uint8)
+            for i in range(npts):
+                for j in range(i+1,npts):
+                    s1 = (pts==i+1); m = np.ones(self.size, dtype=np.double); m[s1] = 0
+                    d1 = skfmm.distance(np.ma.masked_array(nd.distance_transform_edt(m, return_indices=False,
+                              return_distances=True, sampling=self.data_attrs['scale']), selbg))
+
+                    s2 = (pts==j+1); m = np.ones(self.size, dtype=np.double); m[s2] = 0
+                    d2 = skfmm.distance(np.ma.masked_array(nd.distance_transform_edt(m, return_indices=False,
+                              return_distances=True, sampling=self.data_attrs['scale']), selbg))
+
+                    # xxx - need something like imregionalmin in 3d, could not quickly find an easy solution
+                    #   parameterize the min select percentage?
+                    d = d1+d2; bwlabels = ((d.data < 1.01*d.min()) & ~d.mask); bwlabels[s1 | s2] = 1
+                    if self.minpath_skel:
+                        # optionally skeletonize keeping original minpath points as anchors
+                        bwlabels, diff, simpleLUT = binary_warping(bwlabels.copy(order='C'),
+                            np.zeros(self.size,dtype=np.bool), mask=(~selmin).copy(order='C'), borderval=False,
+                            slow=True, connectivity=self.fg_connectivity)
+                        # fill back out slightly so more easily viewed in itksnap
+                        bwlabels, diff, simpleLUT = binary_warping(bwlabels.copy(order='C'),
+                            np.ones(self.size,dtype=np.bool), borderval=False, slow=True, simpleLUT=simpleLUT,
+                            connectivity=self.fg_connectivity, numiters=1)
+                    paths[bwlabels] = 1
+            self.data_cube = paths
+
+            if self.dpCleanLabels_verbose:
+                print('\tdone in %.4f s' % (time.time() - t))
+
         # smoothing operates on each label one at a time
         if self.smooth:
             if self.dpCleanLabels_verbose:
@@ -264,6 +312,11 @@ class dpCleanLabels(emLabels):
         elif self.ECS_label < 0:
             ECS_label = labels.max()+1; labels[sel_ECS] = ECS_label; nlabels += 1
 
+        if self.min_label > 1:
+            assert( self.ECS_label==0 or self.ECS_label==1 ) # xxx - did not fix other ECS labeling schemes
+            selfg = np.logical_and((labels > 0), np.logical_not(sel_ECS))
+            labels[selfg] += (self.min_label - 1); nlabels += (self.min_label - 1)
+
         return labels, nlabels
 
     @staticmethod
@@ -290,6 +343,15 @@ class dpCleanLabels(emLabels):
         p.add_argument('--get-svox-type', action='store_true', help='Recompute supervoxel type using majority method')
         p.add_argument('--write-voxel-type', action='store_true',
             help='Perform get-svox-type and also write out voxel-type based on supervoxels')
+        # make overlay that traces minpath between particular label value
+        p.add_argument('--minpath', nargs=1, type=int, default=[-1], metavar=('label'),
+            help='Calculate min foreground path between specified label (default off)')
+        p.add_argument('--minpath-skel', action='store_true',
+                       help='Whether to skeletonize min foreground path (for use with minpath)')
+
+        # used to set min label value for both relabel and minsize
+        p.add_argument('--min-label', nargs=1, type=int, default=[1], metavar=('min'),
+                       help='First label after relabel if relabeling (also minsize)')
 
         # other options
         p.add_argument('--fg-connectivity', nargs=1, type=int, default=[1], choices=[1,2,3],
@@ -309,6 +371,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     cleanLbls = dpCleanLabels(args)
-    cleanLbls.readCubeToBuffers()
+    if cleanLbls.inraw:
+        cleanLbls.loadFromRaw()
+    else:
+        cleanLbls.readCubeToBuffers()
     cleanLbls.clean()
     cleanLbls.writeCube()
