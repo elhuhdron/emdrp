@@ -30,7 +30,9 @@ import numpy as np
 
 class dpCubeIter(object):
 
-    LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes', 'filemodulators']
+    LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes', 'filemodulators',
+                 'filepaths_affixes', 'filenames_suffixes']
+    TRUE_STRS = ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh']
 
     #def __init__(self, inprefix, volume_range_beg, volume_range_end, overlap,
     #             cube_size=[1,1,1], left_remainder_size=[0,0,0], right_remainder_size=[0,0,0],
@@ -87,7 +89,17 @@ class dpCubeIter(object):
         else:
             self.filemodulators = np.array(self.filemodulators,dtype=np.uint32).reshape((-1,3))
             assert(self.filemodulators.shape[0] == self.nflags)
-            assert( (self.cube_size % self.filemodulators == 0).all() )
+
+        if len(self.filepaths_affixes) == 0:
+            self.filepaths_affixes = [False for x in range(self.nflags)]
+        else:
+            assert( len(self.filepaths_affixes) == self.nflags )
+            self.filepaths_affixes = [s.lower() in self.TRUE_STRS for s in self.filepaths_affixes]
+        if len(self.filenames_suffixes) == 0:
+            self.filenames_suffixes = [True for x in range(self.nflags)]
+        else:
+            assert( len(self.filenames_suffixes) == self.nflags )
+            self.filenames_suffixes = [s.lower() in self.TRUE_STRS for s in self.filenames_suffixes]
 
     def __iter__(self):
         for cur_index in range(self.volume_size):
@@ -167,7 +179,7 @@ class dpCubeIter(object):
             cmd = [self.cmd]
         ncmd = len(cmd)
 
-        cnt = 0; empty_strs = ['' for i in range(self.nflags)]
+        cnt = 0
         for volume_info in self:
             _, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border = volume_info
             ccmd = cmd[0] if ncmd == 1 else cmd[cnt]
@@ -176,8 +188,8 @@ class dpCubeIter(object):
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
-                                            suffixes if self.use_suffix else empty_strs, 
-                                            affixes if self.affix_path else empty_strs)
+                                            [x if y else '' for x,y in zip(suffixes, self.filenames_suffixes)],
+                                            [x if y else '' for x,y in zip(affixes, self.filepaths_affixes)])
             print(ccmd + (''if self.no_volume_flags else str_volume) + str_inputs)
 
             cnt += 1
@@ -205,6 +217,7 @@ class dpCubeIter(object):
         p.add_argument('--cmdfile', nargs=1, type=str, default='',
                        help='Full name and path of text file containing command')
         p.add_argument('--cmd', nargs=1, type=str, default='', help='Specify command on command line as string')
+        # arguments that modulate each parameter that is being iterated by cubeiter
         p.add_argument('--fileflags', nargs='*', type=str, default=[],
                        help='in/out files command line switches (0 for none)')
         p.add_argument('--filepaths', nargs='*', type=str, default=[], help='in/out files paths (0 for none)')
@@ -212,6 +225,10 @@ class dpCubeIter(object):
         p.add_argument('--filepostfixes', nargs='*', type=str, default=[], help='in/out files filename postfixes')
         p.add_argument('--filemodulators', nargs='*', type=int, default=[],
                        help='Allows for supervolumes at multiples of cube_size (x0 y0 z0  x1 y1 z1 ...)')
+        p.add_argument('--filepaths-affixes', nargs='*', type=str, default=[],
+                       help='Whether to append suffix to each filepath (knossos-style, default false)')
+        p.add_argument('--filenames-suffixes', nargs='*', type=str, default=[],
+                       help='Whether to append suffix to each filename (default true)')
         p.add_argument('--volume_range_beg', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Starting range in chunks for total volume')
         p.add_argument('--volume_range_end', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
@@ -227,10 +244,6 @@ class dpCubeIter(object):
         p.add_argument('--use-chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
                        help='Size of chunks in voxels')
         p.add_argument('--leave_edge', action='store_true', help='Whether to leave right-most overlap or not')
-        p.add_argument('--affix_path', action='store_true',
-                       help='Whether to add chunk suffix as path prefix (knossos-style)')
-        p.add_argument('--no-suffix', action='store_false', dest='use_suffix',
-                       help='Do not append knossos suffix to file name (iterate single file)')
         p.add_argument('--no_volume_flags', action='store_true',
                        help='Do not include chunk, size and offset flags in output')
 
