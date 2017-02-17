@@ -190,9 +190,13 @@ class emLabels(dpWriteh5):
     @staticmethod
     def getSizes(lbls, maxlbls=None):
         assert( lbls.dtype.kind in 'ui' )
-        if maxlbls is None:
-            maxlbls = lbls.max()
-        sizes,edges = np.histogram(lbls, bins=range(0,maxlbls+2), range=(0,maxlbls+1))
+        #if maxlbls is None:
+        #    maxlbls = lbls.max()
+        # xxx - could not find an efficient method that uses maxlbls, would have to write C-function
+        sizes = np.bincount(np.ravel(lbls)) # better
+        ##sizes = nd.measurements.histogram(lbls, 0, maxlbls, maxlbls+1) # same as hist
+        ##sizes,edges = np.histogram(lbls, bins=range(0,maxlbls+2), range=(0,maxlbls+1)) # slow
+        ##sizes = nd.labeled_comprehension(1, lbls, np.arange(0,maxlbls+1,dtype=np.int64), np.sum, np.int64, 0) # worst
         return sizes
 
     # get type of each supervoxel by majority vote by summing votes per supervoxel
