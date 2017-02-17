@@ -137,10 +137,6 @@ class dpLabelMesher(emLabels):
         # for easy saving of scale as attribute in hdf5 output
         self.scale = self.data_attrs['scale']
 
-        # Pad data with zeros so that meshes are closed on the edges
-        sizes = np.array(cube.shape); r = self.RAD; sz = sizes + 2*r;
-        dataPad = np.zeros(sz, dtype=self.data_type); dataPad[r:sz[0]-r, r:sz[1]-r, r:sz[2]-r] = cube
-
         # get sizes first with hist (prevents sums in meshing loop)
         if self.dpLabelMesher_verbose:
             print('Getting supervoxel sizes using %d max labels' % (self.nlabels,)); t = time.time()
@@ -149,6 +145,15 @@ class dpLabelMesher(emLabels):
             print('\tdone in %.3f s' % (time.time() - t,))
         self.seeds = np.arange(1, self.nVoxels.size+1, dtype=np.int64); self.seeds = self.seeds[self.nVoxels>0]
         #print(np.argmax(self.nVoxels))
+
+        if self.dpLabelMesher_verbose:
+            print('Padding data with %d zero border' % (self.RAD,)); t = time.time()
+        # Pad data with zeros so that meshes are closed on the edges
+        sizes = np.array(cube.shape); r = self.RAD; sz = sizes + 2*r;
+        dataPad = np.zeros(sz, dtype=self.data_type); dataPad[r:sz[0]-r, r:sz[1]-r, r:sz[2]-r] = cube
+        del self.data_cube, cube
+        if self.dpLabelMesher_verbose:
+            print('\tdone in %.3f s' % (time.time() - t,))
 
         assert( self.seeds.size > 0 )   # error, no labels
         n = self.seeds.size; #self.nVoxels = np.zeros((n,), dtype=np.int64)
@@ -194,33 +199,26 @@ class dpLabelMesher(emLabels):
             # min coordinates of this seed relative to original (non-padded cube)
             self.mins[i] = pmin - r; self.rngs[i] = pmax - pmin + 1
 
-            # old method
-            # crop out the bounding box plus the padding, then optionally smooth
-            #crpdpls = bwdpls[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,pmin[2]:pmax[2]+1].astype(self.PDTYPE)
-            # crop out the bounding box then binarize this seed within bounding box
             crpdpls = (dataPad[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,
-                                pmin[2]:pmax[2]+1] == self.seeds[i]).astype(self.PDTYPE)
+                               pmin[2]:pmax[2]+1] == self.seeds[i]).astype(self.PDTYPE)
 
             if self.do_smooth:
                 crpdplsSm = filters.convolve(crpdpls, W, mode='reflect', cval=0.0, origin=0)
                 # if smoothing results in nothing above contour level, use original without smoothing
                 if (crpdplsSm > self.contour_lvl).any():
-                    del crpdpls; crpdpls = crpdplsSm; del crpdplsSm
+                    del crpdpls; crpdpls = crpdplsSm
+                del crpdplsSm
             if self.doplots: showImgData(np.squeeze(crpdpls[:,:,crpdpls.shape[2]/2]),'slice')
             self.crpdpls = crpdpls
             # save bounds relative to entire dataset
-            self.bounds_beg[i] = self.mins[i] + self.dataset_index; self.bounds_end[i] = self.mins[i] + self.rngs[i] -1
-            + self.dataset_index;
+            self.bounds_beg[i] = self.mins[i] + self.dataset_index
+            self.bounds_end[i] = self.mins[i] + self.rngs[i] - 1 + self.dataset_index;
 
             #call the vtk Pipeline
             vertices, faces = self.vtkMesh(self.mins[i],self.rngs[i])
             self.vertices[i] = vertices
             self.faces[i] = faces
             # store vertices and faces for future reference
-            if self.center_origin:
-               self.vertices[i][:,0] -= sizes[0]/2; self.vertices[i][:,1] -= sizes[1]/2
-               self.vertices[i][:,2] = sizes[2]/2 - self.vertices[i][:,2]
-            if self.flip_faces: self.faces[i] = self.faces[i][:,::-1]
             self.nVertices[i] = self.vertices[i].shape[0]
             self.nFaces[i] = self.faces[i].shape[0]
 
@@ -235,6 +233,7 @@ class dpLabelMesher(emLabels):
         # The preaviusly created array is converted to a byte string (not string, see np docs) and imported.
         data_string = self.crpdpls.transpose((2,1,0)).tostring();
         dataImporter.CopyImportVoidPointer(data_string, len(data_string))
+        del data_string
         # Set the type of the newly imported data
         #dataImporter.SetDataScalarTypeToUnsignedChar()
         #dataImporter.SetDataScalarTypeToUnsignedShort()
@@ -244,93 +243,93 @@ class dpLabelMesher(emLabels):
         dataImporter.SetNumberOfScalarComponents(1)
 
         if self.set_voxel_scale:
-           # Have to set the voxel anisotropy here, as there does not seem an easy way once the poly is created.
-           dataImporter.SetDataSpacing(self.data_attrs['scale'])
-           # Data extent is the extent of the actual buffer, whole extent is ???
-           # Use extents that are relative to non-padded cube
-           if(self.meshes):
-            beg = min_coord - self.dataset_index
-            end = beg + min_range - 1
+            # Have to set the voxel anisotropy here, as there does not seem an easy way once the poly is created.
+            dataImporter.SetDataSpacing(self.data_attrs['scale'])
+            # Data extent is the extent of the actual buffer, whole extent is ???
+            # Use extents that are relative to non-padded cube
+            if(self.meshes):
+                beg = min_coord - self.dataset_index
+                end = beg + min_range - 1
 
-           else:
-            beg = min_coord ;  end = min_range + min_coord - 1;
-            #print(beg,end)
+            else:
+                beg = min_coord ;  end = min_range + min_coord - 1;
+                #print(beg,end)
 
-           dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
-           dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+            dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+            dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
 
-           # use vtk for isosurface contours and surface mesh reduction
-           iso = vtk.vtkContourFilter()
-           iso.SetInputConnection(dataImporter.GetOutputPort())
-           iso.SetComputeNormals(0)
-           iso.SetValue(0, self.contour_lvl)
+            # use vtk for isosurface contours and surface mesh reduction
+            iso = vtk.vtkContourFilter()
+            iso.SetInputConnection(dataImporter.GetOutputPort())
+            iso.SetComputeNormals(0)
+            iso.SetValue(0, self.contour_lvl)
 
-           if self.decimatePro:
-              deci = vtk.vtkDecimatePro()
-              rf = 1-self.reduce_frac; deci.SetTargetReduction(rf); df = 0.01
-              deci.SplittingOn(); deci.PreserveTopologyOff(); deci.BoundaryVertexDeletionOn()
-              if self.min_faces > 0: updates = range(100)
-              else: updates = ['deci.BoundaryVertexDeletionOff()','deci.PreserveTopologyOn()','0']
-           else:
-              deci = vtk.vtkQuadricClustering()
-              #deci.SetDivisionOrigin(0.0,0.0,0.0); deci.SetDivisionSpacing(self.reduce_spacing)
-              nb = self.reduce_nbins; deci.SetNumberOfDivisions(nb,nb,nb); deci.AutoAdjustNumberOfDivisionsOff()
-              updates = ['deci.AutoAdjustNumberOfDivisionsOn()','0']
+            if self.decimatePro:
+                deci = vtk.vtkDecimatePro()
+                rf = 1-self.reduce_frac; deci.SetTargetReduction(rf); df = 0.01
+                deci.SplittingOn(); deci.PreserveTopologyOff(); deci.BoundaryVertexDeletionOn()
+                if self.min_faces > 0: updates = range(100)
+                else: updates = ['deci.BoundaryVertexDeletionOff()','deci.PreserveTopologyOn()','0']
+            else:
+                deci = vtk.vtkQuadricClustering()
+                #deci.SetDivisionOrigin(0.0,0.0,0.0); deci.SetDivisionSpacing(self.reduce_spacing)
+                nb = self.reduce_nbins; deci.SetNumberOfDivisions(nb,nb,nb); deci.AutoAdjustNumberOfDivisionsOff()
+                updates = ['deci.AutoAdjustNumberOfDivisionsOn()','0']
 
-            # thought of adding checking for closed surfaces, http://comments.gmane.org/gmane.comp.lib.vtk.user/47957
-            # this did not work, for low reduce_frac, many open edges remain even for large objects
+             # thought of adding checking for closed surfaces, http://comments.gmane.org/gmane.comp.lib.vtk.user/47957
+             # this did not work, for low reduce_frac, many open edges remain even for large objects
 
-            # not clear that triangle filter does anything, contour filter already makes triangulated meshes?
-            # send polygonal mesh from isosurface to triangle filter to convert to triangular mesh
-            #tri = vtk.vtkTriangleFilter(); tri.SetInputConnection(iso.GetOutputPort());
-            #deci.SetInputConnection(tri.GetOutputPort())
+             # not clear that triangle filter does anything, contour filter already makes triangulated meshes?
+             # send polygonal mesh from isosurface to triangle filter to convert to triangular mesh
+             #tri = vtk.vtkTriangleFilter(); tri.SetInputConnection(iso.GetOutputPort());
+             #deci.SetInputConnection(tri.GetOutputPort())
 
-           deci.SetInputConnection(iso.GetOutputPort())
-           # xxx - this is kindof a cheap trick, if we reduce down "too much", then rerun to preserve more
-           for update in updates:
-               deci.Update()
+            deci.SetInputConnection(iso.GetOutputPort())
+            # xxx - this is kindof a cheap trick, if we reduce down "too much", then rerun to preserve more
+            for update in updates:
+                deci.Update()
 
-               # http://forrestbao.blogspot.com/2012/06/vtk-polygons-and-other-cells-as.html
-               # http://stackoverflow.com/questions/6684306/how-can-i-read-a-vtk-file-into-a-python-datastructure
-               dOut = deci.GetOutput()
-               # xxx - points seem to be single instead of inputted type, probably depends on vtk version:
-               #   http://public.kitware.com/pipermail/vtkusers/2010-April/059413.html
-               vertices = nps.vtk_to_numpy(dOut.GetPoints().GetData())
-               faces = nps.vtk_to_numpy(dOut.GetPolys().GetData()).reshape((-1,4))[:,1:]
-               nVertices = vertices.shape[0]
-               nFaces = faces.shape[0]
-               #if self.dpLabelMesher_verbose :
-                 # print('\t%d vertices, %d faces' % (nVertices, nFaces))
-               if self.min_faces > 0:
-                  if nFaces >= self.min_faces: break
-                  rf -= df; deci.SetTargetReduction(rf)
-               else:
-                  if nVertices > 2 and nFaces > 0: break
-                  eval(update)
-           assert( nVertices > 2 and nFaces > 0 )  # there has to be at least one face
+                # http://forrestbao.blogspot.com/2012/06/vtk-polygons-and-other-cells-as.html
+                # http://stackoverflow.com/questions/6684306/how-can-i-read-a-vtk-file-into-a-python-datastructure
+                dOut = deci.GetOutput()
+                # xxx - points seem to be single instead of inputted type, probably depends on vtk version:
+                #   http://public.kitware.com/pipermail/vtkusers/2010-April/059413.html
+                vertices = nps.vtk_to_numpy(dOut.GetPoints().GetData())
+                faces = nps.vtk_to_numpy(dOut.GetPolys().GetData()).reshape((-1,4))[:,1:]
+                nVertices = vertices.shape[0]
+                nFaces = faces.shape[0]
+                #if self.dpLabelMesher_verbose :
+                #    print('\t%d vertices, %d faces' % (nVertices, nFaces))
+                if self.min_faces > 0:
+                    if nFaces >= self.min_faces: break
+                    rf -= df; deci.SetTargetReduction(rf)
+                else:
+                    if nVertices > 2 and nFaces > 0: break
+                    eval(update)
+            assert( nVertices > 2 and nFaces > 0 )  # there has to be at least one face
 
-           if self.doplots:
-              mapper = vtk.vtkPolyDataMapper()
-              mapper.SetInputConnection(deci.GetOutputPort())
-              dpLabelMesher.vtkShow(mapper=mapper)
+            if self.doplots:
+                mapper = vtk.vtkPolyDataMapper()
+                mapper.SetInputConnection(deci.GetOutputPort())
+                dpLabelMesher.vtkShow(mapper=mapper)
 
             # append the current surface to vtk object with all the surfaces
-           if self.doplots or self.mesh_outfile_stl:
-               self.allPolyData.AddInputConnection(deci.GetOutputPort())
+            if self.doplots or self.mesh_outfile_stl:
+                self.allPolyData.AddInputConnection(deci.GetOutputPort())
 
-           if self.doplots:
-              connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
-              connectivityFilter.SetInputConnection(self.allPolyData.GetOutputPort())
-              connectivityFilter.SetExtractionModeToAllRegions()
-              connectivityFilter.ColorRegionsOn()
-              connectivityFilter.Update()
-              mapper = vtk.vtkPolyDataMapper()
-              mapper.SetInputConnection(connectivityFilter.GetOutputPort())
-              mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
-              mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
-              dpLabelMesher.vtkShow(mapper=mapper)
+            if self.doplots:
+                connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
+                connectivityFilter.SetInputConnection(self.allPolyData.GetOutputPort())
+                connectivityFilter.SetExtractionModeToAllRegions()
+                connectivityFilter.ColorRegionsOn()
+                connectivityFilter.Update()
+                mapper = vtk.vtkPolyDataMapper()
+                mapper.SetInputConnection(connectivityFilter.GetOutputPort())
+                mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
+                mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
+                dpLabelMesher.vtkShow(mapper=mapper)
 
-           return vertices,faces
+            return vertices,faces
 
     def writeMeshOutfile(self):
         if not self.mesh_outfile: return
@@ -762,7 +761,6 @@ class dpLabelMesher(emLabels):
                     pointSetToLabelHierarchyFilter = vtk.vtkPointSetToLabelHierarchy()
                     pointSetToLabelHierarchyFilter.SetInputData(polyData)
                     pointSetToLabelHierarchyFilter.SetLabelArrayName('NodeIDs')
-                    #pointSetToLabelHierarchyFilter->SetPriorityArrayName("sizes");
                     pointSetToLabelHierarchyFilter.Update()
                     # Create a mapper and actor for the labels.
                     labelMapper = vtk.vtkLabelPlacementMapper()
@@ -799,7 +797,7 @@ class dpLabelMesher(emLabels):
 
     def mergeMesh(self):
 
-        nobjs = len(self.merge_objects); nskels = len(self.skeletons)
+        nobjs = len(self.merge_objects); #nskels = len(self.skeletons)
 
         # incase there is no meshing file and just using this to view skeletons
         if nobjs > 0 and self.merge_objects[0] < 0:
@@ -809,13 +807,13 @@ class dpLabelMesher(emLabels):
             h5file = h5py.File(self.mesh_infiles[0], 'r'); dset_root = h5file[self.dataset_root]
 
         # read meta-data in seed 0
-        str_seed = ('%08d' % 0)
+        #str_seed = ('%08d' % 0)
         #nlabels = h5file[self.dataset_root][str_seed]['faces'].attrs['nlabels']
-        vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
+        #vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
 
         # get the nml skeleton file and mergelist out of the zipped knossos annotation fil
         zf = zipfile.ZipFile(self.annotation_file, mode='r');
-        inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
+        inmerge = zf.read('mergelist.txt'); #inskel = zf.read('annotation.xml');
         zf.close()
 
         # read the merge list
@@ -1030,12 +1028,6 @@ class dpLabelMesher(emLabels):
             help='Size of smoothing kernel (zeros for none)')
         p.add_argument('--contour-lvl', nargs=1, type=float, default=[0.25], metavar=('LVL'),
             help='Level [0,1] to use to create mesh isocontours')
-        p.add_argument('--center-origin', action='store_true', dest='center_origin',
-            help='Do the weird "origin centering" transformation')
-        #        p.add_argument('--no-flip-faces', action='store_false', dest='flip_faces',
-        #            help='Do change the face order coming from vtk')
-        p.add_argument('--flip-faces', action='store_true', dest='flip_faces',
-            help='Change the face order coming from vtk')
         p.add_argument('--seed-range', nargs=2, type=int, default=[-1,-1], metavar=('BEG', 'END'),
             help='Subset of seeds to process (< 0 for beg/end)')
         p.add_argument('--no-decimatePro', action='store_false', dest='decimatePro',
