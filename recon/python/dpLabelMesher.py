@@ -40,7 +40,6 @@ import time
 import glob
 import zipfile
 import re
-
 from scipy import ndimage as nd
 import scipy.ndimage.filters as filters
 import vtk
@@ -185,10 +184,11 @@ class dpLabelMesher(emLabels):
         if self.dpLabelMesher_verbose:
             tloop = time.time(); t = time.time()
             print('Running meshing on %d seeds' % (self.seed_range[1]-self.seed_range[0],))
+            print('seed : %d is %d / %d' % (self.seeds[self.seed_range[0]],self.seed_range[0],self.seed_range[1]))
         for i in range(self.seed_range[0], self.seed_range[1]):
 
             if self.dpLabelMesher_verbose and (i % self.print_every == 0) and i > self.seed_range[0]:
-                print('\tdone in %.3f s' % (time.time() - t,))
+                print('\tdone in %.3f s' % (time.time() - t,)); t = time.time()
                 print('seed : %d is %d / %d' % (self.seeds[i],i+1,self.seed_range[1]))
 
             cur_bnd = svox_bnd[self.seeds[i]-1]
