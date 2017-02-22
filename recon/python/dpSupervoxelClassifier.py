@@ -204,6 +204,16 @@ class dpSupervoxelClassifier():
         self.iterative_mode = (self.iterate_count > 0)
         self.iterative_frag = [None] * self.nchunks
         self.iterative_mode_count = 0
+        if len(self.iterate_save_ranges) > 0:
+            assert(len(self.iterate_save_ranges) % 3 == 0) # must specify as python-style ranges
+            n = len(self.iterate_save_ranges)//3
+            self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=np.bool)
+            for i in range(n):
+                start, stop, step = self.iterate_save_ranges[3*i:3*i+3]
+                self.iterate_save_mask[range(start,stop,step)] = 1
+            self.iterate_save_mask[stop:] = 1
+        else:
+            self.iterate_save_mask = np.ones((self.iterate_count,), dtype=np.bool)
 
         if self.iterative_mode:
             # expand the list out to the number of iterations by repeating the last merge percentage
@@ -356,7 +366,8 @@ class dpSupervoxelClassifier():
                 self.iterative_frag[chunk].subgroups_out[-1] = '%.8f' \
                     % self.threshold_subgroups[self.iterative_mode_count]
                 clf_predict, thr = self.get_merge_predict_thr(cdata)
-                self.iterative_frag[chunk].agglomerate(clf_predict)
+                self.iterative_frag[chunk].agglomerate(clf_predict,
+                    doWrite=self.iterate_save_mask[self.iterative_mode_count])
 
                 # make the next training iteration load from the current agglomerated supervoxels
                 self.iterative_frag[chunk].srcfile = self.iterative_frag[chunk].outfile
@@ -436,7 +447,7 @@ class dpSupervoxelClassifier():
             # merge based on current classifier
             frag.subgroups_out[-1] = '%.8f' % self.threshold_subgroups[self.iterative_mode_count]
             clf_predict, thr = self.get_merge_predict_thr(sdata)
-            frag.agglomerate(clf_predict)
+            frag.agglomerate(clf_predict, doWrite=self.iterate_save_mask[self.iterative_mode_count])
 
             # make the next training iteration load from the current agglomerated supervoxels
             self.iterative_frag[ichunk].srcfile = self.iterative_frag[ichunk].outfile

@@ -51,7 +51,8 @@ class dpWatershedTypes(object):
     def __init__(self, args):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
-            if type(v) is list and k not in ['ThrHi', 'ThrLo', 'fg_types_labels']:
+            if type(v) is list and k not in ['ThrHi', 'ThrLo', 'fg_types_labels', 'ThrRngSave', 'ThrHiSave',
+                    'ThrLoSave']:
                 # do not save items that are known to be lists (even if one element) as single elements
                 if len(v)==1 and k not in ['fg_types', 'Tmins']:
                     setattr(self,k,v[0])  # save single element lists as first element
@@ -81,6 +82,19 @@ class dpWatershedTypes(object):
         self.size_crop = self.size - 2*self.cropborder; self.offset_crop = self.offset + self.cropborder
         assert( not self.docrop or self.method == 'overlap' )  # currently cropping only supported for overlap method
         assert( not self.warpfile or self.method == 'overlap' ) # warps only used for overlap method
+
+        # parallel with regular Thr parameters, which thresholds to save in output (default all)
+        if len(self.ThrRngSave) == 0: self.ThrRngSave = self.ThrRng
+        if len(self.ThrLoSave) == 0: self.ThrLoSave = self.ThrLo
+        if len(self.ThrHiSave) == 0: self.ThrHiSave = self.ThrHi
+        self.TsSave = np.arange(self.ThrRngSave[0], self.ThrRngSave[1], self.ThrRngSave[2])
+        if self.ThrLoSave: self.TsSave = np.concatenate((np.array(self.ThrLoSave), self.TsSave))
+        if self.ThrHiSave: self.TsSave = np.concatenate((self.TsSave, np.array(self.ThrHiSave)))
+        #self.TsSave = np.sort(self.TsSave)  # just to be sure
+        #self.TsSaveMask = (self.Ts == self.TsSave)
+        print(self.TsSave, self.ThrRngSave)
+        self.TsSaveMask = np.in1d(self.Ts, self.TsSave)
+        assert( self.TsSaveMask.sum(dtype=np.int64) == len(self.TsSave) ) # save thresholds not consistent
 
         # other input validations
         assert( (self.Ts > 0).all() and (self.Ts < 1).all() )
@@ -348,29 +362,31 @@ class dpWatershedTypes(object):
                 wlabels = emLabels.nearest_neighbor_fill(labels, mask=None,
                     sampling=self.attrs['scale'] if hasattr(self.attrs,'scale') else None)
 
-                # write out the results
-                if self.nTmin == 1: subgroups = ['%.8f' % (self.Ts[i],)]
-                else: subgroups = ['%d' % (self.Tmins[k],), '%.8f' % (self.Ts[i],)]
-                d = self.attrs.copy(); d['threshold'] = self.Ts[i];
-                d['types_nlabels'] = types_nlabels; d['Tmin'] = self.Tmins[k]
-                emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
-                    offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
-                    chunksize=self.chunksize.tolist(), data=labels, verbose=writeVerbose,
-                    attrs=d, strbits=self.outlabelsbits, subgroups=['with_background']+subgroups )
-                emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
-                    offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
-                    chunksize=self.chunksize.tolist(), data=wlabels, verbose=writeVerbose,
-                    attrs=d, strbits=self.outlabelsbits, subgroups=['zero_background']+subgroups )
-                d['type_nlabels'] = types_ucnlabels;
-                emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
-                    offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
-                    chunksize=self.chunksize.tolist(), data=uclabels, verbose=writeVerbose,
-                    attrs=d, strbits=self.outlabelsbits, subgroups=['no_adjacencies']+subgroups )
-                if self.skeletonize:
+                if self.TsSaveMask[i]:
+                    # write out the results
+                    if self.nTmin == 1: subgroups = ['%.8f' % (self.Ts[i],)]
+                    else: subgroups = ['%d' % (self.Tmins[k],), '%.8f' % (self.Ts[i],)]
+                    d = self.attrs.copy(); d['threshold'] = self.Ts[i];
+                    d['types_nlabels'] = types_nlabels; d['Tmin'] = self.Tmins[k]
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
-                        chunksize=self.chunksize.tolist(), data=sklabels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=['skeletonized']+subgroups )
+                        chunksize=self.chunksize.tolist(), data=labels, verbose=writeVerbose,
+                        attrs=d, strbits=self.outlabelsbits, subgroups=['with_background']+subgroups )
+                    emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
+                        offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
+                        chunksize=self.chunksize.tolist(), data=wlabels, verbose=writeVerbose,
+                        attrs=d, strbits=self.outlabelsbits, subgroups=['zero_background']+subgroups )
+                    d['type_nlabels'] = types_ucnlabels;
+                    emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
+                        offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
+                        chunksize=self.chunksize.tolist(), data=uclabels, verbose=writeVerbose,
+                        attrs=d, strbits=self.outlabelsbits, subgroups=['no_adjacencies']+subgroups )
+                    if self.skeletonize:
+                        emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
+                            offset=self.offset_crop.tolist(), size=self.size_crop.tolist(),
+                            datasize=self.datasize.tolist(), chunksize=self.chunksize.tolist(), data=sklabels,
+                            verbose=writeVerbose, attrs=d, strbits=self.outlabelsbits,
+                            subgroups=['skeletonized']+subgroups )
 
     # This labeling method connects zslices layer-by-layer. This can be done by simply overlapping the eroded labeled
     #   regoins or by overlapping by using warped labels (with warps generated externally by some optic flow method).
@@ -470,6 +486,15 @@ class dpWatershedTypes(object):
         p.add_argument('--ThrHi', nargs='*', type=float, default=[0.995, 0.999, 0.9995, 0.9999],
             help='Extra thresholds for probs on high end')
         p.add_argument('--ThrLo', nargs='*', type=float, default=[], help='Extra thresholds for probs on low end')
+
+        # optionally also specify which thresholds to save in output (parallel arguments, better way?)
+        p.add_argument('--ThrRngSave', nargs='*', type=float, default=[],
+            help='Python range same format as ThrRng for probability thresholds to save')
+        p.add_argument('--ThrHiSave', nargs='*', type=float, default=[],
+            help='Extra thresholds on high end to save')
+        p.add_argument('--ThrLoSave', nargs='*', type=float, default=[],
+            help='Extra thresholds on low end to save')
+
         p.add_argument('--Tmins', nargs='+', type=int, default=[256],
             help='Minimum component size threshold list (for "peak detection")')
         p.add_argument('--outlabels', nargs=1, type=str, default='', metavar='FILE', help='Supervoxels h5 output file')

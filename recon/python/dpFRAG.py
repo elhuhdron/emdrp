@@ -849,7 +849,7 @@ class dpFRAG(emLabels):
     # this is like a loopback test for this script only (create FRAG using GT then agglomerate based on GT overlap).
     # also used by iterative supervoxel agglomeration method.
     # this method updates the FRAG (but not the FRAG edge features) based on the target agglomeration.
-    def agglomerate(self, target):
+    def agglomerate(self, target, doWrite=True):
         if self.keep_subgroups:
             # the agglomerated labels depend on the input labels, so keep that information in output subgroups
             if self.subgroups_out:
@@ -948,7 +948,8 @@ class dpFRAG(emLabels):
         self.data_cube = supervox_map[self.supervoxels_noperim]
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = self.dpFRAG_verbose;
         self.data_attrs['types_nlabels'] = [ncomps]
-        self.writeCube(); self.dpWriteh5_verbose = verbose
+        if doWrite:
+            self.writeCube(); self.dpWriteh5_verbose = verbose
 
         # other self updates for the new supervoxels
         self.supervoxels_noperim = self.data_cube
