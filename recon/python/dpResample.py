@@ -40,17 +40,17 @@ from dpCubeIter import dpCubeIter
 class dpResample(dpWriteh5):
 
     def __init__(self, args):
-        #self.LIST_ARGS += ['train_offsets', 'prob_types']
+        self.LIST_ARGS += dpCubeIter.LIST_ARGS
         dpWriteh5.__init__(self,args)
 
-        self.cubeIter = dpCubeIter.cubeIterGen(self.volume_range_beg,self.volume_range_end,self.overlap,self.cube_size,
-                    left_remainder_size=self.left_remainder_size, right_remainder_size=self.right_remainder_size,
-                    chunksize=self.chunksize, leave_edge=self.leave_edge)
+        # xxx - also semi-unclean, would fix along with cleaner in/out method
+        self.dataset_in = self.dataset
+        self.datasize_in = self.datasize
 
         self.resample_dims = self.resample_dims.astype(np.bool)
         self.nresample_dims = self.resample_dims.sum(dtype=np.uint8)
         assert( self.nresample_dims > 0 )   # no resample dims specified
-        self.slices = 2**self.nresample_dims
+        self.nslices = 2**self.nresample_dims
 
         # xxx - probably a way to do this programatically, but easier to read as enumerated.
         #   also this script is intended to only ever down/up sampled by factors of 2.
@@ -76,51 +76,67 @@ class dpResample(dpWriteh5):
             print('dpResample, verbose mode:\n'); print(vars(self))
 
     def iterResample(self):
+        # xxx - ahhhhhh, this has to be fixed somehow
+        if self.chunksize is not None and (self.chunksize < 0).all(): self.chunksize = self.use_chunksize
+        self.cubeIter = dpCubeIter.cubeIterGen(self.volume_range_beg,self.volume_range_end,self.overlap,self.cube_size,
+                    left_remainder_size=self.left_remainder_size, right_remainder_size=self.right_remainder_size,
+                    chunksize=self.chunksize, leave_edge=self.leave_edge)
+
         for self.volume_info,n in zip(self.cubeIter, range(self.cubeIter.volume_size)):
             _, self.size, self.chunk, self.offset, _, _, _, _ = self.volume_info
-            self.inith5()
+            self.singleResample()
 
-            if self.dpResample_verbose:
-                print('Resample chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
-                    self.size.tolist() + self.offset.tolist())); t = time.time()
-            self.readCubeToBuffers()
+    def singleResample(self):
+        self.dataset = self.dataset_in
+        self.inith5()
 
-            if self.upsample:
-                # update the scale and compute new chunk/size/offset
-                self.data_attrs['scale'][self.resample_dims] /= 2
-                new_chunk = self.chunk.copy()
-                new_chunk[self.resample_dims]= new_chunk[self.resample_dims]*2
-                new_size = self.size.copy()
-                new_size[self.resample_dims]= new_size[self.resample_dims]*2
-                new_offset = self.offset.copy()
-                new_offset[self.resample_dims]= new_offset[self.resample_dims]*2
+        if self.dpResample_verbose:
+            print('Resample chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
+                self.size.tolist() + self.offset.tolist())); t = time.time()
+        self.readCubeToBuffers()
 
-                new_data = np.zeros(new_size,dtype=self.data_type)
+        new_attrs = self.data_attrs
+        new_chunk = self.chunk.copy()
+        new_size = self.size.copy()
+        new_offset = self.offset.copy()
+
+        if self.upsample:
+            # update the scale and compute new chunk/size/offset
+            new_attrs['scale'][self.resample_dims] /= 2
+            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]*2
+            new_size[self.resample_dims] = new_size[self.resample_dims]*2
+            new_offset[self.resample_dims] = new_offset[self.resample_dims]*2
+
+            new_data = np.zeros(new_size,dtype=self.data_type)
+            for i in range(self.nslices):
+                new_data[self.slices[i]] = self.data_cube
+        else:
+            # update the scale and compute new chunk/size/offset
+            new_attrs['scale'][self.resample_dims] *= 2
+            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]//2
+            new_size[self.resample_dims] = new_size[self.resample_dims]//2
+            new_offset[self.resample_dims] = new_offset[self.resample_dims]//2
+            odd_chunks = (self.chunk % 2 == 1)
+            sel = (self.resample_dims & odd_chunks)
+            new_offset[sel] += self.chunksize[sel]//2
+
+            if self.pixel_averaging:
+                new_data = np.zeros(new_size,dtype=np.double)
                 for i in range(self.nslices):
-                    new_data[self.slices[i]] = self.data_cube
+                    new_data += self.data_cube[self.slices[i]]
+                new_data = (new_data / self.nslices).astype(self.data_type)
             else:
-                # update the scale and compute new chunk/size/offset
-                self.data_attrs['scale'][self.resample_dims] *= 2
-                new_chunk = self.chunk.copy()
-                new_chunk[self.resample_dims]= new_chunk[self.resample_dims]//2
-                new_size = self.size.copy()
-                new_size[self.resample_dims]= new_size[self.resample_dims]//2
-                new_offset = self.offset.copy()
-                new_offset[self.resample_dims]= new_offset[self.resample_dims]//2
+                new_data = self.data_cube[self.slices[0]]
 
-                if self.pixel_averaging:
-                    new_data = np.zeros(new_size,dtype=np.double)
-                    for i in range(self.nslices):
-                        new_data += self.data_cube[self.slices[i]]
-                    new_data = (new_data / self.nslices).astype(self.data_type)
-                else:
-                    new_data = self.data_cube[self.slices[0]]
-
-            self.data_cube = new_data
-            self.size, self.chunk, self.offset = new_size, new_chunk, new_offset
-            self.inith5(); self.writeCube()
-            if self.dpResample_verbose:
-                print('\t\tdone in %.4f s' % (time.time() - t,))
+        self.size, self.chunk, self.offset = new_size, new_chunk, new_offset
+        print('\twrite to chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
+            self.size.tolist() + self.offset.tolist())); t = time.time()
+        self.inith5()
+        self.data_cube = new_data
+        self.data_attrs = new_attrs
+        self.writeCube()
+        if self.dpResample_verbose:
+            print('\tdone in %.4f s' % (time.time() - t,))
 
     @staticmethod
     def addArgs(p):
@@ -140,4 +156,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     resamp = dpResample(args)
-    resamp.iterResample()
+    if (resamp.cube_size < 1).any():
+        resamp.singleResample()
+    else:
+        resamp.iterResample()
