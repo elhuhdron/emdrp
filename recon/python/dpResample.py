@@ -120,23 +120,30 @@ class dpResample(dpWriteh5):
             sel = (self.resample_dims & odd_chunks)
             new_offset[sel] += self.chunksize[sel]//2
 
-            if self.pixel_averaging:
+            if self.downsample_op == 'none':
+                new_data = self.data_cube[self.slices[0]]
+            elif self.downsample_op == 'mean':
                 new_data = np.zeros(new_size,dtype=np.double)
                 for i in range(self.nslices):
                     new_data += self.data_cube[self.slices[i]]
                 new_data = (new_data / self.nslices).astype(self.data_type)
-            else:
-                new_data = self.data_cube[self.slices[0]]
+            elif self.downsample_op == 'median':
+                new_data = np.zeros(np.concatenate([new_size, [self.nslices]]),dtype=np.double)
+                for i in range(self.nslices):
+                    new_data[:,:,:,i] = self.data_cube[self.slices[i]]
+                new_data = np.median(new_data, axis=3).astype(self.data_type)
 
         self.size, self.chunk, self.offset = new_size, new_chunk, new_offset
-        print('\twrite to chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
-            self.size.tolist() + self.offset.tolist())); t = time.time()
+        if self.dpResample_verbose:
+            print('\tdone in %.4f s' % (time.time() - t,))
+            print('\twrite to chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
+                self.size.tolist() + self.offset.tolist())); t = time.time()
         self.inith5()
         self.data_cube = new_data
         self.data_attrs = new_attrs
         self.writeCube()
         if self.dpResample_verbose:
-            print('\tdone in %.4f s' % (time.time() - t,))
+            print('\t\tdone in %.4f s' % (time.time() - t,))
 
     @staticmethod
     def addArgs(p):
@@ -144,6 +151,8 @@ class dpResample(dpWriteh5):
         dpWriteh5.addArgs(p)
         dpCubeIter.addArgs(p)
         p.add_argument('--upsample', action='store_true', help='Upsample mode (default downsampling)')
+        p.add_argument('--downsample-op', nargs=1, type=str, default=['none'], metavar='OP',
+                       choices=['none','mean','median'], help='Specify which operation to use for downsampling method')
         p.add_argument('--pixel-averaging', action='store_true', help='Use pixel averaging method for downsampling')
         p.add_argument('--resample-dims', nargs=3, type=int, default=[1,1,1], metavar=('X', 'Y', 'Z'),
             help='Boolean specifying which dimensions to resample')
