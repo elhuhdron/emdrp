@@ -638,7 +638,7 @@ class dpFRAG(emLabels):
 
                         # save the variables in ovlp_attrs to edge attributes
                         d = locals(); m = {}
-                        for k in dpFRAG.ovlp_attrs:
+                        for k in self.ovlp_attrs:
                             if k in d: m[k] = d[k]
                         # concatenate sovlp_attrs and ovlp_attrs for the overlap
                         self.FRAG[i][j]['ovlp_attrs'] = {**m, **mo}

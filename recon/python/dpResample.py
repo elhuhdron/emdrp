@@ -23,7 +23,8 @@
 # SOFTWARE.
 
 # Method for doing simple factor of 2 downsampling/upsampling.
-# Upsampling simply repeats pixels. Downsampling can just decimate without transformation or do "pixel averaging"
+# Upsampling simply repeats pixels (intended for upsampling labels only, not for interpolation).
+# Downsampling can just decimate without transformation or do "pixel mixing".
 
 import numpy as np
 #import h5py
@@ -153,7 +154,6 @@ class dpResample(dpWriteh5):
         p.add_argument('--upsample', action='store_true', help='Upsample mode (default downsampling)')
         p.add_argument('--downsample-op', nargs=1, type=str, default=['none'], metavar='OP',
                        choices=['none','mean','median'], help='Specify which operation to use for downsampling method')
-        p.add_argument('--pixel-averaging', action='store_true', help='Use pixel averaging method for downsampling')
         p.add_argument('--resample-dims', nargs=3, type=int, default=[1,1,1], metavar=('X', 'Y', 'Z'),
             help='Boolean specifying which dimensions to resample')
         p.add_argument('--dpResample-verbose', action='store_true', help='Debugging output for dpResample')
