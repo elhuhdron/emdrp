@@ -42,6 +42,9 @@ probaugfile         = ''
 rawaugfile          = ''
 #rawaugfile          = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder_aug.h5'
 
+# output raw supervoxels (with empty labels removed)
+rawout              = '/home/' + username + ('/Downloads/svox_%dx%dx%d.raw' % tuple(size))
+
 feature_set = 'minimal'
 progressBar = True
 verbose = True
@@ -68,8 +71,12 @@ g_train = frag.FRAG
 print('Exporting adjacency matrix'); t=time.time()
 import networkx as nx
 am=nx.to_numpy_matrix(g_train)
-np.savetxt("tmp-adjacency_matrix-cpu.txt",am, fmt="%d", delimiter='')
+#np.savetxt("tmp-adjacency_matrix-cpu.txt",am, fmt="%d", delimiter='')
+am.tofile('tmp-adjacency-matrix-cpu-%dx%d-%s.raw' % (am.shape[0], am.shape[1], str(am.dtype)))
 print('\tdone in %.4f s' % (time.time() - t))
+
+# dump supervoxels
+frag.supervoxels_noperim.transpose((2,1,0)).tofile(rawout)
 
 if getFeatures:
     print('Outputting boundary voxels'); t=time.time()
