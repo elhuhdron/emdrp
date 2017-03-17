@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-# Method for doing simple factor of 2 downsampling/upsampling.
+# Method for doing simple divisible integer factor downsampling/upsampling.
 # Upsampling simply repeats pixels (intended for upsampling labels only, not for interpolation).
 # Downsampling can just decimate without transformation or do "pixel mixing".
 
@@ -51,26 +51,56 @@ class dpResample(dpWriteh5):
         self.resample_dims = self.resample_dims.astype(np.bool)
         self.nresample_dims = self.resample_dims.sum(dtype=np.uint8)
         assert( self.nresample_dims > 0 )   # no resample dims specified
-        self.nslices = 2**self.nresample_dims
+        self.nslices = self.factor**self.nresample_dims
 
-        # xxx - probably a way to do this programatically, but easier to read as enumerated.
-        #   also this script is intended to only ever down/up sampled by factors of 2.
+        ## xxx - probably a way to do this programatically, but easier to read as enumerated.
+        ##   this code commented out was only for downsampling by factor of 2
+        #if (self.resample_dims == np.array([1,0,0])).all():
+        #    self.slices = [np.s_[::2,:,:], np.s_[1::2,:,:]]
+        #elif (self.resample_dims == np.array([0,1,0])).all():
+        #    self.slices = [np.s_[:,::2,:], np.s_[:,1::2,:]]
+        #elif (self.resample_dims == np.array([0,0,1])).all():
+        #    self.slices = [np.s_[:,:,::2], np.s_[:,:,1::2]]
+        #elif (self.resample_dims == np.array([1,1,0])).all():
+        #    self.slices = [np.s_[::2,::2,:], np.s_[1::2,::2,:], np.s_[::2,1::2,:], np.s_[1::2,1::2,:]]
+        #elif (self.resample_dims == np.array([1,0,1])).all():
+        #    self.slices = [np.s_[::2,:,::2], np.s_[1::2,:,::2], np.s_[::2,:,1::2], np.s_[1::2,:,1::2]]
+        #elif (self.resample_dims == np.array([0,1,1])).all():
+        #    self.slices = [np.s_[:,::2,::2], np.s_[:,1::2,::2], np.s_[:,::2,1::2], np.s_[:,1::2,1::2]]
+        #elif self.resample_dims.all():
+        #    self.slices = [np.s_[::2,::2,::2], np.s_[1::2,::2,::2], np.s_[::2,1::2,::2], np.s_[::2,::2,1::2],
+        #                   np.s_[1::2,1::2,::2], np.s_[1::2,::2,1::2], np.s_[::2,1::2,1::2], np.s_[1::2,1::2,1::2]]
+        #assert( len(self.slices) == self.nslices ) # sanity check
+
+        # programmatic for factor, but still not for dimensions, again didn't seem worth it, always 3d
+        self.slices = [None]*self.nslices; f = self.factor
         if (self.resample_dims == np.array([1,0,0])).all():
-            self.slices = [np.s_[::2,:,:], np.s_[1::2,:,:]]
+            for i in range(f):
+                self.slices[i] = np.s_[i::f,:,:]
         elif (self.resample_dims == np.array([0,1,0])).all():
-            self.slices = [np.s_[:,::2,:], np.s_[:,1::2,:]]
+            for i in range(f):
+                self.slices[i] = np.s_[:,i::f,:]
         elif (self.resample_dims == np.array([0,0,1])).all():
-            self.slices = [np.s_[:,:,::2], np.s_[:,:,1::2]]
+            for i in range(f):
+                self.slices[i] = np.s_[:,:,i::f]
         elif (self.resample_dims == np.array([1,1,0])).all():
-            self.slices = [np.s_[::2,::2,:], np.s_[1::2,::2,:], np.s_[::2,1::2,:], np.s_[1::2,1::2,:]]
+            for i in range(f):
+                for j in range(f):
+                    self.slices[i*f + j] = np.s_[i::f,j::f,:]
         elif (self.resample_dims == np.array([1,0,1])).all():
-            self.slices = [np.s_[::2,:,::2], np.s_[1::2,:,::2], np.s_[::2,:,1::2], np.s_[1::2,:,1::2]]
+            for i in range(f):
+                for j in range(f):
+                    self.slices[i*f + j] = np.s_[i::f,:,j::f]
         elif (self.resample_dims == np.array([0,1,1])).all():
-            self.slices = [np.s_[:,::2,::2], np.s_[:,1::2,::2], np.s_[:,::2,1::2], np.s_[:,1::2,1::2]]
+            for i in range(f):
+                for j in range(f):
+                    self.slices[i*f + j] = np.s_[:,i::f,j::f]
         elif self.resample_dims.all():
-            self.slices = [np.s_[::2,::2,::2], np.s_[1::2,::2,::2], np.s_[::2,1::2,::2], np.s_[::2,::2,1::2],
-                           np.s_[1::2,1::2,::2], np.s_[1::2,::2,1::2], np.s_[::2,1::2,1::2], np.s_[1::2,1::2,1::2]]
-        assert( len(self.slices) == self.nslices ) # sanity check
+            ff = f*f
+            for i in range(f):
+                for j in range(f):
+                    for k in range(f):
+                        self.slices[i*ff + j*f + k] = np.s_[i::f,j::f,k::f]
 
         # print out all initialized variables in verbose mode
         if self.dpResample_verbose:
@@ -90,6 +120,7 @@ class dpResample(dpWriteh5):
     def singleResample(self):
         self.dataset = self.dataset_in
         self.inith5()
+        assert( (self.size[self.resample_dims] % self.factor == 0).all() )
 
         if self.dpResample_verbose:
             print('Resample chunk %d %d %d, size %d %d %d, offset %d %d %d' % tuple(self.chunk.tolist() + \
@@ -101,28 +132,37 @@ class dpResample(dpWriteh5):
         new_size = self.size.copy()
         new_offset = self.offset.copy()
 
+        f = self.factor
         if self.upsample:
             # update the scale and compute new chunk/size/offset
-            new_attrs['scale'][self.resample_dims] /= 2
-            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]*2
-            new_size[self.resample_dims] = new_size[self.resample_dims]*2
-            new_offset[self.resample_dims] = new_offset[self.resample_dims]*2
+            new_attrs['scale'][self.resample_dims] /= f
+            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]*f
+            new_size[self.resample_dims] = new_size[self.resample_dims]*f
+            new_offset[self.resample_dims] = new_offset[self.resample_dims]*f
 
             new_data = np.zeros(new_size,dtype=self.data_type)
             for i in range(self.nslices):
                 new_data[self.slices[i]] = self.data_cube
         else:
             # update the scale and compute new chunk/size/offset
-            new_attrs['scale'][self.resample_dims] *= 2
-            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]//2
-            new_size[self.resample_dims] = new_size[self.resample_dims]//2
-            new_offset[self.resample_dims] = new_offset[self.resample_dims]//2
-            odd_chunks = (self.chunk % 2 == 1)
-            sel = (self.resample_dims & odd_chunks)
-            new_offset[sel] += self.chunksize[sel]//2
+            new_attrs['scale'][self.resample_dims] *= f
+            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]//f
+            new_size[self.resample_dims] = new_size[self.resample_dims]//f
+            new_offset[self.resample_dims] = new_offset[self.resample_dims]//f
+            rmd_chunks = (self.chunk % f != 0)
+            sel = (self.resample_dims & rmd_chunks)
+            new_offset[sel] += self.chunksize[sel]//f
 
             if self.downsample_op == 'none':
                 new_data = self.data_cube[self.slices[0]]
+            elif self.downsample_op == 'labels':
+                # same as none except zero if any voxels are zero
+                new_data = np.zeros(np.concatenate([new_size, [self.nslices]]),dtype=np.double)
+                for i in range(self.nslices):
+                    new_data[:,:,:,i] = self.data_cube[self.slices[i]]
+                sel = np.any(new_data==0, axis=3)
+                new_data = self.data_cube[self.slices[0]]
+                new_data[sel] = 0
             elif self.downsample_op == 'mean':
                 new_data = np.zeros(new_size,dtype=np.double)
                 for i in range(self.nslices):
@@ -153,13 +193,16 @@ class dpResample(dpWriteh5):
         dpCubeIter.addArgs(p)
         p.add_argument('--upsample', action='store_true', help='Upsample mode (default downsampling)')
         p.add_argument('--downsample-op', nargs=1, type=str, default=['none'], metavar='OP',
-                       choices=['none','mean','median'], help='Specify which operation to use for downsampling method')
+                       choices=['none','labels','mean','median'],
+                       help='Specify which operation to use for downsampling method')
+        p.add_argument('--factor', nargs=1, type=int, default=[2], metavar=('F'),
+                       help='Integer factor to resample, must divide size of resampled dims')
         p.add_argument('--resample-dims', nargs=3, type=int, default=[1,1,1], metavar=('X', 'Y', 'Z'),
             help='Boolean specifying which dimensions to resample')
         p.add_argument('--dpResample-verbose', action='store_true', help='Debugging output for dpResample')
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Simple factor of 2 up/down sampling script',
+    parser = argparse.ArgumentParser(description='Simple divisible integer factor up/down sampling script',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     dpResample.addArgs(parser)
     args = parser.parse_args()
