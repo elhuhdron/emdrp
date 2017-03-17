@@ -119,6 +119,7 @@ class dpResample(dpWriteh5):
 
     def singleResample(self):
         self.dataset = self.dataset_in
+        self.datasize = self.datasize_in
         self.inith5()
         assert( (self.size[self.resample_dims] % self.factor == 0).all() )
 
@@ -131,14 +132,18 @@ class dpResample(dpWriteh5):
         new_chunk = self.chunk.copy()
         new_size = self.size.copy()
         new_offset = self.offset.copy()
+        new_datasize = self.datasize.copy()
 
         f = self.factor
         if self.upsample:
             # update the scale and compute new chunk/size/offset
             new_attrs['scale'][self.resample_dims] /= f
-            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]*f
-            new_size[self.resample_dims] = new_size[self.resample_dims]*f
-            new_offset[self.resample_dims] = new_offset[self.resample_dims]*f
+            new_attrs['boundary'][self.resample_dims] *= f
+            new_attrs['nchunks'][self.resample_dims] *= f
+            new_chunk[self.resample_dims] *= f
+            new_size[self.resample_dims] *= f
+            new_offset[self.resample_dims] *= f
+            new_datasize[self.resample_dims] *= f
 
             new_data = np.zeros(new_size,dtype=self.data_type)
             for i in range(self.nslices):
@@ -146,9 +151,15 @@ class dpResample(dpWriteh5):
         else:
             # update the scale and compute new chunk/size/offset
             new_attrs['scale'][self.resample_dims] *= f
-            new_chunk[self.resample_dims] = new_chunk[self.resample_dims]//f
-            new_size[self.resample_dims] = new_size[self.resample_dims]//f
-            new_offset[self.resample_dims] = new_offset[self.resample_dims]//f
+            new_attrs['boundary'][self.resample_dims] //= f
+            new_attrs['nchunks'][self.resample_dims] = \
+                np.ceil(new_attrs['nchunks'][self.resample_dims] / f).astype(np.int32)
+            new_chunk[self.resample_dims] //= f
+            new_size[self.resample_dims] //= f
+            new_offset[self.resample_dims] //= f
+            new_datasize[self.resample_dims] //= f
+
+            # update offset for non-divisible chunks
             rmd_chunks = (self.chunk % f != 0)
             sel = (self.resample_dims & rmd_chunks)
             new_offset[sel] += self.chunksize[sel]//f
@@ -182,6 +193,7 @@ class dpResample(dpWriteh5):
         self.inith5()
         self.data_cube = new_data
         self.data_attrs = new_attrs
+        self.datasize = new_datasize
         self.writeCube()
         if self.dpResample_verbose:
             print('\t\tdone in %.4f s' % (time.time() - t,))
