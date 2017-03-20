@@ -42,7 +42,11 @@ from validate import Validator, ValidateError
 import random
 import pickle as myPickle
 import StringIO as myStringIO
- 
+
+# for elastic transform
+from scipy.ndimage.interpolation import map_coordinates
+from scipy.ndimage.filters import gaussian_filter 
+
 # http://stackoverflow.com/questions/15704010/write-data-to-hdf-file-using-multiprocessing
 import multiprocessing as mp
 import sharedmem
@@ -104,7 +108,7 @@ class EMDataParser():
     FIRST_TILED_BATCH = 200001 
 
     # others    
-    NAUGS = 16              # total number of simple augmentations (including reflections in z, 8 for xy augs only)
+    NAUGS = 32              # total number of simple augmentations (including reflections in z, 8 for xy augs only)
     HDF5_CLVL = 5           # compression level in hdf5
 
     def __init__(self, cfg_file, write_outputs=False, init_load_path='', save_name=None, append_features=False,
@@ -619,11 +623,12 @@ class EMDataParser():
 
         # get data, augmented data and labels depending on batch type
         if batchnum >= self.FIRST_TILED_BATCH:
+            augs = [tiledAug]
             self.getTiledBatch(data,aug_data,labels,seglabels,batchnum,tiledAug)
         elif batchnum >= self.FIRST_RAND_NOLOOKUP_BATCH:
-            self.generateRandNoLookupBatch(data,aug_data,labels,seglabels)
+            augs = self.generateRandNoLookupBatch(data,aug_data,labels,seglabels)
         else:
-            self.generateRandBatch(data,aug_data,labels,seglabels)
+            augs = self.generateRandBatch(data,aug_data,labels,seglabels)
         
         # option to return zero labels, need this when convnet is expecting labels but not using them.
         # this is useful for dumping features over a large area that does not contain labels.
@@ -644,7 +649,7 @@ class EMDataParser():
             print 'EMDataParser: Got batch ', batchnum, ' (%.3f s)' % (time.time()-t,)
 
         # xxx - add another parameter here for different plots?
-        if plot_outputs: self.plotDataLbls(data,labels,seglabels,batchnum < self.FIRST_TILED_BATCH)
+        if plot_outputs: self.plotDataLbls(data,labels,seglabels,augs,pRand=(batchnum < self.FIRST_TILED_BATCH))
         #if plot_outputs: self.plotData(data,dataProc,batchnum < self.FIRST_TILED_BATCH)
 
         #time.sleep(5) # useful for "brute force" memory leak debug
@@ -708,6 +713,8 @@ class EMDataParser():
             self.getLblDataAtPoint(inds,labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunk)
         self.tallyTrainingPrior(labels)
 
+        return augs
+
     def generateRandNoLookupBatch(self,data,aug_data,labels,seglabels):
         # load a new cube in chunklist or chunkrange modes        
         if self.use_chunk_list and not self.chunk_list_all: self.randChunkList()    
@@ -720,6 +727,8 @@ class EMDataParser():
             if not self.no_labels:
                 self.getLblDataAtPoint(inds[imgi,:],labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunks[imgi])
         if not self.no_labels: self.tallyTrainingPrior(labels)
+
+        return augs
 
     def generateRandNoLookupInds(self, factor=2):
         # generate random indices from anywhere in the rand cube
@@ -876,7 +885,7 @@ class EMDataParser():
             selx = slice(indsl[0]-self.seg_out_size/2,indsl[0]-self.seg_out_size/2+self.seg_out_size)
             sely = slice(indsl[1]-self.seg_out_size/2,indsl[1]-self.seg_out_size/2+self.seg_out_size)
             lbls = EMDataParser.augmentData(self.segmented_labels_cube[chunk][selx,sely,indsl[2]].reshape((\
-                self.seg_out_size,self.seg_out_size,1)),aug).reshape((self.seg_out_size,self.seg_out_size))
+                self.seg_out_size,self.seg_out_size,1)),aug,order=0).reshape((self.seg_out_size,self.seg_out_size))
             seglabels[:] = lbls.flatten('C')
             # xxx - currently affinity labels assume a single pixel border around the segmented labels only.
             #   put other views here if decide to expand label border for selection (currently does not seem neccessary)
@@ -1287,7 +1296,7 @@ class EMDataParser():
 
     # plotting code to validate that data / labels are being created / selected correctly
     # matplotlib imshow does not swap the axes so need transpose to put first dim on x-axis (like in imagej, itk-snap)
-    def plotDataLbls(self,data,labels,seglabels,pRand=True,doffset=0.0):
+    def plotDataLbls(self,data,labels,seglabels,augs,pRand=True,doffset=0.0):
         imgno = -1; interp_string = 'nearest' # 'none' not supported by slightly older version of matplotlib (meh)
         # just keep bring up plots with EM data sample from batch range
         while True:
@@ -1330,6 +1339,7 @@ class EMDataParser():
                     img = np.require(np.concatenate((slc,slc,slc), axis=2) / 255.0, dtype=np.single)
                     imgA = np.require(np.concatenate((slc,slc,slc,
                         np.ones((self.image_size,self.image_size,1))*255), axis=2) / 255.0, dtype=np.single)
+                    aug = augs[imgno] if len(augs) > 1 else augs[0]
                     
                     alpha = 0.5 # overlay (independent) labels with data
                     pl.subplot(2,2,2*i+1)
@@ -1366,7 +1376,7 @@ class EMDataParser():
                     b = self.image_size/2-self.seg_out_size/2; slc = slice(b,b+self.seg_out_size)
                     img2[slc,slc,:] = imgseg;
                     pl.imshow(img2.transpose((1,0,2)),interpolation=interp_string)
-                    pl.title('seglabel')
+                    pl.title('seglabel, aug %d' % aug)
             pl.show()
 
     # simpler plotting for just data, useful for debugging preprocessing for autoencoders
@@ -1395,14 +1405,45 @@ class EMDataParser():
             pl.show()
 
     @staticmethod
-    def augmentData(d,augment):
+    def augmentData(d,augment,order=1):
         if augment == 0: return d                               # no augmentation
         if np.bitwise_and(augment,4): d = d.transpose(1,0,2)    # tranpose x/y
         if np.bitwise_and(augment,1): d = d[::-1,:,:]           # reflect x
         if np.bitwise_and(augment,2): d = d[:,::-1,:]           # reflect y
         if np.bitwise_and(augment,8): d = d[:,:,::-1]           # reflect z
+        # elastic transform
+        if np.bitwise_and(augment,16):
+            assert(d.shape[2]==1)
+            d = EMDataParser.elastic_transform(d.reshape(d.shape[:2]), order=order)[:,:,None]
         return d
 
+    # xxx - did not find this to be useful, either way to noisy / jittery for high alpha and low sigma
+    #    or way to blurry for high alpha and high sigma, low alpha does almost nothing, as expected
+    # modified from https://gist.github.com/chsasank/4d8f68caf01f041a6453e67fb30f8f5a
+    @staticmethod
+    def elastic_transform(image, alpha=8, sigma=2, order=3, random_state=None):
+        """Elastic deformation of images as described in [Simard2003]_.
+        .. [Simard2003] Simard, Steinkraus and Platt, "Best Practices for
+           Convolutional Neural Networks applied to Visual Document Analysis", in
+           Proc. of the International Conference on Document Analysis and
+           Recognition, 2003.
+        """
+        assert len(image.shape)==2
+    
+        if random_state is None:
+            #random_state = np.random.RandomState(None)
+            random_state = nr
+    
+        shape = image.shape
+    
+        dx = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
+        dy = gaussian_filter((random_state.rand(*shape) * 2 - 1), sigma, mode="constant", cval=0) * alpha
+    
+        x, y = np.meshgrid(np.arange(shape[0]), np.arange(shape[1]), indexing='ij')
+        indices = np.reshape(x+dx, (-1, 1)), np.reshape(y+dy, (-1, 1))
+        
+        return map_coordinates(image, indices, order=order, mode='reflect').reshape(shape)
+    
     @staticmethod
     def get_options(cfg_file):
         config = ConfigObj(cfg_file, 
@@ -1683,7 +1724,7 @@ class EMDataParser():
 
 # for test
 if __name__ == '__main__':
-    dp = EMDataParser(sys.argv[1:][0], True)
+    dp = EMDataParser(sys.argv[1:][0], write_outputs=False)
     #dp = EMDataParser(sys.argv[1:][0], False, '', 'meh1')
     #dp.no_label_lookup = True
     dp.initBatches()
@@ -1693,8 +1734,8 @@ if __name__ == '__main__':
     nBatches = 10;
     # test rand batches
     #for i in range(nBatches): dp.getBatch(i+1, True)
-    for i in range(dp.FIRST_RAND_NOLOOKUP_BATCH,dp.FIRST_RAND_NOLOOKUP_BATCH+nBatches): dp.getBatch(i+1, True)
+    #for i in range(dp.FIRST_RAND_NOLOOKUP_BATCH,dp.FIRST_RAND_NOLOOKUP_BATCH+nBatches): dp.getBatch(i+1, True)
     # test tiled batches
     batchOffset = 0;
-    for i in range(dp.FIRST_TILED_BATCH+batchOffset,dp.FIRST_TILED_BATCH+batchOffset+nBatches): dp.getBatch(i,True,0)
+    for i in range(dp.FIRST_TILED_BATCH+batchOffset,dp.FIRST_TILED_BATCH+batchOffset+nBatches): dp.getBatch(i,True,16)
     
