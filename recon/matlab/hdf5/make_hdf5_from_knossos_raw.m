@@ -32,13 +32,14 @@ for mag = mags
 
   % Name of the dataset, stored in meta, used in filename
   %dataset = 'M0007_33';
-  dataset = 'k0725';
+  %dataset = 'k0725';
+  dataset = 'K0057_D31';
 
   % Paths to root of Knossos raw data and path to where hdf5 should be written.
   %inpath = sprintf('/mnt/fs/common/ECS_paper/ECS_3d_analysis/M0007_33/cubes/M0007_33_mag%d',mag);
   %outpath = '/Data/big_datasets';
   %inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/%s_mag%d',dataset,mag);
-  inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/mag%d',mag);
+  inpath = sprintf('/run/media/watkinspv/My Passport/K0057_D31/cubes/K0057_D31_mag%d',mag);
   outpath = '/Data/watkinspv';
 
   % The raw size of the Knossos cubes
@@ -49,7 +50,8 @@ for mag = mags
   
   % The prefix of the raw file names (Knossos cubes)
   %raw_prefix = sprintf('M0007_33_mag%d',mag);
-  raw_prefix = sprintf('110629_k0725_mag%d',mag);
+  %raw_prefix = sprintf('110629_k0725_mag%d',mag);
+  raw_prefix = sprintf('K0057_D31_mag%d',mag);
   
   % Chunksize written to hdf5 file, typically same as the Knossos raw size
   chunksize = rawsize;
@@ -165,6 +167,7 @@ for mag = mags
   end
   
   for ix1 = 1:nchunks(1)
+    t = now;
     for ix2 = 1:nchunks(2)
       for ix3 = 1:nchunks(3)
         if chunk_lists(ix1,ix2,ix3)
@@ -172,30 +175,31 @@ for mag = mags
           chunk_ind = [ix1 ix2 ix3]-1;
           chunk_ind_write = chunk_ind - chunk_sel_offset;
           if all(chunk_ind_write >= 0 & chunk_ind_write < nchunks_selr)
+            if ~do_chunk_select_crop
+              chunk_ind_write = chunk_ind_write + chunk_sel_offset;
+            end
+            if ix2==1 && ix3==1
+              disp(['writing hdf mag' num2str(mag) ' data for all-yz chunks starting at chunk ',num2str(chunk_ind),...
+                ' to all-yz chunks starting at chunk ', num2str(chunk_ind_write),' in ',hdffname]);
+            end
             fn = fullfile(inpath,sprintf('x%04d',chunk_ind(1)),sprintf('y%04d',chunk_ind(2)),...
               sprintf('z%04d',chunk_ind(3)),sprintf('%s_x%04d_y%04d_z%04d.raw',raw_prefix,chunk_ind));
             if exist(fn,'file')
-              t = now;
               fh = fopen(fn); V = fread(fh,bytes_per_chunk,'uint8=>uint8'); fclose(fh);
               if length(V) == rawtotal
                 chunk_lists(ix1,ix2,ix3) = true; % valid chunk
                 V = reshape(V,chunksizer);
                 if do_write
-                  if ~do_chunk_select_crop
-                    chunk_ind_write = chunk_ind_write + chunk_sel_offset;
-                  end
                   write_hd5_chunk(permute(V,dim_order),outfile, data_name, chunk_ind_write(dim_order), ...
                     do_Corder, false); 
                 end
-                disp(['writing hdf mag' num2str(mag) ' data for chunk ',num2str(chunk_ind),' to chunk ', ...
-                  num2str(chunk_ind_write),' in ',hdffname]);
-                display(sprintf('\tdone in %.3f s',(now-t)*86400));
               end % if raw file is correct size
             end % if file exists
           end % if chunk selected for write
         end % if in chunk list
       end % for z chunk
     end % for y chunk
+    display(sprintf('\tdone in %.3f s',(now-t)*86400));
   end % for x chunk
   
   % write all the meta data, knossos conf and data conf

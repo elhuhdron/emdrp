@@ -336,7 +336,7 @@ title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
 
 %figure(baseno+figno); figno = figno+1; clf
 subplot(2,2,3);
-plot(split_er',combined_eftpl');
+plot(split_er',combined_eftpl', '-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
@@ -504,7 +504,7 @@ title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
   nlabels(1,mi(1)),nlabels(2,mi(2))));
 
 subplot(2,2,3)
-plot(lnlabels',combined_eftpl');
+plot(lnlabels',combined_eftpl', '-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
