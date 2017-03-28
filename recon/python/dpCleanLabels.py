@@ -120,9 +120,12 @@ class dpCleanLabels(emLabels):
             # xxx - fix old comments from matlab meshing code, fix this
 
             # xxx - local parameters, expose if find any need to change these
-            rad = 5;                # amount to pad (need greater than one for method 3 because of smoothing
-            contour_level = 0.5;   # binary threshold for calculating surface mesh
-            smooth_size = [3, 3, 3];
+            #rad = 5;                # amount to pad (need greater than one for method 3 because of smoothing
+            #contour_level = 0.25;   # binary threshold for calculating surface mesh
+            #smooth_size = [3, 3, 3];
+            rad = 7;                # amount to pad (need greater than one for method 3 because of smoothing
+            contour_level = 0.3;    # binary threshold for calculating surface mesh
+            smooth_size = [5, 5, 5];
 
             #emptyLabel = 65535; % should define this in attribs?
             sizes = np.array(self.data_cube.shape); sz = sizes + 2*rad;

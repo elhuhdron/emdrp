@@ -40,9 +40,6 @@ class dpWriteh5(dpLoadh5):
         dpLoadh5.__init__(self, args)
 
         # Options / Inits
-        if not self.fillvalue: self.fillvalue = '0'
-        if isinstance(self.fillvalue, str):
-            self.fillvalue = np.asscalar(np.fromstring(self.fillvalue, dtype=self.data_type, sep=' '))
         if not self.outfile: self.outfile = self.srcfile
 
     def writeCube(self, data=None, outfile=None):
@@ -50,6 +47,9 @@ class dpWriteh5(dpLoadh5):
         # xxx - this class hierarchy maybe should be revisited someday.... to die
         if not self.data_type_out: self.data_type_out = self.data_type
         if isinstance(self.data_type_out, str): self.data_type_out = eval('np.' + self.data_type_out)
+        if not self.fillvalue: self.fillvalue = '0'
+        if isinstance(self.fillvalue, str):
+            self.fillvalue = np.asscalar(np.fromstring(self.fillvalue, dtype=self.data_type_out, sep=' '))
 
         if data is None:
             data = self.data_cube
@@ -84,7 +84,7 @@ class dpWriteh5(dpLoadh5):
 
         # optionally add a list of chunk Regions of Interest specified in text file
         if self.inroi:
-            rois=np.loadtxt('tmp_roi_k0725.txt',dtype=np.int64).reshape((-1,3,3))
+            rois=np.loadtxt(self.inroi,dtype=np.int64).reshape((-1,3,3))
             self.data_attrs['roi_chunks'] = rois[:,0,:].reshape((-1,3))
             self.data_attrs['roi_sizes'] = rois[:,1,:].reshape((-1,3))
             self.data_attrs['roi_offsets'] = rois[:,2,:].reshape((-1,3))
