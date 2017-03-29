@@ -735,8 +735,13 @@ class EMDataParser():
         if self.no_labels:
             size = self.size_rand; offset = self.labels_offset
         else:
-            size = self.size_rand - 2*self.read_border; offset = self.labels_offset + self.read_border
+            # xxx - bug was here originally up until K0057, 29 Mar 2017, was missing +1
+            # plus one since difference of zero actually means no choice of placement after border removed 
+            #     (so dimension sized 1), difference of 1 means 2 posible choices, etc
+            size = self.size_rand - 2*self.read_border + 1
+            offset = self.labels_offset + self.read_border
         nrand_inds = factor*self.num_cases_per_batch
+        #print(size, self.labels_offset, self.read_border)
         inds = np.concatenate([x.reshape((nrand_inds,1)) for x in np.unravel_index(nr.choice(size.prod(), 
             nrand_inds), size)], axis=1) + offset
             
