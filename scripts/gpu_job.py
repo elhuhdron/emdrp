@@ -40,8 +40,7 @@ def run_next_jobs(force=False):
 
         # check for PID locks first, use this to not start queued jobs until after some dependent process finishes
         # lock file (<PID>.lck in each gpu directory) is removed if the process id is not active
-        job_command = filter( lambda x: os.path.isfile(x) and re.match(r'^.*\.lck$',x), 
-            (os.path.join(cur_gpu_path,s) for s in os.listdir(cur_gpu_path)) ) 
+        job_command = [x for x in (os.path.join(cur_gpu_path,s) for s in os.listdir(cur_gpu_path)) if os.path.isfile(x) and re.match(r'^.*\.lck$',x)] 
         if len(job_command) > 0 and not force:
             active_pids = []
             for pidlck in job_command:
@@ -69,7 +68,7 @@ def run_next_jobs(force=False):
         '''
     
         # get the oldest job sorted by timestamp, use touch to shuffle priorities around, ls -lrt returns order
-        job_files = filter( os.path.isfile, (os.path.join(cur_gpu_path,s) for s in os.listdir(cur_gpu_path)) )
+        job_files = list(filter( os.path.isfile, (os.path.join(cur_gpu_path,s) for s in os.listdir(cur_gpu_path)) ))
         job_tuple = sorted( zip( job_files, (os.path.getmtime(s) for s in job_files) ), key=lambda tup: tup[1] )
         if len(job_tuple) < 1: 
             outfile.write('GPU %d free, but no jobs queued' % (gpu,) + '\n')
@@ -129,8 +128,8 @@ def run_next_jobs(force=False):
 
 def parse_job_script(job_script):
     infile = open(job_script, 'r'); job_command = infile.read(); infile.close()
-    job_command = filter( lambda x: not re.match(r'^\s*$',x), job_command.split('\n') ) # remove whitespace lines
-    job_command = filter( lambda x: not re.match(r'^\s*#.*$',x), job_command ) # remove commented lines
+    job_command = [x for x in job_command.split('\n') if not re.match(r'^\s*$',x)] # remove whitespace lines
+    job_command = [x for x in job_command if not re.match(r'^\s*#.*$',x)] # remove commented lines
     if job_command is None or len(job_command) == 0: return None, None, None
     job_command = job_command[0] # use first non-commented command only
     # remove any nohups and redirects, will append separately before making system call
@@ -162,14 +161,14 @@ def submit_job( script, relink ):
     job_path, convnet_out_path, convnet_paths = get_paths()
     cmd_to_queue, cmd_gpu, cmd_type = parse_job_script(script)
     if cmd_to_queue is None:
-        print 'Bad command in ' + script; return
+        print('Bad command in ' + script); return
     cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(cmd_gpu))
     #if relink[0] is not None:
     #    cmd_to_queue = 'rm ' + relink[0] + '\n' + 'link -s ' + relink[1] + ' ' + relink[0] + '\n' + cmd_to_queue + '\n'
     #print cmd_to_queue
     fn = os.path.join(cur_gpu_path, 'queued-gpu-job-%s' % (binascii.hexlify(os.urandom(4)),))
     outfile = open(fn,'w'); outfile.write(cmd_to_queue); outfile.close()
-    print 'Queued "' + script + '" to gpu' + str(cmd_gpu)
+    print('Queued "' + script + '" to gpu' + str(cmd_gpu))
 
 def clear_jobs():
     job_path, convnet_out_path, convnet_paths = get_paths()
@@ -178,7 +177,7 @@ def clear_jobs():
         silent_remove(os.path.join(job_path, GPU_STARTED % (gpu,)))
         cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(gpu))
         for s in os.listdir(cur_gpu_path): silent_remove(os.path.join(cur_gpu_path,s))
-        print 'Job info cleared for gpu' + str(gpu)
+        print('Job info cleared for gpu' + str(gpu))
 
 def get_paths():
     global NUM_GPUS
