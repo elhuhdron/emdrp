@@ -1,0 +1,13 @@
+
+http://stackoverflow.com/questions/26474222/mariadb-10-centos-7-moving-datadir-woes
+
+https://www.vultr.com/docs/install-mariadb-on-centos-7
+
+https://mariadb.com/kb/en/mariadb/configuring-mariadb-for-remote-client-access/
+GRANT ALL PRIVILEGES ON *.* TO 'root'@'192.168.100.%' IDENTIFIED BY 'my-new-password' WITH GRANT OPTION;
+firewall-cmd --add-port=3306/tcp 
+firewall-cmd --permanent --add-port=3306/tcp
+
+https://www.techonthenet.com/mysql/questions/show_grants.php
+
+

@@ -1,0 +1,1240 @@
+=================================================
+Notes to prepare linux developer workstation to run components of the EM Data Reconstruction Pipeline (EMDRP).
+Steps have been validated with default installs using CentOS 6.6 and RHEL 6.5.
+New notes have been added for initialization with CentOS7.1.
+
+NOTE: commands that can be directly pasted to terminal are prepended with >
+
+  Name    Previous Name   Machine              Tag        GPUs                 Cores / CPU                     Mem
+  red     matra           Dell Poweredge R720  ---        2 780Ti              8 Xeon CPU E5-2670 v2 @ 2.50GHz 128G
+  orang   cdcu-dev2       Dell Precision T7610 01942074   1-980TiSC 1-780TI    4 Xeon CPU E5-2603 v2 @ 1.80GHz 32G
+  blue    ---             Phantek Gigabyte     02051609   1-980TiSC 1-980TiFTW 4 Core i7-6700K CPU @ 4.00GHz   32G
+  green   ---             Phantek ASUS         02021553   1-780Ti              4 Core i7-6700K CPU @ 4.00GHz   48G
+  xgreen  ---             X99P-SLI (5 clones)  02021565   4 980Ti              6 Core i7-5930K @ 3.5Ghz        16G
+  xgreen  ---             Synology DS1515      ---        ---                  xxx                             2G (?)
+Names are all prefixed with ndsw-cdcu-
+xgreen are all behind second local interface on green (sssd disabled, local logins only).
+infra and ultra are virtual machines (virt-install) running on green with minimal centos7 install.
+  currently cisco switch and virtual machines only have nindsadmin login.
+Local interface is 10.42.55.1/255.255.255.0: 
+  Local Interface      subnet IP
+  blue (debug gateway) 100
+  green (gateway)      101
+  red                  102
+  infra (green kvm)    103
+  ultra (green kvm)    104
+  synology             99
+  clones               1-5
+  cisco sg300-20       90
+
+Retired Machines:
+  Name    Retired      Previous Name   Machine              Tag        Cores / CPU                     Mem
+  yello   2017 Feb 10  cdcu-dev1       Dell Precision T5600 01903086   6 Xeon CPU E5-2620 0 @ 2.00GHz  32G
+
+Absolutely need sudoers or root access to perform the setup / install required modules. 
+All machines currently setup with a local administrator account called nindsadmin during CentOS install.
+Give user login sudo access to log most install steps (note: steps as su not logged in sudoers history)
+    > sudo visudo
+Add line username ALL(ALL)	ALL
+
+
+
+
+=================================================
+NEW notes for fresh CentOS7 install:
+
+Download image and write to usb with, for example:
+    > dd if=CentOS-7-x86_64-DVD-1503-01.iso | pv --size 4310695936 | dd of=/dev/sdd
+
+Boot from large usb stick. "Verify" does not always work; unknown reason (did not work on cdcu-red for example).
+
+Possible that install fails because nouveau driver can't load with newer nVidia cards, workaround with:
+http://askubuntu.com/questions/598417/nouveau-unknown-chipset-on-installer
+Add to linux boot (i.e., at end of the line containing vmlinuz):
+    nomodeset rdblacklist=nouveau
+
+Add nindsadmin account as local administrator (root access) so machine can be setup by IT administrator.
+
+Need to add at least DNS server and domain information in network config, default config will not work or 
+  quit working after some time. See networking notes below.
+
+Then after first boot, install the driver as normal (see Instructions to get NVIDIA driver working).
+
+
+
+
+=================================================
+Instructions to get NVIDIA driver working:
+
+IMPORTANT: must disable nouveau driver, even if proper kernel modules are already installed.
+  The nouveau driver is not compatible with the nvidia proprietary drivers.
+Verify these items (xxx - verify this) needed for kernel update and for building driver are installed:
+    > sudo yum install kernel-headers kernel-devel gcc make
+Then blacklist the driver and rebuild initramfs:
+    > sudo gedit /etc/modprobe.d/blacklist.conf
+Add line: blacklist nouveau
+    > sudo mv /boot/initramfs-$(uname -r).img /boot/initramfs-$(uname -r).img.bak
+    > sudo dracut -v /boot/initramfs-$(uname -r).img $(uname -r)
+Reboot
+    > /sbin/lsmod | grep nou
+Should be empty
+
+Get NVIDIA driver for your card from nvidia website (linux 64 bit driver).
+Change to runlevel 3 if not already:
+   > sudo init 3
+Login as root
+
+BEFORE UPDATING DRIVER, disable the nvidia temperature script (if installed).
+cd to directory with NVIDIA{driver}.run
+Install the NVIDA driver via:
+   > sh NVIDIA{driver}.run
+If the driver does not install properly, you might have to uninstall the old version:
+   > sh NVIDIA{old_driver}.run --uninstall
+IMPORTANT: To install the drivers but not interfere with the current system graphics use switch --no-opengl-files
+  When driver installs do NOT let the installer update the X configuration file.
+  This is useful if you want to leave an onboard graphics as the default system graphics and leave nvidia cards
+    for compute jobs only (often referred to as headless).
+
+If xwindows is installed test via:
+   > glxgears
+Should bring up a window with an animation of spinning gears
+If running at runlevel 3, test via:
+   > nvidia-smi
+Should display all installed nvidia CUDA enabled devices and some info.
+
+xxx - old note, was only happening intermittently on cdcu-dev1 and cdcu-dev2 (older installs):
+Running into intermittent problem where xwindows link for open gl is overwritten somehow.
+Matlab 3d plots and glxgears will error out without proper rendering.
+Reinstalling nvidia driver fixes this, but (xxx - verify) also recreating this link:
+    > ls -lrt /usr/lib64/xorg/modules/extensions/
+-rwxr-xr-x 1 root root 12258728 Apr  8 13:12 libglx.so.346.59
+lrwxrwxrwx 1 root root       16 Apr  8 13:12 libglx.so -> libglx.so.346.59
+
+xxx - decide this might not be the best idea, increases power usage / heat even when card is idle
+Need this tweaks for some cards to force nVidia PowerMizer to always keep performace level at highest setting:
+http://forums.linuxmint.com/viewtopic.php?f=42&t=129879
+https://www.youtube.com/watch?v=DEOBZWOUizc
+xxx - figure out how to do this if not using nvidia cards for system graphics (headless)
+  separate .conf file for nvidia??? fix this on red if/when figured out
+
+xxx - eliminated machines that were using an external power supply, so these steps should no longer be necessary:
+NOTE: The temperature script is an sh shell script that calls nvidia-smi to get the core temperature on each card.
+  This is important for any machines that are utilizing an extra power supply, because if this power supply fails
+    then the machine will not shut down, but the card will not be powered properly, causing it to overheat.
+    One GTX 580 nvidia card was destroyed this way, so script forces the machine to shutdown incase any card 
+    exceeds the max allowed core temperature (defined in script).
+  Other overheating situations have also occurred (bad ventilation in case), and this prevents any melted hardware as
+    a result of overheating.
+
+Copy / setup the gpu temperature script as root:
+    > cd
+    > mkdir scripts
+    > cd scripts
+    > cp /home/nindsadmin/workspace_eclipse/ctome_server/scripts/nvidia_temp.sh .
+
+Edit it appropriately. Comment out the shutdown lines, run and verify that it writes OK to logs.
+After verifying that it works ok:
+    > su
+    > crontab -e
+and add the line
+*/2 * * * * sh /root/scripts/nvidia_temp.sh
+
+
+
+
+=================================================
+Misc useful instructions:
+
+Python packages installed as root often do not set permissions correctly. This only occurs if su'ed as root, 
+  but not with sudo as sudo user. To fix, e.g.
+    > chmod -R a+rx /usr/lib/python2.6/site-packages
+    > chmod -R a+rx /usr/lib64/python2.6/site-packages
+
+Machines should be setup by administrator for NIH login.
+For reference only (DO NOT do this), equivalent local user can be added with:
+  useradd -c "Paul Watkins" -u 200131246 -m -d /home/watkinspv watkinspv 
+The login must be same as NIH login and -u is HHS ID without the last digit (checksum digit).
+
+Clean out / rebuild the yum repo caches:
+    > sudo yum clean all; sudo yum repolist
+
+To update all packages (maybe not necessary for most installs from CentOS/RHEL 6 base install):
+    > sudo yum update -y
+
+The whole deal:
+    > sudo yum clean all; sudo yum repolist; sudo yum update -y
+
+Copy displaying progress or backup with rsync:
+    > rsync -avh --progress -e ssh src dest
+Had some trouble with using default shell on local machine copies, so force with '-e ssh'.
+
+Copy from a list of files using rsync:
+    > rsync -avRh -e ssh --progress --files-from=/home/watkinspv/Downloads/dataset_files.txt . watkinspv@cdcu-blue.ninds.nih.gov:/Data/datasets
+
+One liner to kill jobs from ps:
+    > kill $(ps -A | grep 'python' | awk '{print $1}')
+
+List all rules set with firewall-cmd:
+    > sudo firewall-cmd --list-all
+
+
+
+
+=================================================
+NEW notes for fresh CentOS7 setup:
+xxx - this replaces most of the rest of this document, many steps removed by using anaconda.
+  update this document to reflect new setup and/or start a new archival document for setting up older systems.
+  
+PackageKit can interfere with yum, kill the offending process and just remove it:
+    > sudo yum remove PackageKit 
+
+Install cvs and checkout from ctome_server (see below) to get this HOWTO locally:
+    > sudo yum install cvs
+
+To setup a /Data volume on a new drive:
+http://xmodulo.com/manage-lvm-volumes-centos-rhel-7-system-storage-manager.html
+xxx - add example command here for new 2TB single disk as /Data
+
+Install EPEL repository and yum priorities:
+    > sudo yum install epel-release yum-plugin-priorities
+
+NOTE: after recent EPEL update, mirrors take a while to update, can cause 404 not found error, see:
+http://unix.stackexchange.com/questions/153566/installing-epel-repository-on-centos-fails
+http://stackoverflow.com/questions/25642071/how-to-install-postgis-on-oracle-linux-6-4-x64/25646883#25646883
+
+Optionally install nux-desktop repository (contains drivers for exfat, maybe others?):
+http://li.nux.ro/repos.html
+    > wget http://li.nux.ro/download/nux/dextop/el7/x86_64/nux-dextop-release-0-5.el7.nux.noarch.rpm
+    > sudo yum localinstall nux-dextop-release-0-5.el7.nux.noarch.rpm
+
+Setup yum priorities, make base priority=1, because some packages in other repos can conflict with base:
+    http://wiki.centos.org/PackageManagement/Yum/Priorities
+
+Utilizing anaconda now instead of system python installs. Will need both python2 and python3 versions installed.
+Recommend installing to home directory instead of for all users.
+Recommended additions in .bashrc for initializing one or the other from command line (default still system python):
+
+# added by Anaconda3 2.4.1 installer
+#export PATH="/home/watkinspv/anaconda3/bin:$PATH"
+alias ac3init='export PATH="/home/watkinspv/anaconda3/bin:$PATH"
+
+# added by Anaconda2 2.5.0 installer
+#export PATH="/home/watkinspv/anaconda2/bin:$PATH"
+alias ac2init='export PATH="/home/watkinspv/anaconda2/bin:$PATH"'
+
+Can also add any other PATH or PYTHONPATH updates appropriate into ac?init, i.e.:
+alias ac3init='export PATH="/home/watkinspv/anaconda3/bin:$PATH"; export PYTHONPATH=$HOME/gits/emdrp/recon/python:$HOME/gits/emdrp/recon/python/utils:$HOME/gits/emdrp/recon/python/utils/pyCext:$PYTHONPATH; export PATH=$PATH:$HOME/gits/emdrp/recon/python'
+
+Verify build tools are installed (usually come with checking build tools during centos install):
+    > sudo yum install gcc gcc-gfortran gcc-c++ make
+Will need newer cmake (2.8 or newer), doesn't come by default:
+    > sudo yum install cmake
+
+Install other required development packages that might need for other builds or do not come with anaconda:
+    > sudo yum install blas-devel lapack-devel atlas-devel eigen3-devel
+    > sudo yum install hdf5-devel snappy-devel
+    > sudo yum install java-1.7.0-openjdk-devel java-1.8.0-openjdk-devel
+  Mostly these apply to building OpenCV:
+    > sudo yum install gtk2-devel jasper-devel tbb-devel freeglut-devel
+    > sudo yum install libjpeg-turbo-devel libpng-devel libtiff-devel libwebp-devel libdc1394-devel
+
+Optional modules:
+  For exfat:
+    > sudo yum install exfat-utils fuse-exfat
+  For ntfs (write):
+    > sudo yum install ntfs-3g
+  For pipe viewer, useful for command line copy with progress:
+    > sudo yum install pv
+
+Decided to start requirements files for python2 and 3, containing all modules required for all elements of EMDRP,
+  checked into cvs as *_requirements.txt
+For reference ONLY (used to create requirements file), remove version from pip list installed with:
+    > pip list installed | sed -e 's/(.*$//'
+Can install via pip with, for example:
+    > pip install -r python3_pip_requirements.txt
+Can install any anaconda requirements with, for example:
+    > conda install --file python2_conda_requirements.txt
+
+For vtk in python2
+    > conda install vtk
+For vtk in python3
+    > conda install -c menpo vtk=7.0.0
+
+
+Had to build on biowulf (older glibc), used:
+    https://github.com/menpo/conda-vtk
+    first install anaconda3 in homedir on biowulf, then
+        > git clone https://github.com/menpo/conda-vtk
+        > pip install --upgrade pip
+        > conda upgrade conda-build
+        OR
+        > conda install conda-build
+        > cd ~gits/conda-vtk/
+        > conda build conda/
+  Build was in:
+    /home/watkinspv/anaconda3/conda-bld/conda_1483136819218/work/VTK-7.0.0
+    /home/watkinspv/anaconda3/conda-bld/linux-64/vtk-7.0.0-py35_0.tar.bz2
+  Install with:
+    > conda install --use-local vtk=7.0.0
+
+# If you want to upload this package to anaconda.org later, type:
+#
+# $ anaconda upload /home/watkinspv/anaconda3/conda-bld/linux-64/vtk-7.0.0-py35_0.tar.bz2
+#
+# To have conda build upload to anaconda.org automatically, use
+# $ conda config --set anaconda_upload yes
+  
+
+Good idea to start using conda environments along with requirements, for example:
+    > conda create --name cuda-convnet2 --clone root
+    > source activate cuda-convnet2
+then end session with:
+    > source deactivate
+NOTE: Error: 'conda' can only be installed into the root environment
+
+
+Configure git username and email:
+  https://git-scm.com/book/en/v2/Getting-Started-First-Time-Git-Setup
+Checkout emdrp code from github:
+    > git clone https://github.com/elhuhdron/emdrp.git
+Make sure the python C extension builds:
+    > cd emdrp/recon/python/utils/pyCext
+    > make
+
+Follow instructions below for building emdrp/cuda-convnets2 (which includes building opencv, skip install steps). 
+  Some special notes for Centos7. Can use example on github EMDRP readme.md to test without cifar examples.
+  xxx - figure out which version of opencv we needed and if build is still necessary
+    recollection is that we needed opencv3.x for cuda-convnets2 which can't be installed easily still.
+    this is not written down anywhere though, conveniently
+  xxx - move relevant notes here when we decide how to move forward with this document
+
+Existing user crontab entry for gpu_job script (xxx - provide more information here):
+*/2 * * * * . $HOME/.bash_profile; $HOME/gits/emdrp/scripts/gpu_job.py
+
+
+For pyfftw in anaconda3:
+    > sudo yum install fftw-devel
+on biowulf:
+    > module load fftw/3.3.4/gnu-4.4.7
+then:
+    > pip install pyfftw
+this was slow, ending up downloading and building fftw (see TOBUILD) with intel compiler
+    > module load intel
+then install pyfftw with:
+    > CFLAGS="-I/home/watkinspv/local/include" LDFLAGS="-L/home/watkinspv/local/lib" pip install pyfftw
+
+
+
+
+=================================================
+OLD NOTES (CentOS6, some items still relevant) Base setup for python installs and yum repositories:
+
+Make sure proper libraries are installed to build and run cuda-convnets
+   > python -V
+Python versions known to work: 2.6.6
+To make sure yum is working and check what repositories it's looking at:
+    > sudo yum repolist
+See instructions below for adding other repositiories.
+To look at currently installed packages and versions:
+    > sudo yum list installed
+Verify installed developer tools (these are usually often installed by default in RHEL/CentOS).
+    > sudo yum install gcc gcc-gfortran gcc-c++ python-devel
+See special notes below for installing a newer development toolset (devtoolset) that is not compatible with OS version.
+Install python setuptools (easy_install) and pip.
+See special instructions below for older installs with multiple python versions.
+    > sudo yum install python-setuptools 
+Alternatively, get setuptools directly. https://pypi.python.org/pypi/setuptools
+  Start with whatever version of python is appropriate, for example, python3.4
+    > wget https://bootstrap.pypa.io/ez_setup.py
+    > sudo python ez_setup.py
+    > sudo easy_install pip
+
+Special instructions to install python setup utilities for older RHEL distros (had to do this on evop3 with RHEL5).
+In particular if two versions of python are installed (one for the OS, and a newer on in /usr/local/lib),
+      in this example 2.4 is installed in /usr/lib and 2.7 in /usr/local/lib:
+   > sudo ln -s /usr/local/lib/python2.7 /usr/lib/python
+   > wget --no-check-certificate https://bootstrap.pypa.io/ez_setup.py
+   > sudo /usr/local/bin/python2.7 ez_setup.py --insecure
+   > sudo ln -s /usr/local/bin/easy_install /usr/bin/easy_install
+   > sudo easy_install pip
+   > which pip2.7
+Subsequently use the pip#.# command to install for that version for all pip install commands.
+For reference see: https://bitbucket.org/pypa/setuptools
+
+Errors can result from old setuptools, so make sure these are updated (xxx - check if first command is enough?):
+   > sudo pip install setuptools -U
+   > sudo easy_install -U distribute
+
+-devel packages were missing for RedHat Enterprise Linux 5/6 (as of 3/26/14), this is not needed for CentOS.
+http://redhat-centos.blogspot.com/2013/06/configuring-centos-base-repo-for-redhat.html
+   or copy over /etc/yum.repos.d/CentOS-Base.repo from a CentOS machine, need to change ?release= to 6 (or 5), then:
+   > sudo cd /etc/pki/rpm-gpg/
+   > sudo wget http://mirror.centos.org/centos/RPM-GPG-KEY-CentOS-6
+   > sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-6 
+
+Need EPEL repository:
+NOTE: search for different version for RHEL/CentOS 5 and ignore KEY steps.
+   > wget --no-check-certificate https://fedoraproject.org/static/0608B895.txt
+   > sudo mv 0608B895.txt /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-6
+   > sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-EPEL-6 
+   > wget https://dl.fedoraproject.org/pub/epel/6/x86_64/epel-release-6-8.noarch.rpm
+   > sudo rpm -ivh epel-release-6-8.noarch.rpm 
+NOTE: standard EPEL install now available via yum
+
+NOTE: EPEL and CentOS base repositories seem to be sufficient for new installs using CentOS7 and anaconda.
+
+Then install rpm fusion (xxx - flush this out with commands):
+    http://rpmfusion.org/Configuration
+
+Special note for RHEL5 / CentOS5, still need rpm forge (which is no longer recommended) for updated hdf5.
+Do not do this for RHEL6 / CentOS6. For 5, also set priority higher than epel (otherwise will take old hdf5 from epel).
+http://www.tecmint.com/enable-rpmforge-repository/
+If this step is not taken, the h5py build will fail.
+
+Setup yum priorities because some packages in other repos can conflict with base (xxx - flush this out with commands):
+    http://wiki.centos.org/PackageManagement/Yum/Priorities
+
+
+
+
+=================================================
+Required development packages:
+
+Install other required development packages
+   > sudo yum install blas-devel lapack-devel atlas-devel
+
+Get / make sure hdf5 is installed and hdf5 for python (see www.h5py.org)
+This depends on need for vtk or not (vtk currently used for surface meshing script for frontend), without vtk:
+   > sudo yum install hdf5 hdf5-devel
+vtk currently not compatible with the newest hdf5, so for with vtk (automatically gets compatible hdf5):
+    > sudo yum install vtk vtk-python hdf5-devel
+java module for hdf5 (*jhdf*) is not available as a binary for linux, so need to build from source, see:
+  http://www.hdfgroup.org/products/java/release/downloadsrc.html
+  Download all the files, have both *.tar and *.gz in build directory, don't need to untar anything.
+  Need newer cmake/ctest:
+        > sudo yum install cmake28
+  Need 64 bit java, can use openjdk:
+    https://access.redhat.com/documentation/en-US/JBoss_Enterprise_Application_Platform/6/html/Installation_Guide/Install_OpenJDK_on_Red_Hat_Enterprise_Linux.html
+  Verify that 64 bit java can run with:
+    > java -d64
+  Might have to modify link /usr/bin/java (try alternatives first, see redhat link).
+  Build will still fail after all tests Passed for unknown reason, just copy from the build/bin director to /usr/lib64
+  OR, copy the two *jhdf* from a working build.
+
+=================================================
+Required development python packages:
+NOTE: most of the following pip installs can be replaced with an anaconda installation:   
+
+Get required scientific python modules:
+   > sudo yum install python-imaging
+   > sudo pip install numpy
+   > sudo pip install scipy
+   > sudo pip install nose
+Verify numpy with (dependent on nose):
+   > python -c "import numpy; numpy.test()"
+See also http://www.scipy.org/
+
+Need cython (for hdf5 and gala at least, maybe others):
+    > sudo pip install cython
+
+New h5py relies on unittests, so need the backport if running python 2.6 (should not be need for python 2.7):
+    > sudo pip install unittest2
+Then install python module:
+   > sudo pip install h5py
+
+Other required python modules:
+    > sudo pip install argparse
+    > sudo pip install configobj
+        http://www.voidspace.org.uk/python/articles/configobj.shtml
+
+
+
+
+=================================================
+For database connectivity with python:
+
+NOTE: new notes for jdbc in python
+Install oracle jdbc client and set ORACLE_HOME / LD_LIBRARY_PATH:
+    http://www.oracle.com/technetwork/topics/linuxx86-64soft-092277.html
+Set these env variables correctly / appropriately (if not already):
+    > export JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk-1.7.0.71.x86_64
+    > export CLASSPATH=.:$JAVA_HOME/jre/lib:$JAVA_HOME/lib:$JAVA_HOME/lib/tools.jar:$ORACLE_HOME/lib/ojdbc6.jar
+Install support for java from python (without Jython) and support for jdbc:
+    > sudo pip install JPype1
+    > sudo pip install jaydebeapi
+Install commons IO for easy reading of clob objects:
+    http://commons.apache.org/proper/commons-io/download_io.cgi
+    Add commons io to CLASSPATH, for example:
+    export CLASSPATH=.:$JAVA_HOME/jre/lib:$JAVA_HOME/lib:$JAVA_HOME/lib/tools.jar:$ORACLE_HOME/lib/ojdbc6.jar:$HOME/commons-io-2.4/commons-io-2.4.jar
+
+xxx - add new notes for sqlrelay
+
+
+
+
+
+=================================================
+Optional (required for particular applications as described) development and python packages:
+xxx - most of these notes are old, clean up, or maybe start archiving old notes into a different doc?
+
+Note, matplotlib will likely not work on a machine that is not running xwindows.
+Need matplotlib for displaying any kind of plots with numpy data.
+   > sudo pip install matplotlib
+Some potential matplotlib dependencies that may not be installed:
+    > sudo yum install freetype-devel libpng-devel
+
+Optional for NTFS read / write, (xxx - verify this can install from EPEL instead of rpmforge):
+   > sudo yum install fuse-ntfs-3g
+
+Optional, currently the best thing going for tif files in python:
+    > sudo pip install tifffile
+
+Optional for saving python session (like matlab save command with no arguments):
+    > sudo pip install dill
+        https://github.com/uqfoundation/dill
+
+Need google snappy for writing Knossos segmentation cubes:
+    > sudo yum install snappy snappy-devel
+    > sudo pip install python-snappy
+
+For aleks-watershed, need C++11 compatible compiler, not installed by default on CentOS 6.5
+Install devtoolset from Scientific Linux (CERN):
+    > wget http://ftp.mirrorservice.org/sites/ftp.scientificlinux.org/linux/scientific/51/i386/RPM-GPG-KEYs/RPM-GPG-KEY-cern
+    > sudo mv RPM-GPG-KEY-cern /etc/pki/rpm-gpg/
+    > sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-cern 
+    > sudo wget -O /etc/yum.repos.d/slc6-devtoolset.repo http://linuxsoft.cern.ch/cern/devtoolset/slc6-devtoolset.repo
+    > sudo yum install devtoolset-1.1-gcc
+    > sudo yum install devtoolset-1.1-gcc-c++
+Install boost:
+    > sudo yum install boost boost-devel
+
+Follow instructions for additional modules need with gala: https://github.com/janelia-flyem/gala
+Update steps (xxx - change this to the full set of steps):
+   > sudo easy_install -U distribute
+   > sudo pip install matplotlib -U
+   > sudo pip install cython
+   > sudo pip install PIL -U
+   > sudo pip install h5py -U
+   > sudo pip install networkx
+   > sudo pip install scikit-learn
+   > sudo pip install scikit-image
+    > sudo pip install viridis
+    > sudo pip install libtiff
+    > sudo pip install gala
+Download patch for deepcopy: http://bugs.python.org/issue1515
+    > patch -p1 -b < issue1515.patch
+    Specify file to patch: /usr/lib64/python2.6/copy.py
+Need this in order to display ASCII progressbar:
+    > sudo pip install progressbar-latest
+For python3:
+    > sudo pip install progressbar33
+Update permissions:    
+   > sudo chmod -R a+rx /usr/lib/python2.6/site-packages
+   > sudo chmod -R a+rx /usr/lib64/python2.6/site-packages
+Copy repo to local to install gala and run example (see README):
+    > git clone https://github.com/janelia-flyem/gala
+
+
+For knossos build:
+DO NOT do this, not functional:
+    > sudo yum install qt5-qtbase qt5-qtbase-devel qt-creator
+This resulted in crashes using qtcreator, so downloaded and ran installer instead, install everything
+    https://www.qt.io/developers/
+also need:
+    > sudo yum install cmake3 boost boost-devel libcurl-devel python-devel libXmu-devel libXi-devel
+xxx - build against anaconda python instead of system python???
+Cloned / built and deployed these first:
+  https://github.com/knossos-project/PythonQt
+  http://quazip.sourceforge.net/ (use the .pro file to build in qtcreator)
+Deployed to local directory (like install_dir within build dirs) and then used rsync:
+    > sudo rsync -avRh . /usr/local/
+xxx - could not figure out how to get qtcreator to find libs installed in home directory, copied qt files to /usr/local
+    >  sudo rsync -avRh ~/Qt5.7.0/5.7/gcc_64/lib /usr/local
+
+diff -r knossos/CMakeLists.txt ../gits/knossos/CMakeLists.txt
+38c38,39
+< find_package(TurboJPEG REQUIRED)
+---
+> #find_package(TurboJPEG REQUIRED)
+> find_package(JPEG REQUIRED)
+132c133,134
+<     TurboJPEG::TurboJPEG#turbojpeg is partly included in QtGui, multiple definition if you try to link it afterwards
+---
+>     #TurboJPEG::TurboJPEG#turbojpeg is partly included in QtGui, multiple definition if you try to link it afterwards
+>     ${JPEG_LIBRARIES}
+
+
+
+=================================================
+bbcp
+http://www.slac.stanford.edu/~abh/bbcp/
+http://pcbunn.cithep.caltech.edu/bbcp/using_bbcp.htm
+http://www.leeladharan.com/compiling-and-installing-bbcp-on-fedora-centos
+
+for tuning network performance, searched "tuning tcp_rmem"
+https://wwwx.cs.unc.edu/~sparkst/howto/network_tuning.php
+https://russ.garrett.co.uk/2009/01/01/linux-kernel-tuning/
+https://www.acc.umu.se/~maswan/linux-netperf.txt
+
+sudo yum install openssl-devel
+git clone http://www.slac.stanford.edu/~abh/bbcp/bbcp.git
+cd bbcp/src
+../MakeSname
+make
+
+sudo firewall-cmd --add-port=5031/tcp --permanent
+
+bbcp -P 5 -V watkinspv@ndsw-cdcu-green:/dev/zero /dev/null 
+bbcp -P 5 -V /dev/zero ndsw-cdcu-green:/dev/null 
+
+Had best luck with single stream copy to/from biowulf using linux tcp size defaults and auto-tuning:
+time bbcp -s 1 -V -f -P 10 biowulf.nih.gov:/data/CDCU/full_datasets/neon/vgg3pool_k0725_26x40x40/k0725_vgg3pool_aggloall48_rf_75iter2p_medium_filter_clean_twopass_meshes.h5 tmp.h5
+
+Could not get the -I "list of files" option to work, so instead split the files into separate subdirs on biowulf.
+For example:
+  > xargs -a tmp.aa mv -t /data/CDCU/full_datasets/neon/vgg3pool_k0725_26x40x40/agglo/01
+  > time bbcp -s 1 -V -f -P 10 -r biowulf.nih.gov:/data/CDCU/full_datasets/neon/vgg3pool_k0725_26x40x40/agglo/03/ /mnt/syn/watkinspv/full_datasets/neon/vgg3pool_k0725_26x40x40/agglo/
+
+time bbcp -s 1 -V -f -P 10 biowulf.nih.gov:/data/CDCU/full_datasets/neon/vgg3pool_k0725_26x40x40/k0725_vgg3pool_aggloall48_rf_75iter2p_medium_filter_clean_twopass_meshes.h5 tmp.h5
+
+time bbcp -s 1 -V -f -P 10 /Data/watkinspv/full_datasets/neon/vgg3pool_k0725_26x40x40/k0725_vgg3pool_aggloall48_rf_75iter2p_medium_filter_clean_twopass_meshes.h5 biowulf.nih.gov:/data/CDCU/tmp.h5
+
+
+
+
+=================================================
+virtual machine setup used for transfers to/from biowulf
+
+https://linux.dell.com/files/whitepapers/KVM_Virtualization_in_RHEL_7_Made_Easy.pdf
+search for few other useful ones (forgot to copy command line for install) with "virt-install centos7"
+
+use centos7 minimal install
+
+http://serverfault.com/questions/257962/kvm-guest-installed-from-console-but-how-to-get-to-the-guests-console
+  use "Modifying the image" solution, use mkisfs so that ttyS0 added to command line for install
+  http://linuxpitstop.com/edit-iso-files-using-mkisofs-in-linux/
+
+have to modify 
+
+https://github.com/adrahon/vagrant-kvm/issues/163
+  chmod go+x $HOME
+
+checked in networking scripts
+
+extra packages installed:
+  > sudo yum install net-tools
+  > sudo yum install bind-utils
+
+start (stop by shutdown):
+  > sudo virsh start infra
+  > sudo virsh start ultra
+get console if ssh broken:
+  > sudo virsh console ultra
+print status info:
+  > sudo virsh dominfo ultra
+
+
+
+
+=================================================
+Matlab notes (need license, required for some backend processing / analysis)
+
+NOTE: can not write to installed pathdef.m without root access, so add local path to startup.m in
+/home/$(USER)/matlab/startup.m
+
+for example:
+
+p = {...
+     '/home/watkinspv/workspace_eclipse/ctome_server/hdf5tools:', ...
+};
+addpath(p{:});
+
+
+
+=================================================
+Instructions to obtain and build original cuda-convnets, run as normal user (not as root):
+
+Install CUDA5.5 (current version being used for cuda-convnets), follow nVidia instructions.
+
+  Followed these instructions to modify cuda-convnets to build with CUDA5. 
+    https://gist.github.com/kuantkid/4180952
+    https://github.com/nitishsrivastava/deepnet/wiki/Compiling-with-CUDA-5
+  These mods are checked into cvs with spots commented as CUDA5 or CUDA4, modify appropriately, currently using 5.
+  Setup link to point to CUDA4 or CUDA5, e.g., (also option when cuda is installed to add this link)
+    ln -s /usr/local/cuda-5.0 cuda
+
+  Create /etc/profile.d/cuda.sh with the following 2 lines:
+    export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:/usr/local/cuda/lib64
+    export PATH=${PATH}:/usr/local/cuda/bin
+
+Code is now maintained as a brach of Alex Krizhevsky's cuda-convets. Original code available at 
+  http://code.google.com/p/cuda-convnet/
+
+xxx - synchronize to known working labels in this trunk, currently just sync to HEAD
+
+  > cd <cvs_workspace_path>/ctome_server/cuda-convnet-EM-alpha
+  > sh build.sh clobber
+  > sh build.sh
+
+Very likely that architecture in makefile needs to be changed depending on the card, see line in Makefile
+  GENCODE_ARCH := -gencode=arch=compute_35,code=\"sm_35,compute_35\"
+Replace with the proper version for the card installed, then rebuild..
+
+Once built, test python harness:
+  python convnet.py 
+
+Should produce a list of usage options
+
+Then create data directory, download & unpack the cifar example data to test:
+    CDCU file share: Common\cuda_convnet_datasets\cifar-10-py-colmajor.tar.gz
+
+Then test the cifar version, examples:
+
+python convnet.py --data-path=/home/$(whoami)/Data/cifar/cifar-10-py-colmajor --save-path=/home/$(whoami)/Data/convnet_out/test --test-range=6 --train-range=1-5 --layer-def=./example-layers/layers-19pct.cfg --layer-params=./example-layers/layer-params-19pct.cfg --data-provider=cifar --test-freq=20 --epochs=100 --gpu=0
+
+
+
+
+=================================================
+Instructions to obtain and build cuda-convnets2 (run as normal user):
+Code is now maintained as a brach of Alex Krizhevsky's cuda-convets. Original code available at 
+  https://code.google.com/p/cuda-convnet2/
+  
+    Install CUDA6 or CUDA6.5
+    Need newer gcc/g++, see notes above on devtoolset
+    Need new libjpeg-turbo (could not find newest version in any repos, so install from rpm):
+        http://sourceforge.net/projects/libjpeg-turbo/
+        > rpm -K libjpeg-turbo-official-1.3.1.x86_64.rpm 
+        > sudo rpm -i libjpeg-turbo-official-1.3.1.x86_64.rpm 
+        > sudo chmod -R a+rx /opt/libjpeg-turbo
+    Add dynamic library load for libjpeg-turbo by adding file /etc/ld.so.conf.d/libjpeg-turbo.conf with contents:
+        /opt/libjpeg-turbo/lib64
+    Then:
+        > sudo chmod a+r /etc/ld.so.conf.d/libjpeg-turbo.conf 
+        > sudo ldconfig
+    Need a few more dependencies for building OpenCV:
+        > sudo yum install cmake28
+        > sudo yum install ffmpeg ffmpeg-devel
+        > sudo yum install eigen3-devel
+    Make sure the full open jdk is installed, for example:
+        > sudo yum install java-1.7.0-openjdk-devel
+    Download and build OpenCV:
+        http://docs.opencv.org/master/dd/dd5/tutorial_py_setup_in_fedora.html#gsc.tab=0
+        
+        http://docs.opencv.org/doc/tutorials/introduction/linux_install/linux_install.html#linux-installation
+        http://www.giuseppeurso.eu/en/how-to-compile-opencv-on-centos-with-java-support/\
+        NOTE: as of Oct 8, 2014 needed change in modules/python/src2/gen2.py
+            self.code_include.write( '#include "{0}"\n'.format(hdr[hdr.rindex('opencv2/'):]) )
+        
+        > cd ~/<my_working _directory>
+        > git clone https://github.com/Itseez/opencv.git
+        > mkdir release; cd release
+        > export JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk.x86_64; cmake28 -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_C_COMPILER=/opt/rh/devtoolset-1.1/root/usr/bin/gcc -DCMAKE_CXX_COMPILER=/opt/rh/devtoolset-1.1/root/usr/bin/g++ -DCUDA_ARCH_BIN=35 -DCUDA_ARCH_PTX=35 -DWITH_JPEG=ON -DBUILD_JPEG=OFF -DJPEG_INCLUDE_DIR=/opt/libjpeg-turbo/include -DJPEG_LIBRARY=/opt/libjpeg-turbo/lib64/libjpeg.a ..
+        
+        for new Centos7 setups with anaconda to include python support:
+export JAVA_HOME=/usr/lib/jvm/java-1.7.0-openjdk; cmake -DBUILD_opencv_java=OFF -D WITH_TBB=ON -D WITH_EIGEN=ON -DCMAKE_BUILD_TYPE=RELEASE -DCMAKE_INSTALL_PREFIX=/usr/local -DCUDA_ARCH_BIN=35 -DCUDA_ARCH_PTX=35 -DWITH_JPEG=ON -DBUILD_JPEG=OFF -D BUILD_TESTS=OFF -D BUILD_PERF_TESTS=OFF -D BUILD_EXAMPLES=ON -D WITH_OPENGL=ON -D ENABLE_FAST_MATH=1 -D CUDA_FAST_MATH=1 -D WITH_CUBLAS=1 -DPYTHON3_EXECUTABLE=$(which python3) -DPYTHON3_INCLUDE_DIR=$(python3 -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON3_PACKAGES_PATH=$(python3 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())") -D PYTHON3_LIBRARY=$(python3 -c "from distutils import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")/libpython3.5m.so -D BUILD_opencv_python3=ON -DPYTHON2_EXECUTABLE=$(which python2) -DPYTHON2_INCLUDE_DIR=$(python2 -c "from distutils.sysconfig import get_python_inc; print(get_python_inc())") -DPYTHON2_PACKAGES_PATH=$(python2 -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())") -D PYTHON2_LIBRARY=$(python2 -c "from distutils import sysconfig; print(sysconfig.get_config_var('LIBDIR'))")/libpython2.7.so -D BUILD_opencv_python2=ON .. >& cmake.out.txt
+
+        > make
+might have this issue for samples: https://github.com/Itseez/opencv/issues/5859
+        > sudo make install
+        > sudo chmod -R a+rx /usr/local/share /usr/local/include /usr/local/lib /usr/local/bin
+    Need to add pkg-config for opencv to ~/.bashrc
+        export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
+
+    For some reason this was required on red (CentOS7, cuda7.5), added to .bashrc:
+        export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64
+
+    Finally should be able to build cuda-convnet2, files are checked in locally, but based on:
+        https://code.google.com/p/cuda-convnet2
+        > sh build.sh clean
+        > sh build.sh
+        > python convnet.py 
+    Should produce a list of usage options
+        
+    Get Alex's pickled CIFAR batches: http://www.cs.toronto.edu/~kriz/cifar-10-py-colmajor.tar.gz
+    Then test the cifar version, examples:
+
+python convnet.py --data-path=/home/$(whoami)/Data/cifar/cifar-10-py-colmajor-new --save-path=/home/$(whoami)/Data/convnet_out/test --test-range=6 --train-range=1-5 --layer-def=./layers/layers-cifar10-11pct.cfg --layer-params=./layers/layer-params-cifar10-11pct.cfg --data-provider=cifar --test-freq=20 --epochs=100 --gpu=0 --inner-size 24 
+
+    xxx - add imagenet examples, running on multiple GPUs?
+
+
+
+=================================================
+New notes for installation / running of nervana neon.
+Complete installs / build for opencv first.
+
+> sudo yum install libyaml-devel
+
+http://neon.nervanasys.com/docs/latest/installation.html
+
+to update / reinstall:
+
+conda remove --name neon --all
+conda info --envs
+cd ~/gits/neon
+git pull
+conda create --name neon pip
+source activate neon
+make sysinstall -e VIS=true
+cd ../emdrp/neon/
+pip install -r requirements.txt
+
+
+
+
+
+=================================================
+OLD Notes on installing mondo rescue for cloning linux installs (same machine or different machine):
+  http://www.mondorescue.org/
+  http://www.mondorescue.org/docs/mondorescue-howto.html
+
+Download repo file
+  ftp://ftp.mondorescue.org/rhel/6/x86_64/mondorescue.repo
+
+  mv <Download path>/mondorescue.repo /etc/yum.repos.d/
+
+Verify can see the packages
+  > sudo yum list mondo --showduplicates
+
+Install version 3.0.3
+  > sudo yum install mondo-3.0.3-1.rhel6
+
+
+
+NEW NOTES while cloning blue (centos7):
+Had to install one perl module separately:
+http://trac.mondorescue.org/wiki/FAQ (Q49)
+http://mirrors.karan.org/epel7/Packages/perl-IO-Interface/20131231012215/1.05-2.el6.x86_64/perl-IO-Interface-1.05-2.el7.x86_64.rpm
+  > sudo rpm -ivh perl-IO-Interface-1.05-2.el7.x86_64.rpm
+
+Had to set in /etc/mindi/mindi.conf
+EXTRA_SPACE=250000
+
+Run mondoarchive as root (no sudo):
+  > mondoarchive -OVi -E '/home/watkinspv/Data|/Data/watkinspv|/mnt|/home/watkinspv/mndobkp|/Data/mndotmp' -I '/' -N -d '/home/watkinspv/mndobkp' -g -s 4480m -4 -z -S '/Data/mndotmp' -T '/Data/mndotmp' -p mondorescue -M 64000
+
+For restore, iso can be converted to bootable format using isohybrid. 
+Smaller bootable image available after mondoarchive, for example:
+    > cd /home/watkinspv/mndobkp
+    > cp /var/cache/mindi/mindi.iso .
+    > isohybrid mindi.iso
+    > dd if=mindi.iso | pv --size 130023424 | dd of=/dev/sdd
+This approach did not work, lvm tools were not available with mondo expert mode in centos7.
+
+FIRST: download minimal centos7 image and create partitions in rescue mode
+See NOTE above on blacklisting nouveau driver for regular CentOS install (but go rescue mode).
+
+http://tldp.org/HOWTO/Partition/fdisk_partitioning.html
+http://www.thegeekstuff.com/2010/08/how-to-create-lvm/?utm_source=feedburner&utm_medium=feed&utm_campaign=Feed%3A+TheGeekStuff+%28The+Geek+Stuff%29
+
+Created files as part of restore called make-partition-and-lvm.txt that has exact steps required
+  to create exact clone partition and lvm setup. Copy to usb and mount, then use this file to replicate.
+  This also contains i-want-my-lvm from mondo setup, although these commands are no longer very useful.
+  Also contains fstab for clone.
+
+This command in make-partition-and-lvm.txt, but keeping here for reference (also for ext*).
+Change the UUID of the boot partition (/dev/sda1) to match that of cloned system.
+Can save UUID from mountlist.txt to /dev/sda1, then rename, then reformat, .... sth like that
+  > tune2fs /dev/sde5 -U f0acce91-a416-474c-8a8c-43f3ed3768f9
+  OR for xfs
+  > xfs_admin -U `cat /tmp/blkid.txt` /dev/sda1
+
+After partitioning is complete, then reboot with mindi image to restore.
+Do NOT have the external drive with the iso images plugged in during the boot.
+
+Had some trouble running mondorestore without a cdrom drive, followed this:
+http://mondorescue-mailing-list.679749.n3.nabble.com/Mondo-devel-The-mondorestore-command-was-not-found-on-your-backup-media-td4025559.html
+Figured out these steps, so just follow these exactly:
+  > mkdir /bkp
+  > mkdir /bkp/mondo
+  plugin the external drive that has mondo rescue iso on it
+  > mount /dev/sdc1 /bkp/mondo
+  > cd /bkp/mondo
+  > mount mondorescue-1.iso /mnt/cdrom
+  > cd /tmp
+  > mkdir cdrom
+  > cd cdrom
+  > cp /mnt/cdrom/images/all.tar.gz .
+  > tar xvf all.tar.gz
+  > mv all.tar.gz ..
+  > cp -R * /
+  > cd /tmp
+  > umount -l /bkp/mondo
+  unplug and replugin the external usb drive
+  > vi mondorestore.cfg
+  modify iso-dev, iso-mnt and iso-dir, for example:
+    iso-dev /dev/sdc1
+    iso-mnt /bkp/mondo
+    iso-dir /
+  IMPORTANT:
+  > lvm vgchange -a y
+  > mondorestore
+
+Follow old mondorestore instructions below, except:
+DO NOT: worry about the dracut step, does not work from mondo prompt.
+
+TO rebuild initramfs, boot from centos7 install, go to troubleshooting, allow it to mount drives, perform the chroot.
+DO: re-edit /etc/fstab as mondo somehow mangles it with duplicate entries
+  Then run dracut for the SAME kernel version as is in boot, i.e.,
+  > dracut -f -v /boot/initramfs-3.10.0-327.10.1.el7.x86_64.img 3.10.0-327.10.1.el7.x86_64
+  DO NOT use the $(uname -r) thing because uname might not be correct after the rescue boot.
+
+NOTE: System may reboot itself after first boot (SElinux rebuild?).  
+
+NOTE: Most likely have to set time after clone, DO this before starting network:
+    http://www.cyberciti.biz/faq/howto-set-date-time-from-linux-command-prompt/
+  > sudo date +%T -s "10:13:13"
+  > sudo hwclock --systohc
+
+Need to change hostname for networking to work, see notes below.
+
+
+
+OLD (original) mondoarchive / mondorestore notes:
+Setup partition on external or other HD for backups. Use parted to created partition, for example:
+  > sudo parted -a optimal /dev/sdb mkpart primary ext4 8MB 250000MB
+  > sudo parted -a optimal /dev/sdb mkpart primary ext4 250000MB 2TB
+
+Useful information here on formatting: http://blogsysadmin.blogspot.com/2011/08/formatting-and-labeling-partition.html
+For example:
+  > sudo mkfs -t ext4 /dev/sdb1
+  > sudo e2label /dev/sdb1 /bkp/mondo
+
+Then add the new partitions to /etc/fstab, for example, add the line:
+LABEL=/bkp/mondo        /bkp/mondo              ext4    defaults        1 2
+
+IMPORTANT: if you let mondorescue automatically setup the new drives, then DO NOT have the backup drives in fstab or
+  they will also be reformatted as part of the rescue process. Current methodology is to have these added to fstab,
+  but them comment them out, reboot and run mondorescue to archive (to the main disk). Then copy the mondorescue files
+  to the external and burn the first file to DVD to boot.
+
+Currently using mondorescue for everything except Data backup. Backup data files manually using rsync, for example:
+  rsync -avh --progress /home/watkinspv/Data /bkp/Data/pwatkins
+Also backing up software installs using rsync
+
+Mondo rescue was not able to regenerate lvm partitions automatically, so this step has to be done by hand. 
+Use /tmp/i-want-my-lvm for examples on how to create lvm partitions. Set partitions to boot and lvm appropriately
+  using parted. For example, after above examples run parted and
+    set 1 boot on
+See also cdcu1_partition_info.txt and fstab.eg which contain commands for viewing lvm partitions and the original
+  /etc/fstab file on cdcu1dev
+
+Current methodology for cloning and restoring drive using mondorescue (xxx - needs work):
+  - remove any other drives from fstab and umount
+  - run mondoarchive, use interactive, OR, for example:
+  
+mondoarchive -OVi -E '/home/watkinspv/Data|/bkp|/Data|/net|/mnt|/home/watkinspv/mndobkp' -I '/' -N -d '/home/watkinspv/mndobkp' -g -s 4480m -4 -z -S '/Data/mndotmp' -T '/Data/mndotmp' -p mondorescue -M 64000
+
+    Suggest to use command line start because exclude is limited to number of characters in a text box in interactive.
+    This issue came up during an archive attempt (likely to surface again). For some reason was causing a fatal error
+      not allowing mondoarchive to create the last ISO file:
+      http://trac.mondorescue.org/wiki/FAQ#Q16Whydoesmondoarchivetakessolongtobackupmysystem
+      Followed the advise of this posting and removed nfsnobody from the /etc/passwd after making backup.
+      **Removing nfsnobody from /etc/passwd did not fix the very large lastlog file, so need to clear before backup.
+        (also will work if forgotten but still done during the backup before last ISO is created)
+    Good idea to clear browser caches and delete unneeded files from ~/Downloads folders
+
+  - backup to hard drive using directory somewhere in /home
+  - exclude backup folder and Data folders
+  - burn first iso to dvd
+  - copy other iso to external usb drive
+  - boot from mondo dvd, with external usb drive UNPLUGGED
+  - strongly suggest do not clone without a working backup drive (maybe not possible if hd failure has occurred)
+  - go into expert mode and setup partitions appropriately
+  - record all new filesystem sizes so that mountlist can be edited by hand during mondorestore
+  - record UUID of boot device so that fstab can be updated, i.e. (if first drive is boot drive)
+    > blkid /dev/sda1
+  - run 'mondorestore' and choose Interactively and then ***choose*** 'Hard disk' (DO NOT use USB)
+  - hand edit mount list to match how restore is to be done
+  - choose not to partition or format drives, only restore
+  - some errors may occur, for example known issue:
+    http://trac.mondorescue.org/ticket/387
+  - likely have to rebuild boot libraries, see info at (for CentOS6):
+    https://access.redhat.com/site/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Deployment_Guide/sec-Verifying_the_Initial_RAM_Disk_Image.html
+    Basically should be:
+      cd /boot
+      mv /boot/initramfs-$(uname -r).img /boot/initramfs-$(uname -r).img.bak
+      dracut
+  - Say yes when asked about cloning
+    - rebuild fstab appropraitely for the new hard disk configuration, remove duplicates and lvm
+    - rebuild mtab same as for fstab (should be obvious changes)
+    - on successful clones did not have to modify any other system files
+  - try to boot with new drive 
+  - possibly fstab might need to be edited again after reboot if file mounting FAILS are noted.
+      noticed duplicate entries during at least one clone
+  - if cloning to another machine, need to change hostname and get new ip address, configuration
+    needs to be edited at /etc/sysconfig/network-scripts/ifcfg-(hardware name of ethernet port), see networking notes
+    Useful website for networking info on CentOS/RHEL:
+    http://www.thegeekstuff.com/2013/10/change-hostname-ip-address/
+  - NOTE: added script to shut machine down to crontab, may need to modify if GPUs are not installed, different number
+      installed, etc. Script located at /root/scripts/nvidia_temp.sh, or disable the job by removing the line with
+      > crontab -e
+
+Encountered some difficulties moving to new hardware because proper modules to support LSI SAS "fake RAID" controller
+  were not included by mindi. See:
+  http://trac.mondorescue.org/wiki/FAQ#Q5HowdoIrestoremymondorescuesetonanewhardwareplatform  
+  Modified mindi script (`which mindi`) and added to FORCE_MODS variable, for example, 
+    in this case added "raid_class scsi_transport_sas mpt2sas"
+
+
+
+
+=================================================
+For synology setup:
+install synology assistant
+local interface (plug directly into ethernet port, no switch)
+IPADDR=169.254.1.1
+NETMASK=255.255.0.0
+connect local interface DIRECTLY to diskstation
+    > sudo firewall-cmd --add-port=9999/udp --permanent
+    > sudo firewall-cmd --add-port=9998/udp --permanent
+    > sudo firewall-cmd --add-port=9997/udp --permanent
+nindsadmin
+ndsw-cdcu-green (same)
+setup for static ip (see host notes / network-scripts)
+bonded the four ethernet interfaces to increase bandwidth (for the lacp mode, need to configure on switch also)
+NOTE: for synology assistant to connect from remote (ssh -Y) remote firefox must be the only firefox open
+  on the local machine. Start firefox first, then synass, then connect
+should also work to just open browser and go to http://10.42.55.99:5000
+synology assistant seems to have problems with more than a few interfaces enabled
+  need to disable bridge interfaces on green in order to login via browser
+setup data volume as share on synology
+
+xxx - removed nfs shares on clones in favor of "push method" to synology for aggregating probs
+setup /Data/cdcu on each clone machine as nfs shares (https://www.howtoforge.com/nfs-server-and-client-on-centos-7)
+    > sudo systemctl enable rpcbind; sudo systemctl enable nfs-server
+    > sudo systemctl start rpcbind; sudo systemctl start nfs-server; sudo systemctl start rpc-statd; sudo systemctl start nfs-idmapd
+    > sudo firewall-cmd --permanent --zone public --add-service mountd
+    > sudo firewall-cmd --permanent --zone public --add-service rpc-bind
+    > sudo firewall-cmd --permanent --zone public --add-service nfs
+    > sudo firewall-cmd --reload
+    > sudo vi /etc/exports
+/Data/cdcu      10.42.55.1/255.255.255.0(ro,async,no_wdelay,crossmnt,all_squash,insecure_locks,sec=sys,anonuid=1024,anongid=100)
+    > sudo exportfs -r
+
+    > sudo vi /etc/fstab
+10.42.55.99:/volume1/data /mnt/syn         nfs        rw,async,rsize=65536,wsize=65536,timeo=1,retrans=5 0 0
+10.42.55.1:/Data/cdcu     /mnt/g1          nfs        ro,async,rsize=65536,timeo=1,retrans=5 0 0
+OR
+    > sudo mount $gsyn:/volume1/data /mnt/syn -o rw,async,rsize=65536,wsize=65536,timeo=1,retrans=5    
+    > sudo mount $g1:/Data/cdcu /mnt/g1 -o ro,async,rsize=65536,timeo=1,retrans=5    
+
+Enabled jumbo frames on all local interfaces (MTU=9000), can test with:
+  > ping -M do -c 4 -s 8972 $gsyn
+MUST enable jumbo frame support on the switch also, then reboot switch
+
+
+
+=================================================
+For cisco SG300-20 managed switch setup:
+can not delete cisco login, used root password
+added nindsadmin
+
+
+
+=================================================
+NEW networking notes, for hostname see:
+http://www.thegeekstuff.com/2013/10/change-hostname-ip-address/
+
+NOTE: After boot, may need to move network scripts to match new ethernet controller names in 
+    /etc/sysconfig/network-scripts/ifcfg-* 
+MAYBE: should change the mac address by editing this file and changing to same as machine that was cloned???
+  MACADDR=
+Then:
+  > sudo service network restart  
+or with NetworkManager
+  > sudo systemctl -l status network.service
+  > sudo systemctl stop network.service
+  > sudo systemctl start network.service
+NOTE: network restart will fail if no physical connection is plugged in
+
+Checked in ifcfg-* examples for working configurations at network-scripts
+
+Useful way to list all ethernet devices (with names):
+    > ls -lrt /sys/class/net/
+
+all relevant networking files / important steps:
+NOTE: would need an admistrative account for active directory 
+    in order to add hostname to kerberos, need IT administrator for this.
+> sudo vi /etc/sysconfig/network
+> sudo hostnamectl set-hostname ndsw-cdcu-green
+> sudo vi /etc/hostname
+> sudo vi /etc/resolv.conf
+> sudo vi /etc/hosts
+
+> vi /etc/sssd/sssd.conf
+> vi /etc/idmapd.conf 
+> vi /etc/krb5.conf 
+> vi /etc/samba/smb.conf 
+
+To prevent broken pipe timeout for ssh:
+  > sudo vi /etc/ssh/sshd_config
+ClientAliveInterval 600
+ClientAliveCountMax 3
+  > sudo systemctl restart sshd
+
+
+
+Quick reference for clients:
+
+Checked in ifcfg-* examples for working configurations at network-scripts
+
+network files/steps that involve changing hostname:
+> sudo hostnamectl set-hostname ndsw-cdcu-green
+> sudo vi /etc/sysconfig/network
+> vi /etc/sssd/sssd.conf
+> vi /etc/samba/smb.conf 
+
+systemctl restart sssd
+systemctl restart sshd
+
+To stop and disable "NIH login":
+systemctl stop sssd
+systemctl disable sssd
+use local admin account to add user to /etc/passwd (use same user id and group id, that is NIH id)
+  and sudo passwd to set password, then chown -R user /home/user
+
+Notes on local network config:
+
+http://superuser.com/questions/575684/how-to-disable-ipv6-on-a-specific-interface-in-linux
+You can disable it from /etc/sysctl.conf with this line:
+net.ipv6.conf.eth0.disable_ipv6 = 1
+
+From below: 
+on the client edit /etc/sysconfig/network and add
+GATEWAY=10.42.55.101
+
+ssh can take a long time to the lan machines because of ssh reverse dns lookup:
+  > sudo vi /etc/ssh/sshd_config
+and set "UseDNS no" then
+  > sudo systemctl restart sshd
+
+Add (remove for disable) aliases from ~/.bashrc
+
+selinux can get in the way after any system file changes for joining the NIH network, see:
+https://www.certdepot.net/selinux-set-enforcing-and-permissive-modes/
+https://wiki.centos.org/HowTos/SELinux#head-0f6390ddacfab39ee973ed8018a32212c2a02199
+  > touch /.autorelabel
+  > reboot 
+
+  > sestatus -v
+
+  > setenforce enforcing
+  > setenforce permissive
+  > vi /etc/selinux/config
+
+
+
+
+xxx - old, kept for reference
+For the "lan" machines, had to disable network manager for ethernet to load on boot:
+systemctl stop NetworkManager
+systemctl disable NetworkManager
+chkconfig network on
+service network restart
+
+to re-enable:
+https://wiki.centos.org/HowTos/Laptops/NetworkManager
+NetworkManager should be fine on the "lan machines"
+
+for static config
+ifup enp10s0
+ifdown enp10s0
+
+
+
+
+
+gateway setup notes:
+
+iptables / firewalld
+https://wiki.centos.org/HowTos/Network/IPTables
+http://askubuntu.com/questions/66890/how-can-i-make-a-specific-set-of-iptables-rules-permanent
+https://www.centos.org/forums/viewtopic.php?t=53819
+https://www.certdepot.net/rhel7-get-started-firewalld/
+
+NAT
+http://unix.stackexchange.com/questions/222054/how-can-i-use-linux-as-a-gateway
+https://www.howtoforge.com/nat_iptables
+http://www.sflow.org/detectNAT/
+https://forums.untangle.com/networking/20935-detecting-nat.html
+http://lists.netfilter.org/pipermail/netfilter/2004-November/056947.html
+http://newartisans.com/2007/09/neat-tricks-with-iptables/
+http://www.yolinux.com/TUTORIALS/LinuxTutorialIptablesNetworkGateway.html
+https://airvpn.org/topic/9139-prevent-leaks-with-linux-iptables/ (maybe only applies with vpn?)
+
+Bridge (don't need this):
+https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Deployment_Guide/s2-networkscripts-interfaces_network-bridge.html
+
+TTL
+https://www.quora.com/Why-is-the-maximum-TTL-value-in-an-IP-header-255
+http://www.linuxtopia.org/Linux_Firewall_iptables/x4799.html
+https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt
+http://www.osguides.net/internet-a-networking/86-howto-increase-the-ttl-value-with-iptables.html
+
+to enable gateway:
+Enable IPv4 packet forwarding (permanent):
+    Add the following to /etc/sysctl.conf: net.ipv4.ip_forward = 1
+    Apply the sysctl settings: sysctl -p
+
+Enable IPv4 fowarding, and disable ipv6 on gateway (temporary):
+    > sudo echo 1 > /proc/sys/net/ipv4/ip_forward
+    > sudo echo 1 > /proc/sys/net/ipv6/conf/enp10s0/disable_ipv6
+
+To add forwarding rules on gateway:
+    >  sudo firewall-cmd --direct --add-rule ipv4 nat POSTROUTING 0 -o enp0s31f6 -j MASQUERADE
+    >  sudo firewall-cmd --direct --add-rule ipv4 filter FORWARD 0 -i enp10s0 -o enp0s31f6 -j ACCEPT
+    >  sudo firewall-cmd --direct --add-rule ipv4 filter FORWARD 0 -i enp0s31f6 -o enp10s0 -m state --state RELATED,ESTABLISHED -j ACCEPT
+    >  sudo firewall-cmd --direct --add-rule ipv4 mangle PREROUTING 0 -i enp10s0 -j TTL --ttl-inc 1
+
+most suggest --ttl-set 129 or --ttl-inc 128, but why??? i.e.
+iptables -t mangle -A PREROUTING -i eth0 -j TTL --ttl-set 129
+iptables -t mangle -A PREROUTING -j TTL --ttl-inc 128
+
+on the client edit /etc/sysconfig/network and add
+GATEWAY=10.42.55.101
+
+ssh can take a long time to the lan machines because of ssh reverse dns lookup:
+  > sudo vi /etc/ssh/sshd_config
+and set "UseDNS no" then
+  > sudo systemctl restart sshd
+
+OpenVpn server / client setup notes (not using this):
+
+https://wiki.archlinux.org/index.php/OpenVPN
+https://openvpn.net/index.php/open-source/documentation/howto.html#quick
+https://openvpn.net/index.php/access-server/docs/admin-guides/201-how-to-configure-a-host-as-a-gateway-for-client-side-subnets.html
+https://www.linode.com/docs/networking/vpn/tunnel-your-internet-traffic-through-an-openvpn-server
+http://www.tecmint.com/setup-openvpn-server-with-linux-and-windows-clients-in-centos-rhel/
+
+
+
+Get list of macs and ips for machines on current subnet:
+
+ldapsearch -E pr=1000/noprompt -H ldap://ldapad.nih.gov -Y GSSAPI -N -b dc=nih,dc=gov objectClass=computer name > ldap_out.txt
+grep 'name: NDSD-CDCU' ldap_out.txt > tmp.txt
+grep 'name: ndsw-cdcu' ldap_out.txt >> tmp.txt
+grep 'name: ndsd-cdcu' ldap_out.txt >> tmp.txt
+cat tmp.txt | awk '{print $2}' | cut -c -15 > cdcu-names.txt
+rm cdcu-pings.txt; touch cdcu-pings.txt
+cat cdcu-names.txt |  while read output
+do
+    echo "$output" >> cdcu-pings.txt
+    ping -c 1 "$output" >> cdcu-pings.txt
+done
+cat cdcu-pings.txt | grep '64 bytes from' | sed 's/^64 bytes from \(.*\) (\(.*\)).*/\1/' > cdcu-active-names.txt
+cat cdcu-pings.txt | grep '64 bytes from' | sed 's/^64 bytes from \(.*\) (\(.*\)).*/\2/' > cdcu-active-ips.txt
+rm cdcu-active-macs.txt; touch cdcu-active-macs.txt
+arp -n > current-arp.txt
+cat cdcu-active-ips.txt |  while read output
+do
+    if grep -F -w --quiet "$output" current-arp.txt; then
+        grep -F -w "$output" current-arp.txt | awk '{print $3}' >> cdcu-active-macs.txt
+    else
+        echo >> cdcu-active-macs.txt
+    fi
+done
+paste cdcu-active-names.txt cdcu-active-ips.txt cdcu-active-macs.txt | column -s $'\t' -t > cdcu-names-ips-macs.txt
+
+

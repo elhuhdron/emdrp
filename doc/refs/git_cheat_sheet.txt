@@ -1,0 +1,43 @@
+
+http://gitref.org/basic/
+https://www.atlassian.com/git/tutorials/what-is-version-control
+
+just replace everything, somehow this is a hard answer to find:
+git fetch origin; git reset --hard origin/master
+
+to sync with a specific release
+git reset --hard <release_sha>
+
+to update single local file:
+http://stackoverflow.com/questions/3949804/force-overwrite-of-local-file-with-whats-it-origin-repo
+git fetch; git checkout origin/master <filepath>
+
+if you commit and get off the branch, getting error:
+"You are not currently on a branch."
+http://stackoverflow.com/questions/4735556/git-not-currently-on-any-branch-is-there-an-easy-way-to-get-back-on-a-branch
+if before the commit: xxx - how this differs from AAA?
+  git stash
+  git checkout master
+  git stash pop
+if after the commit:
+  git checkout -b newbranch
+  git checkout master
+  git merge newbranch
+  git branch -d newbranch
+
+to update to head but keep local changes (AAA):
+git stash; git pull; git stash pop
+
+after a stash/pull/pop, if conflict occurs, changes are stage for some reason, just do:
+git reset
+which is equivalent to git reset HEAD
+then can checkout files to overwrite with HEAD if desired
+
+test an add without adding:
+git add . -n
+
+http://dalibornasevic.com/posts/2-permanently-remove-files-and-folders-from-git-repo
+git filter-branch --tree-filter 'rm -rf vendor/gems' HEAD
+git push origin master --force
+xxx - afterwards, DO NOT merge another branch that had this file in the commit history
+

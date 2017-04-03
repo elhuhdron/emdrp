@@ -1,0 +1,21 @@
+
+https://www-e815.fnal.gov/webspace/cvs/commands.html
+http://openconcept.ca/blog/mgifford/cvs-cheat-sheet
+
+-q suppresses the "entering directory" prints
+
+cvs -q diff -R ctome_server 
+cvs -q diff -R .
+
+update everything including new directories, -C discards uncommitted changes, -d for new directories
+cvs -q update -C -R -d .
+
+show updates but do nothing
+cvs -qn update .
+
+only commit the current directory, recursive is on by default for commit but not for local
+cvs commit -m 'updated larger crop area for whitening' -lR
+
+only commit the current directory recursively
+cvs commit -m 'updated larger crop area for whitening' -lR
+

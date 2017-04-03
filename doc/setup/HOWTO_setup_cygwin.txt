@@ -1,0 +1,140 @@
+=================================================
+Notes to prepare linux developer cygwin setup to run components of the EM Data Reconstruction Pipeline (EMDRP).
+Steps have been validated on Windows7 64bit using 64bit cygwin install.
+
+xxx - this document needs more re-validation and cleanup. recheck during subsequent cygwin setups.
+
+
+
+
+=================================================
+Cygwin and python setup instructions
+
+
+NOTE: Using windows anaconda in cygwin would alleviate many of the install steps below.
+Future thing to try, use anaconda on cygwin by setting path and then install gcc in anaconda:
+    > conda install mingw
+xxx - validate if this will work with building pyCext, can conda installs work from cygwin.
+  maybe better to install from windows using whatever typical method and then add to path
+To point cygwin to anaconda python, add to .bashrc for example:
+  export PATH=/cygdrive/c/anaconda:$PATH
+
+
+Consistently getting fatest downloads from this mirror:
+  cygwin.mirrors.pair.com
+
+NOTE: Suggest installing into local user directory but "For Everyone".
+   xxx - validate that this can prevent having to run installs as administrator, have need this so far...
+
+Install cywin with:
+    python (pick 2 or 3 depending)
+    gcc/g++, mingw64 gcc/g++ components
+    make
+    wget
+    open-ssh
+    git
+    hdf5
+
+for matplotlib need cygwin modules:
+    freetype
+    python-gtk
+    python-tk
+    pkg-config
+    libX11-devel
+    libfreetype-devel
+    xorg-server 
+    xinit
+    ??gtk-devel
+
+xxx - add notes on how to get the xwindows shortcut on desktop installed.
+  this will run xterm as a xwindow instead of typical cygwin shell. also can try:
+    > startxwin
+
+for scipy need cygwin modules:
+    lapack, lapack-devel, openblas
+
+for scikit-image need cygwin modules:
+    anything libjpeg (including turbo, mingw, etc, not sure minimal requirement)
+
+for python-snappy requires cygwin modules for building (see below):
+    automake, autoconf, libtool
+
+Good reference on doing installs with sudo if installed to location needing admin rights (in Windows):
+  http://stackoverflow.com/questions/4090301/root-user-sudo-equivalent-in-cygwin
+
+Easiest way to get python setuptools is to install them directly. https://pypi.python.org/pypi/setuptools
+  Start with whatever version of python is appropriate, for example, python3.4
+    > wget https://bootstrap.pypa.io/ez_setup.py
+    > python ez_setup.py
+    > easy_install pip
+
+Checkout code for emdrp and build C module.
+  Might require Makefile edits, xxx - work on a more robust Makefile or use automake???
+    > mkdir ~/gits; cd gits
+    > git checkout https://github.com/elhuhdron/emdrp.git
+
+To install matplotlib such that windows can be opened:
+  xxx - this only works if all the necessary cygwin windowing packages were installed, revalidate this
+from the xwin terminal:
+    > pip install matplotlib --verbose
+from administrator account, xxx - what was this for?
+    > chmod -R a+rwx /var/log
+
+All the other pip installs (only subset would be needed with anaconda):
+pip install
+    argparse
+    nose
+    cython
+    configobj
+    numpy
+    h5py
+    scipy
+    scikit-image
+    python-snappy
+
+scikit-image needs pillow, this failed with forked process died unexpectedly, see https://github.com/python-pillow/Pillow/issues/1690, use:
+     MAX_CONCURRENCY=1 pip install pillow
+
+python-snappy requires snappy, could not find cygwin install, so have to build it.
+download source zip from: http://google.github.io/snappy/
+then generate automake stuff with
+    > sh autogen.sh
+then read INSTALL, but basically
+    > ./configure
+    > make
+    > make install
+after make install move libraries in /usr/local/lib to /usr/lib
+    
+add PYTHONPATH for types and C python extension:
+export PYTHONPATH=$HOME/gits/emdrp/recon/python:$HOME/gits/emdrp/recon/python/utils:$HOME/gits/emdrp/recon/python/utils/pyCext:$PYTHONPATH
+
+the rebase issue (for reference, not sure what causes this):
+http://stackoverflow.com/questions/8282113/cygwin-issue-unable-to-remap-same-address-as-parent
+
+
+
+
+=======================
+All steps below here are for frontend only (database access with jdbc) and did ultimately did not work on cygwin.
+
+xxx - maybe this can be avoided by building sqlrelay and using this instead to access database???
+
+pip install
+    jpype1
+    jaydebeapi
+
+need version of java consistent with cygwin (i.e., both 32bit or both 64bit).
+install jdk from oracle on machine (windows version).
+
+then, modified jaydebeeapi to follow all this crap 
+   (check-in modified version of this from version 0.2.0 of jaydebeapi, using 0.6.0 of jpype)
+https://www.coderxpress.net/blog/2014/10/jpype-vs-cygwin/
+
+http://bugs.java.com/view_bug.do?bug_id=6214495
+
+added for Abort:
+-verbose:init -verbose:jni -verbose:class
+
+Finally figure issue out, for jpype1, 0.6.0, only works against jdk6. 
+Install default way (which includes jni.h for java6) and run against this, should work.
+
