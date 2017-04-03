@@ -1,0 +1,4 @@
+configobj
+scipy
+matplotlib
+sharedmem

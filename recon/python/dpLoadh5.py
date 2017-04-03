@@ -219,6 +219,9 @@ class dpLoadh5(object):
             print('\tmin ' + str(self.data_cube_min) + ' max ' + str(self.data_cube_max))
             #if self.data_type == np.uint16 or self.data_type == np.uint32:
             #    print('\tnunique ' + str(len(np.unique(self.data_cube))))
+        # xxx - hacks to use along with dpCubeIter to get mean and std over large volume
+        #print(self.data_cube.mean())
+        #print(np.sum((self.data_cube-155.4)**2)/(self.data_cube.size-1))
 
     def get_hdf_index_from_chunk_index(self, hdf_dataset, chunk_index, offset):
         if hdf_dataset:

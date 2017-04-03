@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # The MIT License (MIT)
 #
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
