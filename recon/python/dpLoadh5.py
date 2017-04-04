@@ -332,12 +332,12 @@ class dpLoadh5(object):
         elif ext == 'gipl':
             dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
         else:
-            # to support creating knossos-style directory structure
-            os.makedirs(os.path.dirname(self.outraw), exist_ok=True)
             if not hasattr(self, 'data_cube_max'): self.data_cube_max = data.max()
             # this is just to avoid writing all zero data to knossos cubes
             if self.data_cube_max == 0:
-                print('\tDATA ZERO, skip')
+                print('\tDATA ZERO, skip'); return
+            # to support creating knossos-style directory structure
+            os.makedirs(os.path.dirname(self.outraw), exist_ok=True)
             if self.raw_compression:
                 import snappy
                 import zipfile
