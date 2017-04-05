@@ -287,9 +287,7 @@ TODO: fill out this section better including:
 
 #### Briggman Lab
 - [Paul Watkins](mailto:paul.watkins@nih.gov)
-- [Hailiang Zhang](mailto:hailiang.zhang@nih.gov)
 - [Kevin Briggman](mailto:kevin.briggman@nih.gov)
 
 #### Website Development
 - [Amarendra Yavatkar](mailto:yavatka@ninds.nih.gov)
-- [Mayur Joshi](mailto:joshim2@ninds.nih.gov)
