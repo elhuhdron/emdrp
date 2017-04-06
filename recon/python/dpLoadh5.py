@@ -279,7 +279,8 @@ class dpLoadh5(object):
             data[:z[0],-z[1]:,-z[2]:] = 0; data[-z[0]:,-z[1]:,-z[2]:] = 0
         if bool(self.dtypeGray):
             dtypeGray = eval('np.' + self.dtypeGray) if isinstance(self.dtypeGray, str) else self.dtypeGray
-            data -= data.min(); data /= data.max(); data = (data*np.iinfo(dtypeGray).max).astype(dtypeGray)
+            #data -= data.min(); data /= data.max() # xxx - scale as option? typically for probs, so commented
+            data = (data*np.iinfo(dtypeGray).max).astype(dtypeGray)
         if self.nColorsLUTraw and islabels:
             data = data % self.nColorsLUTraw
         if self.relabel_seq and islabels:
