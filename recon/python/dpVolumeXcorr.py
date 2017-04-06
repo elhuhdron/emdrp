@@ -487,7 +487,8 @@ class dpVolumeXcorr(dpWriteh5):
         p.add_argument('--loadfile', nargs=1, type=str, default='', help='Load previous run saved in npz for plotting')
         p.add_argument('--nthreads', nargs=1, type=int, default=[8], help='Number of threads to use in fftw')
 
-        # arguments for concatenate mode (concatenate runs over dpCubeIter volumes and reduce down to specified size)
+        # arguments for concatenate mode (concatenate runs over savefiles that were created for independent volumes
+        #   and reduces down to specified size)
         p.add_argument('--loadfiles-path', nargs=1, type=str, default='', help='Path to saved runs to concatenate')
         p.add_argument('--concat-chunk', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
             help='Starting chunk alignment for concatenate')
