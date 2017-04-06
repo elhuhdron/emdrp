@@ -135,7 +135,7 @@ class dpCubeIter(object):
         else:
             use_volume_size = self.volume_size
             use_volume_step = self.volume_step
-            cur_ovlp = np.zeros_like(self.filemodulators_overlap)
+            cur_ovlp = np.zeros((3,),dtype=np.int32)
         
         for cur_index in range(use_volume_size):
             # the current volume indices, including the right and left remainders
@@ -148,10 +148,10 @@ class dpCubeIter(object):
 
                 cur_fm_volume = cur_volume // fm_cube_size
                 cur_chunk = (cur_volume * self.cube_size) - 2*cur_fm_volume + self.volume_range_beg
-                cur_ovlp = np.zeros_like(self.filemodulators_overlap)
-                sel = (cur_fm_volume % fm_cube_size == 0)
+                cur_ovlp = np.zeros((3,),dtype=np.int32)
+                sel = (cur_volume % fm_cube_size == 0)
                 cur_ovlp[sel] = -self.filemodulators_overlap[sel] # "top" cube overlap
-                sel = (cur_fm_volume % fm_cube_size == fm_cube_size-1)
+                sel = (cur_volume % fm_cube_size == fm_cube_size-1)
                 cur_ovlp[sel] = -self.filemodulators_overlap[sel] # "bottom" cube overlap
                 size = self.cube_size_voxels
             else:
