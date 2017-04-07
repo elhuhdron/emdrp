@@ -13,7 +13,8 @@ size = [1024,1024,480]
 offset = [0,0,32]
 has_ECS = True
 
-username = 'watkinspv'
+#username = 'watkinspv'
+username = 'patilra'
 
 # Input supervoxel labels (hdf5)
 labelfile           = '/Data/' + username + '/full_datasets/neon/mbfergus32all/huge_supervoxels.h5'
