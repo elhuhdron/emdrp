@@ -14,7 +14,8 @@ size = [128,128,128]
 offset = [0,0,0]
 has_ECS = True
 
-username = 'watkinspv'
+#username = 'watkinspv'
+username = 'patilra'
 
 # Input supervoxel labels (hdf5)
 labelfile           = '/Data/' + username + '/full_datasets/neon_sixfold/mbfergus32/huge_supervoxels.h5'
@@ -72,7 +73,11 @@ print('Exporting adjacency matrix'); t=time.time()
 import networkx as nx
 am=nx.to_numpy_matrix(g_train)
 #np.savetxt("tmp-adjacency_matrix-cpu.txt",am, fmt="%d", delimiter='')
-am.tofile('tmp-adjacency-matrix-cpu-%dx%d-%s.raw' % (am.shape[0], am.shape[1], str(am.dtype)))
+print(am.dtype, am.shape)
+fn = 'tmp-adjacency-matrix-cpu-%dx%d-%s.raw' % (am.shape[0], am.shape[1], str(am.dtype))
+am.tofile(fn)
+am2 = np.fromfile(fn, dtype=np.float64).reshape(am.shape)
+print(am2.dtype, am2.shape)
 print('\tdone in %.4f s' % (time.time() - t))
 
 # dump supervoxels
