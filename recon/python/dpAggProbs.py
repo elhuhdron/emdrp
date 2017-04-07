@@ -95,9 +95,10 @@ class dpAggProbs(emProbabilities):
             str_nslcs = [':self.overlap[j],:,:', ':,:self.overlap[j],:', ':,:,:self.overlap[j]']
             for j in range(dpWriteh5.ND):
                 if ovlp_pos[j]:
-                    eval('chunk_sel[' + str_pslcs[j] + '] = 0')
+                    exec('chunk_sel[' + str_pslcs[j] + '] = 0')
                 elif ovlp_neg[j]:
-                    eval('chunk_sel[' + str_nslcs[j] + '] = 0')
+                    exec('chunk_sel[' + str_nslcs[j] + '] = 0')
+            orig_size = self.size; orig_offset = self.offset
 
         for j in range(self.ntypes):
             cprobs = np.zeros(np.append(ovlp_size, self.nmerge), dtype=emProbabilities.PROBS_DTYPE, order='C')
@@ -106,7 +107,7 @@ class dpAggProbs(emProbabilities):
                 # load the raw files
                 self.inraw = os.path.join( self.inrawpath, fn + str(i) + '.f32' )
                 if use_ovlp:
-                    self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube[chunk_sel]
+                    self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube[chunk_sel].reshape(ovlp_size)
                 else:
                     self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube
 
@@ -127,6 +128,8 @@ class dpAggProbs(emProbabilities):
                 if use_ovlp:
                     self.size = ovlp_size; self.offset = ovlp_offset; self.inith5()
                 self.writeCube()
+                if use_ovlp:
+                    self.size = orig_size; self.offset = orig_offset; self.inith5()
 
         if self.dpAggProbs_verbose:
             print('\tdone in %.4f s' % (time.time() - t))

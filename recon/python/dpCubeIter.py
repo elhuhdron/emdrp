@@ -152,7 +152,7 @@ class dpCubeIter(object):
                 sel = (cur_volume % fm_cube_size == 0)
                 cur_ovlp[sel] = -self.filemodulators_overlap[sel] # "top" cube overlap
                 sel = (cur_volume % fm_cube_size == fm_cube_size-1)
-                cur_ovlp[sel] = -self.filemodulators_overlap[sel] # "bottom" cube overlap
+                cur_ovlp[sel] = self.filemodulators_overlap[sel] # "bottom" cube overlap
                 size = self.cube_size_voxels
             else:
                 # need special cases to handle the remainders
