@@ -45,6 +45,7 @@ import networkx as nx
 from dpLoadh5 import dpLoadh5
 from typesh5 import emLabels, emProbabilities, emVoxelType
 from pyCext import binary_warping
+from utils import print_cpu_info_linux
 
 class dpWatershedTypes(object):
 
@@ -105,7 +106,9 @@ class dpWatershedTypes(object):
         self.skeletonize = False
 
         # print out all initialized variables in verbose mode
-        if self.dpWatershedTypes_verbose: print('dpWatershedTypes, verbose mode:\n'); print(vars(self))
+        if self.dpWatershedTypes_verbose: 
+            print('dpWatershedTypes, verbose mode:\n'); print(vars(self))
+            print_cpu_info_linux() # for debugging runtime variance on biowulf
 
     def watershed_cube(self):
         writeVerbose = False;

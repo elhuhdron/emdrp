@@ -64,6 +64,7 @@ from matplotlib import pyplot as plt
 from dpLoadh5 import dpLoadh5
 from dpFRAG import dpFRAG
 from metrics import pixel_error_fscore
+from utils import print_cpu_info_linux
 
 class dpSupervoxelClassifier():
 
@@ -199,6 +200,7 @@ class dpSupervoxelClassifier():
             print('Test chunks: %s' % ' '.join([str(x) for x in self.test_chunks]))
 
             #print('dpSupervoxelClassifier, verbose mode:\n'); print(vars(self))
+            print_cpu_info_linux() # for debugging runtime variance on biowulf
 
         # inits for iterative prior mode
         self.iterative_mode = (self.iterate_count > 0)
