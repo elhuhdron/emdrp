@@ -71,8 +71,6 @@ class dpSupervoxelClassifier():
     # Constants
     LIST_ARGS = ['test_chunks', 'label_subgroups', 'label_subgroups_out', 'iterate_merge_perc',
         'thresholds', 'threshold_subgroups']
-    n_jobs = 8
-    #n_jobs = 1
 
     def __init__(self, args):
 
@@ -242,6 +240,15 @@ class dpSupervoxelClassifier():
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k in ['features','features_names','nfeatures']: setattr(self,k,d[k])
 
+        # xxx - make this more systematic for other libraries? 
+        #   typically using anaconda, for which this should work since built on mkl
+        try:
+            import mkl
+            print('Setting mkl num_threads to %d' % (self.nthreads,))
+            mkl.set_num_threads(self.nthreads)
+        except ImportError:
+            pass
+
     def train(self):
 
         if self.dpSupervoxelClassifier_verbose: print('\nTRAIN')
@@ -327,20 +334,20 @@ class dpSupervoxelClassifier():
                 # the gala parameters
                 #self.clf = RandomForestClassifier(n_estimators=100, criterion='entropy', max_depth=20,
                 #    bootstrap=False, random_state=None)
-                #self.clf = RandomForestClassifier(n_estimators=5*nfeatures,n_jobs=self.n_jobs,max_depth=10)
-                self.clf = RandomForestClassifier(n_estimators=256,n_jobs=self.n_jobs,max_depth=16)
+                #self.clf = RandomForestClassifier(n_estimators=5*nfeatures,n_jobs=self.nthreads,max_depth=10)
+                self.clf = RandomForestClassifier(n_estimators=256,n_jobs=self.nthreads,max_depth=16)
             elif self.classifier == 'svm':
                 self.clf = SVC(kernel='rbf',probability=True,cache_size=2000)
             elif self.classifier == 'nb':
                 self.clf = GaussianNB()
             elif self.classifier == 'kn':
-                self.clf = KNeighborsClassifier(n_neighbors=10,n_jobs=self.n_jobs)
+                self.clf = KNeighborsClassifier(n_neighbors=10,n_jobs=self.nthreads)
             elif self.classifier == 'dc':
                 self.clf = DecisionTreeClassifier(max_depth=10)
             elif self.classifier == 'ada':
                 self.clf = AdaBoostClassifier()
             elif self.classifier == 'lr':
-                self.clf = LogisticRegression(penalty='l2',dual=False,solver='sag',n_jobs=self.n_jobs)
+                self.clf = LogisticRegression(penalty='l2',dual=False,solver='sag',n_jobs=self.nthreads)
             else:
                 assert(False)   # i never try anything, i just do it
 
@@ -766,7 +773,8 @@ class dpSupervoxelClassifier():
             help='Offset in chunk to read')
         p.add_argument('--size', nargs=3, type=int, default=[256,256,128], metavar=('X', 'Y', 'Z'),
             help='Size in voxels to read')
-
+        p.add_argument('--nthreads', nargs=1, type=int, default=[8],
+            help='Number of parallel threads to set for scipy and scikit-learn')
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
             help='Debugging output for dpSupervoxelClassifier')
 
