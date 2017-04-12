@@ -114,7 +114,7 @@ class dpResample(dpWriteh5):
                     chunksize=self.chunksize, leave_edge=self.leave_edge)
 
         for self.volume_info,n in zip(self.cubeIter, range(self.cubeIter.volume_size)):
-            _, self.size, self.chunk, self.offset, _, _, _, _ = self.volume_info
+            _, self.size, self.chunk, self.offset, _, _, _, _, _ = self.volume_info
             self.singleResample()
 
     def singleResample(self):

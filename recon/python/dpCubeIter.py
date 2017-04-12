@@ -33,7 +33,7 @@ import numpy as np
 class dpCubeIter(object):
 
     LIST_ARGS = ['fileflags', 'filepaths', 'fileprefixes', 'filepostfixes', 'filemodulators',
-                 'filepaths_affixes', 'filenames_suffixes']
+                 'filepaths_affixes', 'filenames_suffixes', 'filemodulators_overlap']
     TRUE_STRS = ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh']
 
     #def __init__(self, inprefix, volume_range_beg, volume_range_end, overlap,
@@ -91,7 +91,30 @@ class dpCubeIter(object):
         else:
             self.filemodulators = np.array(self.filemodulators,dtype=np.uint32).reshape((-1,3))
             assert(self.filemodulators.shape[0] == self.nflags)
+        if len(self.filemodulators_overlap) == 0:
+            self.filemodulators_overlap = np.zeros((3,),dtype=np.uint32)
+        else:
+            self.filemodulators_overlap = np.array(self.filemodulators_overlap,dtype=np.uint32)
+            assert(self.filemodulators_overlap.size == 3)
 
+        # this is something of a hack to allow for creating hdf5s with overlaps from knossos-style cubes.
+        # xxx - probably not a good way to make this a lot cleaner without completely reimplementing emdrp
+        #   data objects as knossos-style with compression and embedded overlap, make data more easily distributable
+        self.filemodulators_overlap_on = np.any(self.filemodulators_overlap > 0)
+        # did not see the point of omitting an overlap in just one dimensions (unclear use case)
+        assert( not self.filemodulators_overlap_on or np.all(self.filemodulators_overlap > 0) )
+        if self.filemodulators_overlap_on:
+            # remainders and modulator overlaps are not designed to work together and also use case?
+            assert( not self.left_remainder.any() and not self.right_remainder.any() )
+            self.filemodulators_overlap_volume_range = self.volume_range - 2
+            assert( (self.filemodulators_overlap_volume_range % self.filemodulators[-1,:] == 0).all() )
+            self.filemodulators_overlap_volume_step_inner = \
+                self.filemodulators_overlap_volume_range // self.filemodulators[-1,:]
+            self.filemodulators_overlap_cube_size = self.filemodulators[-1,:] + 2
+            self.filemodulators_overlap_volume_step = self.filemodulators_overlap_volume_step_inner * \
+                self.filemodulators_overlap_cube_size
+            self.filemodulators_overlap_volume_size = np.prod(self.filemodulators_overlap_volume_step)
+        
         if len(self.filepaths_affixes) == 0:
             self.filepaths_affixes = [False for x in range(self.nflags)]
         else:
@@ -104,38 +127,62 @@ class dpCubeIter(object):
             self.filenames_suffixes = [s.lower() in self.TRUE_STRS for s in self.filenames_suffixes]
 
     def __iter__(self):
-        for cur_index in range(self.volume_size):
+        if self.filemodulators_overlap_on:
+            # this is something of a hack to allow for creating hdf5s with overlaps from knossos-style cubes.
+            use_volume_size = self.filemodulators_overlap_volume_size
+            use_volume_step = self.filemodulators_overlap_volume_step
+            fm_cube_size = self.filemodulators_overlap_cube_size
+        else:
+            use_volume_size = self.volume_size
+            use_volume_step = self.volume_step
+            cur_ovlp = np.zeros((3,),dtype=np.int32)
+        
+        for cur_index in range(use_volume_size):
             # the current volume indices, including the right and left remainders
-            cur_volume = np.array(np.unravel_index(cur_index, self.volume_step), dtype=np.int64)
+            cur_volume = np.array(np.unravel_index(cur_index, use_volume_step), dtype=np.int64)
 
-            # need special cases to handle the remainders
-            is_left_border = cur_volume == 0; is_right_border = cur_volume == (self.volume_step-1)
-            #is_not_left_border = np.logical_not(is_left_border); is_not_right_border = np.logical_not(is_right_border)
-            is_left_remainder = np.logical_and(is_left_border,self.left_remainder)
-            is_right_remainder = np.logical_and(is_right_border,self.right_remainder)
-            is_not_left_remainder = np.logical_not(is_left_remainder)
-            #is_not_right_remainder = np.logical_not(is_right_remainder)
-            assert( not (np.logical_and(is_left_remainder, is_right_remainder)).any() ) # bad use case
+            if self.filemodulators_overlap_on:
+                # this is basically a completely seperate mode, consider as another script?
+                left_offset, is_left_border, is_right_border = [np.zeros((3,),dtype=np.int32) for i in range(3)]
+                is_left_remainder, is_right_remainder = [np.zeros((3,),dtype=np.bool) for i in range(2)]
 
-            # left and right remainders are offset from the start of the previous and last chunks respectfully
-            cur_volume[is_not_left_remainder] -= self.left_remainder[is_not_left_remainder]
-            cur_chunk = cur_volume * self.cube_size + self.volume_range_beg
-            cur_chunk[is_left_remainder] -= self.cube_size[is_left_remainder]
-
-            left_offset = self.overlap.copy(); left_offset[is_left_border] = 0
-            right_offset = self.overlap.copy();
-            if not self.leave_edge: right_offset[is_right_border] = 0
-
-            # default size is adding left and right offsets
-            size = self.cube_size_voxels + left_offset + right_offset
-
-            # special cases for remainder blocks
-            size[is_left_remainder] = self.left_remainder_size[is_left_remainder] + right_offset[is_left_remainder]
-            size[is_right_remainder] = self.right_remainder_size[is_right_remainder] + left_offset[is_right_remainder]
-            left_offset = -left_offset # default left offset is set negative as returned offset
-            # left offset for left remainder block is from the left side of previous cube
-            left_offset[is_left_remainder] = \
-                self.cube_size_voxels[is_left_remainder] - self.left_remainder_size[is_left_remainder]
+                cur_fm_volume = cur_volume // fm_cube_size
+                cur_chunk = (cur_volume * self.cube_size) - 2*cur_fm_volume + self.volume_range_beg
+                cur_ovlp = np.zeros((3,),dtype=np.int32)
+                sel = (cur_volume % fm_cube_size == 0)
+                cur_ovlp[sel] = -self.filemodulators_overlap[sel] # "top" cube overlap
+                sel = (cur_volume % fm_cube_size == fm_cube_size-1)
+                cur_ovlp[sel] = self.filemodulators_overlap[sel] # "bottom" cube overlap
+                size = self.cube_size_voxels
+            else:
+                # need special cases to handle the remainders
+                is_left_border = cur_volume == 0; is_right_border = cur_volume == (self.volume_step-1)
+                is_left_remainder = np.logical_and(is_left_border,self.left_remainder)
+                is_right_remainder = np.logical_and(is_right_border,self.right_remainder)
+                is_not_left_remainder = np.logical_not(is_left_remainder)
+                #is_not_right_remainder = np.logical_not(is_right_remainder)
+                assert( not (np.logical_and(is_left_remainder, is_right_remainder)).any() ) # bad use case
+    
+                # left and right remainders are offset from the start of the previous and last chunks respectfully
+                cur_volume[is_not_left_remainder] -= self.left_remainder[is_not_left_remainder]
+                cur_chunk = cur_volume * self.cube_size + self.volume_range_beg
+                cur_chunk[is_left_remainder] -= self.cube_size[is_left_remainder]
+    
+                left_offset = self.overlap.copy(); left_offset[is_left_border] = 0
+                right_offset = self.overlap.copy();
+                if not self.leave_edge: right_offset[is_right_border] = 0
+    
+                # default size is adding left and right offsets
+                size = self.cube_size_voxels + left_offset + right_offset
+    
+                # special cases for remainder blocks
+                size[is_left_remainder] = self.left_remainder_size[is_left_remainder] + right_offset[is_left_remainder]
+                size[is_right_remainder] = self.right_remainder_size[is_right_remainder] + \
+                    left_offset[is_right_remainder]
+                left_offset = -left_offset # default left offset is set negative as returned offset
+                # left offset for left remainder block is from the left side of previous cube
+                left_offset[is_left_remainder] = \
+                    self.cube_size_voxels[is_left_remainder] - self.left_remainder_size[is_left_remainder]
 
             # modified to allow for "modulators" which allows for chunk descriptors that only change at multiples of
             #   cube_size. allows for cubeiter to create command lines containing arguments with different cube_sizes
@@ -145,7 +192,10 @@ class dpCubeIter(object):
                 if (fm==1).all():
                     mcur_chunk = cur_chunk
                 else:
-                    mcur_chunk = (cur_volume // fm)*fm * self.cube_size + self.volume_range_beg
+                    if self.filemodulators_overlap_on:
+                        mcur_chunk = cur_fm_volume*self.filemodulators[-1,:]*self.cube_size + self.volume_range_beg + 1
+                    else:
+                        mcur_chunk = (cur_volume // fm)*fm * self.cube_size + self.volume_range_beg
 
                 # create the name suffixes, path affixes
                 suffixes[j] = ''; affixes[j] = ''
@@ -155,7 +205,7 @@ class dpCubeIter(object):
                     affixes[j] = os.path.join(affixes[j], ('%s%04d' % (s, mcur_chunk[i])))
                 affixes[j] += os.path.sep
 
-            yield cur_volume, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border
+            yield cur_volume, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border, cur_ovlp
 
     def flagsToString(self, flags, paths, prefixes, postfixes, suffixes, affixes):
         argstr = ' '
@@ -183,12 +233,14 @@ class dpCubeIter(object):
 
         cnt = 0
         for volume_info in self:
-            _, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border = volume_info
+            _, size, cur_chunk, left_offset, suffixes, affixes, is_left_border, is_right_border, cur_ovlp = volume_info
             ccmd = cmd[0] if ncmd == 1 else cmd[cnt]
 
             str_volume = (' --size %d %d %d ' % tuple(size.tolist())) + \
                 (' --chunk %d %d %d ' % tuple(cur_chunk.tolist())) + \
                 (' --offset %d %d %d ' % tuple(left_offset.tolist()))
+            if self.filemodulators_overlap_on:
+                str_volume += (' --overlap %d %d %d ' % tuple(cur_ovlp.tolist()))
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
                                             [x if y else '' for x,y in zip(suffixes, self.filenames_suffixes)],
                                             [x if y else '' for x,y in zip(affixes, self.filepaths_affixes)])
@@ -227,6 +279,8 @@ class dpCubeIter(object):
         p.add_argument('--filepostfixes', nargs='*', type=str, default=[], help='in/out files filename postfixes')
         p.add_argument('--filemodulators', nargs='*', type=int, default=[],
                        help='Allows for supervolumes at multiples of cube_size (x0 y0 z0  x1 y1 z1 ...)')
+        p.add_argument('--filemodulators-overlap', nargs='*', type=int, default=[],
+                       help='Optional overlap (in voxels) for LAST modulator (x0 y0 z0  x1 y1 z1 ...)')
         p.add_argument('--filepaths-affixes', nargs='*', type=str, default=[],
                        help='Whether to append suffix to each filepath (knossos-style, default false)')
         p.add_argument('--filenames-suffixes', nargs='*', type=str, default=[],

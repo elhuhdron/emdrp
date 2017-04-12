@@ -85,7 +85,7 @@ class dpCubeStitcher(emLabels):
 
     def __iter__(self):
         for self.volume_info,n in zip(self.cubeIter, range(self.cubeIter.volume_size)):
-            _, self.size, self.chunk, self.offset, suffixes, _, _, _ = self.volume_info
+            _, self.size, self.chunk, self.offset, suffixes, _, _, _, _ = self.volume_info
             self.inith5()
 
             if self.dpCubeStitcher_verbose:
@@ -121,7 +121,7 @@ class dpCubeStitcher(emLabels):
         self.first_pass = True
         for cur_cube_info in self:
             cur_data, cur_attrs, cur_ncomps, n = cur_cube_info
-            _, _, _, _, _, _, is_left_border, is_right_border = self.volume_info
+            _, _, _, _, _, _, is_left_border, is_right_border, _ = self.volume_info
             total_ncomps += cur_ncomps
 
             if is_left_border.all():

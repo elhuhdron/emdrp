@@ -143,6 +143,23 @@ def knossos_read_nml(krk_fname=None, krk_contents=None):
         krk_output[krk_tc]["edges"] = krk_nodeIDconversion[krk_output[krk_tc]["edges"]-1]
                 
     return krk_output, meta, commentsString
+
+# http://echorand.me/site/notes/articles/python_linux/article.html
+def print_cpu_info_linux():
+    cpucnt = 0
+    with open('/proc/cpuinfo') as f:
+        for line in f:
+            # Ignore the blank line separating the information between
+            # details about two processing units
+            if line.strip():
+                if line.rstrip('\n').startswith('model name'):
+                    model_name = line.rstrip('\n').split(':')[1]
+                    print(model_name)
+                    cpucnt += 1
+                elif line.rstrip('\n').startswith('cache size'):
+                    cache_size = line.rstrip('\n').split(':')[1]
+                    print('\t' + cache_size)
+    print('Found ' + str(cpucnt) + ' processors')
     
 # testing
 if __name__ == '__main__':

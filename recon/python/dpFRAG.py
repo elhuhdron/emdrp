@@ -1187,9 +1187,9 @@ class dpFRAG(emLabels):
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
-        arg_str += ' --probfile ' + probfiles[0]
+        if probfiles[0]: arg_str += ' --probfile ' + probfiles[0]
         if probfiles[1]: arg_str += ' --probaugfile ' + probfiles[1]
-        arg_str += ' --rawfile ' + rawfiles[0]
+        if rawfiles[0]: arg_str += ' --rawfile ' + rawfiles[0]
         if rawfiles[1]: arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --gtfile ' + gtfile
@@ -1216,9 +1216,9 @@ class dpFRAG(emLabels):
         arg_str += ' --chunk %d %d %d ' % tuple(chunk)
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
-        arg_str += ' --probfile ' + probfiles[0]
+        if probfiles[0]: arg_str += ' --probfile ' + probfiles[0]
         if probfiles[1]: arg_str += ' --probaugfile ' + probfiles[1]
-        arg_str += ' --rawfile ' + rawfiles[0]
+        if rawfiles[0]: arg_str += ' --rawfile ' + rawfiles[0]
         if rawfiles[1]: arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --outfile ' + outfile
@@ -1247,9 +1247,9 @@ class dpFRAG(emLabels):
         arg_str += ' --chunk %d %d %d ' % tuple(chunk)
         arg_str += ' --offset %d %d %d ' % tuple(offset)
         arg_str += ' --size %d %d %d ' % tuple(size)
-        arg_str += ' --probfile ' + probfiles[0]
+        if probfiles[0]: arg_str += ' --probfile ' + probfiles[0]
         if probfiles[1]: arg_str += ' --probaugfile ' + probfiles[1]
-        arg_str += ' --rawfile ' + rawfiles[0]
+        if rawfiles[0]: arg_str += ' --rawfile ' + rawfiles[0]
         if rawfiles[1]: arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --gtfile ' + gtfile

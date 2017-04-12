@@ -64,14 +64,13 @@ from matplotlib import pyplot as plt
 from dpLoadh5 import dpLoadh5
 from dpFRAG import dpFRAG
 from metrics import pixel_error_fscore
+from utils import print_cpu_info_linux
 
 class dpSupervoxelClassifier():
 
     # Constants
     LIST_ARGS = ['test_chunks', 'label_subgroups', 'label_subgroups_out', 'iterate_merge_perc',
         'thresholds', 'threshold_subgroups']
-    n_jobs = 8
-    #n_jobs = 1
 
     def __init__(self, args):
 
@@ -199,6 +198,7 @@ class dpSupervoxelClassifier():
             print('Test chunks: %s' % ' '.join([str(x) for x in self.test_chunks]))
 
             #print('dpSupervoxelClassifier, verbose mode:\n'); print(vars(self))
+            print_cpu_info_linux() # for debugging runtime variance on biowulf
 
         # inits for iterative prior mode
         self.iterative_mode = (self.iterate_count > 0)
@@ -239,6 +239,15 @@ class dpSupervoxelClassifier():
         #self.FEATURES, self.FEATURES_NAMES, self.nfeatures = dpFRAG.make_FEATURES()
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k in ['features','features_names','nfeatures']: setattr(self,k,d[k])
+
+        # xxx - make this more systematic for other libraries? 
+        #   typically using anaconda, for which this should work since built on mkl
+        try:
+            import mkl
+            print('Setting mkl num_threads to %d' % (self.nthreads,))
+            mkl.set_num_threads(self.nthreads)
+        except ImportError:
+            pass
 
     def train(self):
 
@@ -325,20 +334,20 @@ class dpSupervoxelClassifier():
                 # the gala parameters
                 #self.clf = RandomForestClassifier(n_estimators=100, criterion='entropy', max_depth=20,
                 #    bootstrap=False, random_state=None)
-                #self.clf = RandomForestClassifier(n_estimators=5*nfeatures,n_jobs=self.n_jobs,max_depth=10)
-                self.clf = RandomForestClassifier(n_estimators=256,n_jobs=self.n_jobs,max_depth=16)
+                #self.clf = RandomForestClassifier(n_estimators=5*nfeatures,n_jobs=self.nthreads,max_depth=10)
+                self.clf = RandomForestClassifier(n_estimators=256,n_jobs=self.nthreads,max_depth=16)
             elif self.classifier == 'svm':
                 self.clf = SVC(kernel='rbf',probability=True,cache_size=2000)
             elif self.classifier == 'nb':
                 self.clf = GaussianNB()
             elif self.classifier == 'kn':
-                self.clf = KNeighborsClassifier(n_neighbors=10,n_jobs=self.n_jobs)
+                self.clf = KNeighborsClassifier(n_neighbors=10,n_jobs=self.nthreads)
             elif self.classifier == 'dc':
                 self.clf = DecisionTreeClassifier(max_depth=10)
             elif self.classifier == 'ada':
                 self.clf = AdaBoostClassifier()
             elif self.classifier == 'lr':
-                self.clf = LogisticRegression(penalty='l2',dual=False,solver='sag',n_jobs=self.n_jobs)
+                self.clf = LogisticRegression(penalty='l2',dual=False,solver='sag',n_jobs=self.nthreads)
             else:
                 assert(False)   # i never try anything, i just do it
 
@@ -752,6 +761,8 @@ class dpSupervoxelClassifier():
         p.add_argument('--plot-features', action='store_true', help='If plotting, whether to include feature plots')
         p.add_argument('--outfile', nargs=1, type=str, default='', help='Override output file for agglomerations')
         p.add_argument('--labelfile', nargs=1, type=str, default='', help='Override input label (supervoxel) file')
+        p.add_argument('--probfile', nargs=1, type=str, default='', help='Override input prob file')
+        p.add_argument('--probaugfile', nargs=1, type=str, default='', help='Override input prob augment file')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
         p.add_argument('--feature-set', nargs=1, type=str, default='',
             help='Option to control which FRAG features are calculated (override from .ini)')
@@ -762,7 +773,8 @@ class dpSupervoxelClassifier():
             help='Offset in chunk to read')
         p.add_argument('--size', nargs=3, type=int, default=[256,256,128], metavar=('X', 'Y', 'Z'),
             help='Size in voxels to read')
-
+        p.add_argument('--nthreads', nargs=1, type=int, default=[8],
+            help='Number of parallel threads to set for scipy and scikit-learn')
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
             help='Debugging output for dpSupervoxelClassifier')
 

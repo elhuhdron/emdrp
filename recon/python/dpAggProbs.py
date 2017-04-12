@@ -82,13 +82,34 @@ class dpAggProbs(emProbabilities):
             print('dpAggProbs: Aggregating')
             t = time.time()
 
+        # this is an optimization to only selection portion of cube to write in order to support overlaps
+        ovlp_sel = (self.overlap != 0); ovlp_size = self.size.copy()
+        use_ovlp = ovlp_sel.any()
+        if use_ovlp:
+            ovlp_neg = (self.overlap < 0); ovlp_pos = (self.overlap > 0)
+            ovlp_size[ovlp_sel] = self.overlap[ovlp_sel]; ovlp_size[ovlp_neg] = -ovlp_size[ovlp_neg]
+            ovlp_offset = self.offset.copy()
+            ovlp_offset[ovlp_neg] += (self.size[ovlp_neg] - ovlp_size[ovlp_neg])
+            chunk_sel = np.ones(self.size, dtype=np.bool)
+            str_pslcs = ['self.overlap[j]:,:,:', ':,self.overlap[j]:,:', ':,:,self.overlap[j]:']
+            str_nslcs = [':self.overlap[j],:,:', ':,:self.overlap[j],:', ':,:,:self.overlap[j]']
+            for j in range(dpWriteh5.ND):
+                if ovlp_pos[j]:
+                    exec('chunk_sel[' + str_pslcs[j] + '] = 0')
+                elif ovlp_neg[j]:
+                    exec('chunk_sel[' + str_nslcs[j] + '] = 0')
+            orig_size = self.size; orig_offset = self.offset
+
         for j in range(self.ntypes):
-            cprobs = np.zeros(np.append(self.size, self.nmerge), dtype=emProbabilities.PROBS_DTYPE, order='C')
+            cprobs = np.zeros(np.append(ovlp_size, self.nmerge), dtype=emProbabilities.PROBS_DTYPE, order='C')
             fn = self.types[j].upper()
             for i in range(self.nmerge):
                 # load the raw files
                 self.inraw = os.path.join( self.inrawpath, fn + str(i) + '.f32' )
-                self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube
+                if use_ovlp:
+                    self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube[chunk_sel].reshape(ovlp_size)
+                else:
+                    self.loadFromRaw(); cprobs[:,:,:,i] = self.data_cube
 
             for k in range(self.nops[j]):
                 strop = self.agg_ops_types[j][k].lower()
@@ -104,7 +125,11 @@ class dpAggProbs(emProbabilities):
                     assert(False) # bad op
 
                 self.dataset_out = self.types[j] + ('' if strop=='mean' else '_' + strop)
+                if use_ovlp:
+                    self.size = ovlp_size; self.offset = ovlp_offset; self.inith5()
                 self.writeCube()
+                if use_ovlp:
+                    self.size = orig_size; self.offset = orig_offset; self.inith5()
 
         if self.dpAggProbs_verbose:
             print('\tdone in %.4f s' % (time.time() - t))
@@ -129,6 +154,10 @@ class dpAggProbs(emProbabilities):
             help='Weightings for probabilities specified in each rawfile (un-reordered), default to equal weightings')
         p.add_argument('--dim-orderings', nargs='*', type=str, default=[], choices=('xyz','xzy','zyx'),
             metavar='ORD', help='Specify the reslice ordering of the rawfile inputs (default all xyz)')
+
+        # added this feature to optimize overlap support
+        p.add_argument('--overlap', nargs=3, type=int, default=[0,0,0], metavar=('X', 'Y', 'Z'),
+            help='Select out portion of raw cube to support overlaps')
 
         p.add_argument('--dpAggProbs-verbose', action='store_true', help='Debugging output for dpAggProbs')
 
