@@ -1,6 +1,8 @@
 
 # Introduction
 
+TODO: this is old example with cuda-convet2, update for neon, add working example based on same data
+
 EM data is parsed directly out of hdf5 files by a single class ``EMDataParser`` in module ``python_util/parseEMdata.py`` that can also operate standalone for debug. Most typically the network is being trained using supervised learning, so both raw EM images and label hdf5 containers must be given as inputs. The parser pulls out 2D slices based on parameters specified in an ``.ini`` file that is given via command line as the ``--data-path`` argument to ``convnet.py``. The ``--data-provider`` must be specified as ``emdata``. A python glue class ``EMDataProvider`` in module ``python_util/convEMdata.py`` extends the cuda-convnet2 data provider class ``LabeledDataProvider`` and interfaces with ``EMDataParser`` so that image training and testing batches for the convnet are created in real time (happening in parallel on CPU while training occurs on GPU). Creating the batches in real time prevents having to pickle the batches. Also, since the batches are created in parallel with training, this method is essentially just as fast as having the data parsed directly on GPU memory and prevents the complication of implementing data parsing in CUDA code. Documentation below refers to a single presented image to the convnet, either for testing or for training as a *sample image*. The ``.ini`` file input to the ``EMDataParser`` is what determines how many samples images are presented per batch; batch is used here synonymously with the definition in cuda-convnet2.
 
 # Training Example

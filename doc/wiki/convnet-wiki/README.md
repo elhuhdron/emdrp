@@ -1,31 +1,25 @@
 
-# cuda convnet2 EM
+# Convolutional Neural Networks for EM data
 
 ## Documentation
 
-A modified version of the [cuda-convnet2](https://code.google.com/p/cuda-convnet2/) is utilized for classifying EM raw data volumes.
-TODO: this is dated, moved to neon, update this
-Additionally, completely extra documentation has been added for:
+Currently the EMDRP is using [Intel Nervana neon](https://github.com/NervanaSystems/neon) with a harness for processing EM data. This harness extends several aspects of the neon python classes for easy processing of EM data, including a separate [top-level script](../../../neon3/emneon.py) for running the convnets.
+
+The main extension of neon is for loading and augmenting EM data and converting to neon format, and processing outputs to reconstruct probability maps. Additional information is available on:
 - [parsing EM data](EMDataParser.md) for presenting image examples to the network and for extracting network output probabilities
 - measuring [network performance](EMPerformance.md)
 
-TODO: update wiki with added options and layers
+TODO: more detail here on how neon is extended and description of directory structure
 
-TODO: add some description somewhere of the autoencoder architecture and usage
+### Other options
 
-### Directory Structure
+The original emdrp machine voxel classifier was using a [modified version](../../cuda-convnet2) of [cuda-convnet2](https://github.com/akrizhevsky/cuda-convnet2). The initial EM data parser implementations were thus written and still maintained as a single python class. Thus switching to other convnet implementations that do not easily support a python extension for importing data would be more difficult to port to.
 
-All EMDRP code for the convolutional network is under ``cuda-convnet2``.
-The code is maintained with best attempts to have changes to cuda-convnet2 original files at the bottom of the files (new classes, etc) such that merges with any commits to the [github source](https://github.com/akrizhevsky/cuda-convnet2) can be more easily merged. For this reason, reformatting of the original source is not recommended. It is currently unclear how much longer cuda-convnet2 will be maintained on github; last commit in May 2015.
+Initial investigations into using [Google Tensorflow](https://github.com/tensorflow/tensorflow) indicated that TF is much slower and uses more GPU memory than other options. Additionally, initial attempts indicated that the hurdle of modifying TF for processing other data formats is much higher; i.e. requiring something more than a python module (aka cpp code).
 
-### Possible Replacements
-
+Other options:
 - caffe
+- theano
 - torch
-- tensorflow
 
 TODO: fill this out with other options / advantages / tradeoffs, etc
-
-TODO: document the cuda-convnet2 directory structure (Alex did not do this)
-
-TODO: figure out why these pages are rendering differently than top level with Chrome plugin

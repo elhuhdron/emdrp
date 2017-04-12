@@ -32,9 +32,10 @@ For this **Ideal Case** raw EM data (outlined in schematic below), 3D morphologi
 
 ![alt text](images/EM_pipeline_overview_schematic_ideal.png)
 
-The ideal case EM data does not currently exist and in the real world these EM data is subject to several known sources of noise and image artifacts:
+The ideal case raw EM data does not currently exist and in the real world the data is subject to several known sources of noise and image artifacts:
 * For scientific inquiry reasons, it is desirable to acquire raw EM data such that it contains organelles within the ICS regions. These organelles, particularly [mitochondria](https://en.wikipedia.org/wiki/Mitochondrion) typically contain grayscale values darker than the membranes.
-* Electron microscopy is subject to [shot noise]() and other sources of noise. Signal-to-Noise ratio can be controlled based on acquisition parameters to some extent, but some level of noise will always be present in the acquired images.
+* Electron microscopy is subject to [shot noise](https://en.wikipedia.org/wiki/Shot_noise) and other sources of noise. Signal-to-Noise ratio can be controlled based on acquisition parameters to some extent, but some level of noise will always be present in the acquired images.
+* Due to the darker organelles and noise in the data there is a high degree of overlap in the histogram of grayscale values for MEM, ICS and ECS categorized voxels.
 * Cutting artifacts from the ultramicrotome and issues resulting from the tissue preparation and staining can often cause disruptions in the plasma membranes. These results in artifacts in the image where the membrane is either very light in a particular region or sometimes not present at all in the EM image (*membrane gap*). The fine details of plamsa membrane continuity and intact celluar components in the EM images is referred to as **ultrastructure**.
 * The ultramicrotome is designed to attempt to maintain a consistent thickness in the z-direction, but this technique is not perfect. This results in some variation in the z-resolution in the EM volumes, both between z-slices and within z-slices.
 * The voxels are highly anisotropic (larger in z-direction typically by a factor of at least 2 relative to the xy or scanning direction) due to the minimum slice thickness limitation of the ultramicrotome.
@@ -88,7 +89,7 @@ The [labrainth](https://labrainth.ninds.nih.gov) website, typically referred to 
 
 The website has been developed with elements of a computer game, in an attempt to motivate users to complete these labor intensive manual tasks. The second mode was heavily inspired by a previous crowd sourcing [project](https://eyewire.org) for merging together supervoxels.
 
-The word "frontend" is used in order to distinguish elements of the website, which itself contains client-side and server-side components, from the rest of the EMDRP. The remainder of the EMDRP that is not associated directly with the frontend is typically referred to as the "backend". The website is developed based on an SQL database [schema](frontend-wiki/resources/DatabaseIntro.pptx), so communication between the frontend and the backend is performed via SQL database queries and inserts (typically from python scripts associated with the backend) and via the hdf5 data containers (both for raw EM data and label data).
+The word "frontend" is used in order to distinguish elements of the website, which itself contains client-side and server-side components, from the rest of the EMDRP. The remainder of the EMDRP that is not associated directly with the frontend is typically referred to as the "backend" (i.e., this repository). The website is developed based on an SQL database [schema](frontend-wiki/resources/DatabaseIntro.pptx), so communication between the frontend and the backend is performed via SQL database queries and inserts (typically from python scripts associated with the backend) and via the hdf5 data containers (both for raw EM data and label data).
 
 Some items to fill out with further discussion:
 - python script for smoothing raw data for viewing for contouring task
@@ -104,11 +105,13 @@ TODO: more information need in this section:
 - linking to a separate wiki describing details of website implementation?
 - what kind of webserver and database are deployed? supported?
 
+TODO: start divorcing from website details? maybe add description of standalone tools or other web tools to be used going forward for manual annotation?
+
 #### Machine Voxel Classifier
 
 The first step of the proposed architecture is classifying the each voxel of the raw EM data as belonging typically to one of the three types discussed above: membrane (MEM), intracellular space (ICS) or extracellular space (ECS). This first step "cleans up" the raw EM data substantially by exporting a voxel level probability volume (<span style="color: rgb(111,190,68);">light green *Voxel Classification Probabilities*</span> in EMDRP schematic) parallel to the raw EM data volume. This probability volume can then be segmented into labels using more standard image processing algorithm approaches, such as the [watershed](https://en.wikipedia.org/wiki/Watershed_%28image_processing%29). This [label or supervoxel creation](#labeling-algorithm) portion of the EMDRP is discussed in more detail below.
 
-The current choice of implementation for the machine voxel classifier is using a [convolutional neural network](https://en.wikipedia.org/wiki/Convolutional_neural_network) architecture to classify each voxels as belonging to a particular voxel type of interest (i.e., MEM, ICS, ECS). Currently the EMDRP is using a modified version of the [cuda-convnet2](https://github.com/akrizhevsky/cuda-convnet2) implementation. A [modified version of the cuda-convnets2 wiki](cuda-convnet2-EM-wiki/README.md) is being maintained for the modified version used in the EMDRP.
+The current choice of implementation for the machine voxel classifier is using a [convolutional neural network](https://en.wikipedia.org/wiki/Convolutional_neural_network) architecture to classify each voxels as belonging to a particular voxel type of interest (i.e., MEM, ICS, ECS). Currently the EMDRP is using [Intel Nervana neon](https://github.com/NervanaSystems/neon) with a [harness](convnet-wiki/README.md) for processing EM data. Previous classifications were done with a [modified version](../../cuda-convnet2) of [cuda-convnet2](https://github.com/akrizhevsky/cuda-convnet2).
 
 #### Labeling Algorithm
 
@@ -116,9 +119,11 @@ The labeling algorithm component of the EMDRP takes classification probabilities
 
 This algorithm does not utilize any machine learning techniques, but instead is essentially a variant of a watershed algorithm. These same approach could be applied to the raw EM data; however, the output of the machine voxel classifier represents a much "cleaner" version of whatever the categories of interest are, relative to the *Realistic Case* EM data. Indeed some other groups working on segmentation of brain tissue EM simply create an over-segmented set of supervoxels from the raw EM data itself, bypassing the machine voxel classifier step. However, much larger supervoxels (i.e., less splits) can be created by utilizing machine learning for the voxel classification, so that is why this strategy is employed in the EMDRP.
 
-The current approach is to take the probability outputs of multiple trained convnets (the machine voxel classifier) and merge then into a probability volume for each voxel type of interest, namely MEM, ICS and ECS. Currently probabilities are merged by a weighted average of networks trained in different [reslice](cuda-convnet2-EM-wiki/EMDataParser.md) directions (xyz, xzy, zyx). Merging is implemented by ``data-stream-EM-alpha/mergeEMprobs.py``
+The current approach is to take the probability outputs of multiple trained convnets (the machine voxel classifier) and merge then into a probability volume for each voxel type of interest, namely MEM, ICS and ECS. Currently probabilities are merged by a weighted average of networks trained in different [reslice](convnet-wiki/EMDataParser.md) directions (xyz, xzy, zyx). Merging is implemented by ``dpAggProbs.py`` and ``dpMergeProbs.py``.
 
-The current implementation of labeling algorithm is essentially an iterated series of connected component labeling using increasing thresholds of the voxel classification probabilities. Currently a [hand drawn diagram](images/watershedtypes_sketch.jpg) documents these steps. The labeling algorithm is implmemented in ``data-stream-EM-alpha/watershedEMtypes.py``.
+The first step of this watershed method is to take an argmax over the voxel type probabilities. This assigns each voxel to a voxel type (i.e., MEM, ICS, ECS) as a winner-take-all from the convnet probability outputs. These voxel types are conserved by this watershed algorithm, meaning that if a particular voxel was labeled as MEM, for example, based on the winner-take-all of the convnet probabilities then it will still be MEM at the output of the watershed.
+
+The current implementation of labeling algorithm is essentially an iterated series of connected component labeling using increasing thresholds of the voxel classification probabilities. Currently a [hand drawn diagram](images/watershedtypes_sketch.jpg) documents these steps. The labeling algorithm is implmemented in ``dpWatershedTypes.py``.
 
 *Preliminary pseudocode with illustration*
 
@@ -182,9 +187,15 @@ TODO: detail here on each metric and existing implementations
 
 #### Surface Meshing
 
-Currently in ``frontend/SegmentToMesh.m`` using matlab isosurface and ``frontend/lbSegmentToMeshLblEM.py`` using vtk rendering pipeline from python.
+Currently in ``recon/python/dpLabelMesher.py`` using vtk rendering pipeline from python.
 
 TODO: way more detail here, include some discussion of javascript meshing for frontend?
+
+#### Python class hierarchy
+
+Besides the convnets, the majority of the rest of the EMDRP code is as a [python class hierarchy](images/EM_pipeline_python_class_hierarchy.png) that inherits from a base class for loading data out of the hdf5 data containers. Most python classes also implement a command line interface which make up the steps in the [pipeline workflow](resources/EM_pipeline_workflow.docx).
+
+TODO: more detail here and future directions, developing into actual module?
 
 #### Feedback Paths
 

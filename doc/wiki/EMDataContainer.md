@@ -47,7 +47,7 @@ The EM Data Container should be designed for handling [all the types of data](RE
 hdf5 chunksize is always set to kchunk size, which is essentially locked at 128 x 128 x 128
 hdf5 files for all EMDRP data formats are always stored with chunking on and compression enabled.
 
-Currently a python class hierarchy for manipulating hdf5 EM data containers is implemented in ``frontend/*.py``. The superclass of the hierarchy is ``lbLoadh5.py``.
+Currently a [python class hierarchy](images/EM_pipeline_python_class_hierarchy.png) for manipulating hdf5 EM data containers is implemented in ``recon/python``. The superclass of the hierarchy is ``dpLoadh5.py``.
 
 TODO: fill in history of why this is messy
 TODO: fill in documentation of a better class hierarchy that fits the requirements defined in this document
@@ -71,7 +71,7 @@ At least these hdf5 attributes are defined for **all** EM datasets. Attributes a
 | rawsize            | int32         | (3,)      | kchunk (knossos) size                           |
 | nchunks            | int32         | (3,)      | number of kchunks in the entire dataset         |
 
-Currently a raw EM data container is the default type implemented in the classes ``frontend/lbLoadh5.py`` (base class for python manipulation of data container) and ``frontend/lbWriteh5.py``.
+Currently a raw EM data container is the default type implemented in the classes ``dpLoadh5.py`` (base class for python manipulation of data container) and ``dpWriteh5.py``.
 
 ### Label EM Data hdf5 container
 
@@ -93,7 +93,7 @@ These hdf5 attributes are defined for label EM datasets.
 
 TODO: get a better handle on types, and possibly completely standardize the enum for types. currently this is flexibly implemented so that types could take on different meanings in the backend (not frontend) but this may be unnecessary and confusing
 
-Currently a label EM data container python implementation is defined in ``frontend/lbTypesh5.py`` in the ``lbLabels`` class.
+Currently a label EM data container python implementation is defined in ``utils/typesh5.py`` in the ``emLabels`` class.
 
 ### Voxel Classification Type EM Data hdf5 container
 
@@ -101,7 +101,7 @@ Voxel classification type appears as <span style="color: rgb(133,81,161);">purpl
 
 Classification types are typically stored at the top level in a dataset named **voxel_type**. The data is always again voxel-wise parallel to the raw EM volumes, each voxel labeled with an *enum* identifier of what type of voxel it has been classified as. Most typically the types are ICS, ECS or MEM. For voxel_type each voxel must be definitively assigned to one of the categories (as opposed to the [voxel classification probabilities]()). Because the total number of types will never be very large, **uint8** is used to store the voxel types. Typcally the enum for voxel types is:
 
-Curerntly voxel_type can be stored into the **same** hdf5 file as the supervoxels (for use with labrainth merging task). This is an exception to the general rule that different hdf5 data formats should be stored in separate hdf5 files, simply for simplicity of the website design.
+Currently voxel_type can be stored into the **same** hdf5 file as the supervoxels (for use with labrainth merging task). This is an exception to the general rule that different hdf5 data formats should be stored in separate hdf5 files, simply for simplicity of the website design.
 
 | **Voxel Type** | **voxel_type value** |
 |:---------------|:---------------------|
@@ -109,4 +109,4 @@ Curerntly voxel_type can be stored into the **same** hdf5 file as the supervoxel
 | ICS            | 1                    |
 | ECS            | 2                    |
 
-Currently a voxel type EM data container python implementation is defined in ``frontend/lbTypesh5.py`` in the ``lbVoxelType`` class.
+Currently a voxel type EM data container python implementation is defined in ``utils/typesh5.py`` in the ``emVoxelType`` class.
