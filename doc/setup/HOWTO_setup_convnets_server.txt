@@ -14,8 +14,28 @@ NOTE: commands that can be directly pasted to terminal are prepended with >
   xgreen  ---             Synology DS1515      ---        ---                  xxx                             2G (?)
 Names are all prefixed with ndsw-cdcu-
 xgreen are all behind second local interface on green (sssd disabled, local logins only).
-infra and ultra are virtual machines (virt-install) running on green with minimal centos7 install.
+infra and ultra are virtual machines (virt-install/kvm) running on green with minimal centos7 install.
   currently cisco switch and virtual machines only have nindsadmin login.
+Local interface is 10.42.55.xxx/255.255.255.192, using 4 subnets:
+  Local Interface      gateway subnet  IP .xxx
+  cisco sg300-20               0       62
+  green                *       0       8
+  red                  *       1       72
+  infra (green kvm)    *       2       136
+  ultra (green kvm)    *       3       200
+  synology                     0       60
+  synology                     1       124
+  synology                     2       188
+  synology                     3       252
+  clone ($g1)                  0       1
+  clone ($g2)                  0       2
+  clone ($g3)                  1       65
+  clone ($g4)                  2       129
+  clone ($g5)                  3       193
+Had to switch to different subnet approach in order to fully take advantage of synology interfaces.
+  Had tried many configurations with link aggregation to no avail.
+
+OLD:
 Local interface is 10.42.55.1/255.255.255.0: 
   Local Interface      subnet IP
   blue (debug gateway) 100
@@ -592,6 +612,8 @@ time bbcp -s 1 -V -f -P 10 biowulf.nih.gov:/data/CDCU/full_datasets/neon/vgg3poo
 
 Could not get the -I "list of files" option to work, so instead split the files into separate subdirs on biowulf.
 For example:
+  > find . -name '*.h5' > files.txt
+  > split -l 20 files.txt tmp.
   > xargs -a tmp.aa mv -t /data/CDCU/full_datasets/neon/vgg3pool_k0725_26x40x40/agglo/01
   > time bbcp -s 1 -V -f -P 10 -r biowulf.nih.gov:/data/CDCU/full_datasets/neon/vgg3pool_k0725_26x40x40/agglo/03/ /mnt/syn/watkinspv/full_datasets/neon/vgg3pool_k0725_26x40x40/agglo/
 
@@ -624,14 +646,19 @@ checked in networking scripts
 extra packages installed:
   > sudo yum install net-tools
   > sudo yum install bind-utils
+  > sudo yum install nfs-utils
 
 start (stop by shutdown):
   > sudo virsh start infra
   > sudo virsh start ultra
 get console if ssh broken:
   > sudo virsh console ultra
+  use Ctrl-] to exit from console
 print status info:
   > sudo virsh dominfo ultra
+
+In order for nfs mount to work from the virtual machines, the uid either has to match or be > 1024.
+If using jumbo frames, MUST set MTU on ethernet interface AND on the virtual interface ifcfg-*
 
 
 
