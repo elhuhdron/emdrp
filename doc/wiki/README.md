@@ -164,6 +164,9 @@ The purpose of the second step of machine learning is to come up with a learnabl
 
 Currently the best method for agglomerating supervoxels in the EMDRP is still being investigated. The current front-running approach / implementation is [GALA](https://github.com/janelia-flyem/gala) due to easily available code and a general methodology that has been supported by more than one group working on segmenting EM data. GALA is implemented in python and full [documentation](https://gala.readthedocs.org/en/latest/) and [forum](http://gala.30861.n7.nabble.com/) support is also available.
 
+The EMDRP repository has its own supervoxel classification implementation ``dpSupervoxelClassifier.py``.
+TODO: fill this in, update above regarding GALA / LASH
+
 #### Validation Metrics
 
 *Low Level Validation Metrics*
