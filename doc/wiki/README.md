@@ -286,9 +286,7 @@ TODO: more detail here, low-level documentation? doxygen?
 
 ## Computing Resources
 
-Currently all computing resources for the backend (machines, CPU nodes, GPUs) are housed within the CDCU. A shared [file server](smb://nindsdir35fs1.ninds.nih.gov/CDCU) is utilized for storage of EM and lab data.
-
-EMDRP backend code is designed for linux platform, specifically RHEL or CentOS, versions 6.5 and later. A [text document](computing-wiki/resources/HOWTO_setup_convnets_server.txt) is being maintained with a list of all steps required to setup a workstation to run different aspects of the EMDRP. Although the majority of the code is implemented in python using [numpy/scipy](http://www.scipy.org/), some portions are implemented in Matlab, and highly optimized portions written in C/C++ and/or using [CUDA](http://www.nvidia.com/object/cuda_home_new.html) for GPU-acceleration.
+EMDRP backend code is designed for linux platform, specifically RHEL or CentOS, versions 6.5 and later. A [text document](../setup/HOWTO_setup_convnets_server.txt) is being maintained with a list of all steps required to setup a workstation to run different aspects of the EMDRP. Although the majority of the code is implemented in python using [numpy/scipy](http://www.scipy.org/), some portions are implemented in Matlab, and highly optimized portions written in C/C++ and/or using [CUDA](http://www.nvidia.com/object/cuda_home_new.html) for GPU-acceleration.
 
 TODO: fill out this section better including:
 - table of machines with their available resources
