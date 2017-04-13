@@ -112,10 +112,23 @@ display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
 % voxel scale from Knossos file (should match hdf5)
 o.scaleK = [meta.scale.x meta.scale.y meta.scale.z];
-assert( all((o.scale - o.scaleK) < p.tol) );
+% xxx - revisit this, some bullshit in the newer knossos annotation.xml
+assert( ~p.skeleton_mode || all((o.scale - o.scaleK) < p.tol) );
 
 % convert to struct array for indexing, reorder by thingID
 o.info = [o.info{:}]; [~,i] = sort([o.info.thingID]); o.info = o.info(i);
+
+% have to support somas being labeling in a single thing
+if ~p.skeleton_mode && numel(o.info) == 1
+    nnodes = size(o.info(1).nodes, 1);
+    new_info = struct; new_info.nodes = []; new_info.edges = []; new_info.thingID = 0;
+    new_info = repmat(new_info, [nnodes 1]);
+    for i=1:nnodes
+      new_info(i).thingID = i;
+      new_info(i).nodes = o.info(1).nodes(i,:);
+    end
+    o.info = new_info;
+end
 
 % get number of edges and nodes and total skeleton count (nThings) from nml data
 o.nedges = cellfun('size',{o.info.edges},1); o.nnodes = cellfun('size',{o.info.nodes},1);
@@ -142,7 +155,13 @@ else
   % xxx - this was for older matlabs? probably remove
   %dset = sprintf('/%s/%.8f/%s',strrep(reshape(char(pdata.subgroups)',1,[]), ' ','/'),o.thresholds(1),p.dataset_lbls);
 end
-Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
+if p.skeleton_mode
+  Vlbls = h5read(pdata.lblsh5,dset,o.loadcorner+p.matlab_base,o.loadsize);
+else
+  % this is for "node mode" or "soma mode" which gets splits/mergers on somas over a whole dataset
+  %   or a large area that is unloadable in one-shot.
+  o.lblsh5files = glob(fullfile(pdata.lblsh5, '*.h5'));
+end
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
 if p.rawout
@@ -150,91 +169,134 @@ if p.rawout
   gipl_write_volume(Vlbls,fullfile(p.outpath,p.outlbls),o.scale);
 end
 
-fprintf(1,'iterating skeletons to get connected nodes and path lengths\n');
-o.empty_things = (o.nedges < p.min_edges); o.path_length = zeros(1,o.nThings); o.edge_length = cell(1,o.nThings);
+o.path_length = zeros(1,o.nThings); o.edge_length = cell(1,o.nThings);
 o.edges_use = cell(1,o.nThings); o.nodes_use = cell(1,o.nThings); 
 o.path_length_use = zeros(1,o.nThings); o.edge_length_use = cell(1,o.nThings);
-fprintf(1,'total %d things, not including %d with < %d edges, total included %d\n',o.nThings,sum(o.empty_things),...
-  p.min_edges,sum(~o.empty_things));
+if p.skeleton_mode
+  o.omit_things = (o.nedges < p.min_edges);
+  fprintf(1,'total %d things, not including %d with < %d edges, total included %d\n',o.nThings,sum(o.omit_things),...
+    p.min_edges,sum(~o.omit_things));
+else
+  o.omit_things = (o.nnodes > p.max_nodes | o.nnodes == 0);
+  fprintf(1,'total %d things, not including %d with > %d nodes, total included %d\n',o.nThings,sum(o.omit_things),...
+    p.max_nodes,sum(~o.omit_things));
+end
 
 % optionally subsample the skeletons. 
 % this is similar to the jackknife or bernoulli resampling, but only repeated once.
 % allows for systematic testing of the sensitivity of the metrics based on subsampling skeletons.
 if p.skel_subsample_perc < 1
-  use_things = randsample(find(~o.empty_things), round(sum(~o.empty_things)*p.skel_subsample_perc));
+  use_things = randsample(find(~o.omit_things), round(sum(~o.omit_things)*p.skel_subsample_perc));
   sel = false(1,o.nThings); sel(use_things) = true;
-  assert( ~any(o.empty_things & sel) ); % make sure not subsampling empty things
-  fprintf(1,'SUB-sampling %d / %d (non-empty) things\n', length(use_things), sum(~o.empty_things));
+  assert( ~any(o.omit_things & sel) ); % make sure not subsampling empty things
+  fprintf(1,'SUB-sampling %d / %d (non-empty) things\n', length(use_things), sum(~o.omit_things));
   % consider non-sampled skeletons as empty things (done for implementation ease)
-  o.empty_things = ~sel;
+  o.omit_things = ~sel;
 end
 
-for n=1:o.nThings
-  if o.empty_things(n)
-    %fprintf(1,'thingID %d has %d edges < %d min and %d nodes, not including\n',n,nedges(n),min_edges,nnodes(n));
-    continue;
-  end
+if p.skeleton_mode
+  fprintf(1,'iterating skeletons to get connected nodes and path lengths\n');
+  for n=1:o.nThings
+    if o.omit_things(n)
+      %fprintf(1,'thingID %d has %d edges < %d min and %d nodes, not including\n',n,nedges(n),min_edges,nnodes(n));
+      continue;
+    end
+    
+    % iterate over edges
+    o.edge_length{n} = zeros(1,o.nedges(n));
+    o.nodes_use{n} = false(1,o.nnodes(n)); o.edges_use{n} = false(1,o.nedges(n));
+    o.edge_length_use{n} = zeros(1,o.nedges(n));
+    for e=1:o.nedges(n)
+      n1 = o.info(n).edges(e,1); n2 = o.info(n).edges(e,2); % current nodes involved in this edge
+      
+      % update overall metrics for skeleton
+      o.edge_length{n}(e) = sqrt(sum(((o.info(n).nodes(n1,1:3)-o.info(n).nodes(n2,1:3)).*o.scaleK).^2));
+      o.path_length(n) = o.path_length(n) + o.edge_length{n}(e);
+      
+      % get the supervoxel label at both node points
+      n1pt = round(o.info(n).nodes(n1,1:3) - p.knossos_base);
+      n2pt = round(o.info(n).nodes(n2,1:3) - p.knossos_base);
+      
+      % skip this edge if either node is out of bounds of the supervoxel area
+      n1subs = n1pt-o.loadcorner+p.matlab_base;
+      if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
+      tmp = num2cell(n1subs); n1lbl = Vlbls(sub2ind(o.loadsize,tmp{:}));
+      n2subs = n2pt-o.loadcorner+p.matlab_base;
+      if any(n2subs < 1) || any(n2subs > o.loadsize), continue; end
+      tmp = num2cell(n2subs); n2lbl = Vlbls(sub2ind(o.loadsize,tmp{:}));
+      
+      % skip this edge if it it out of bounds of the supervoxel loaded area
+      %   (unlabeled area within the loaded volume).
+      if n1lbl == p.empty_label || n2lbl == p.empty_label, continue; end
+      
+      % this edge and these nodes are within the supervoxel labeled volume so include it
+      o.edges_use{n}(e) = true; o.nodes_use{n}(n1) = true; o.nodes_use{n}(n2) = true;
+      
+      % update overall metrics for skeleton
+      o.path_length_use(n) = o.path_length_use(n) + o.edge_length{n}(e);
+      o.edge_length_use{n}(e) = o.edge_length{n}(e);
+    end
+  end % first pass over skeletons, get path length and connected nodes inside labeled volume
   
-  % iterate over edges
-  o.edge_length{n} = zeros(1,o.nedges(n));
-  o.nodes_use{n} = false(1,o.nnodes(n)); o.edges_use{n} = false(1,o.nedges(n)); 
-  o.edge_length_use{n} = zeros(1,o.nedges(n));
-  for e=1:o.nedges(n)
-    n1 = o.info(n).edges(e,1); n2 = o.info(n).edges(e,2); % current nodes involved in this edge
+  o.nedges_use = cellfun(@sum,o.edges_use); nedges = sum(o.nedges_use);
+  o.omit_things_use = (o.nedges_use < p.min_edges); nskels = sum(~o.omit_things_use);
+  o.nnodes_use = cellfun(@sum,o.nodes_use); nnodes = sum(o.nnodes_use);
+  
+  % sanity checks
+  assert( all( (o.path_length - cellfun(@sum,o.edge_length)) < p.tol ) );
+  assert( all( (o.path_length_use - cellfun(@sum,o.edge_length_use)) < p.tol ) );
+  
+  fprintf(1,'excluding %d/%d edges, %d/%d nodes and %d/%d things ',...
+    sum(o.nedges)-nedges,sum(o.nedges),sum(o.nnodes)-nnodes,sum(o.nnodes),...
+    sum(~o.omit_things)-nskels,sum(~o.omit_things));
+  fprintf(1,'because no edges or outside of labeled volume or subsampling\n');
+  
+  % optionally output the skeletons
+  if p.nmlout
+    fprintf(1,'\texporting non-empty skeleton within labeled volume\n'); t = now;
+    [~,o.skelname,~] = fileparts(pdata.skelin);
     
-    % update overall metrics for skeleton
-    o.edge_length{n}(e) = sqrt(sum(((o.info(n).nodes(n1,1:3)-o.info(n).nodes(n2,1:3)).*o.scaleK).^2));
-    o.path_length(n) = o.path_length(n) + o.edge_length{n}(e);
-    
-    % get the supervoxel label at both node points
-    n1pt = round(o.info(n).nodes(n1,1:3) - p.knossos_base);
-    n2pt = round(o.info(n).nodes(n2,1:3) - p.knossos_base);
-    
-    % skip this edge if either node is out of bounds of the supervoxel area
-    n1subs = n1pt-o.loadcorner+p.matlab_base;
-    if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
-    tmp = num2cell(n1subs); n1lbl = Vlbls(sub2ind(o.loadsize,tmp{:}));
-    n2subs = n2pt-o.loadcorner+p.matlab_base;
-    if any(n2subs < 1) || any(n2subs > o.loadsize), continue; end
-    tmp = num2cell(n2subs); n2lbl = Vlbls(sub2ind(o.loadsize,tmp{:}));
-    
-    % skip this edge if it it out of bounds of the supervoxel loaded area
-    %   (unlabeled area within the loaded volume).
-    if n1lbl == p.empty_label || n2lbl == p.empty_label, continue; end
-    
-    % this edge and these nodes are within the supervoxel labeled volume so include it
-    o.edges_use{n}(e) = true; o.nodes_use{n}(n1) = true; o.nodes_use{n}(n2) = true;
-    
-    % update overall metrics for skeleton
-    o.path_length_use(n) = o.path_length_use(n) + o.edge_length{n}(e);
-    o.edge_length_use{n}(e) = o.edge_length{n}(e);
+    jnk = struct;
+    [outThings, nOutNodes] = getOutThings(o);
+    jnk.fn = fullfile(p.outpath, [o.skelname '_use.nml']);
+    knossos_write_nml(jnk.fn,outThings,meta,{});
+    display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   end
-end % first pass over skeletons, get path length and connected nodes inside labeled volume
+else % if p.skeleton_mode
+  fprintf(1,'iterating nodes to omit out of bounds\n');
+  for n=1:o.nThings
+    if o.omit_things(n)
+      %fprintf(1,'thingID %d has %d edges < %d min and %d nodes, not including\n',n,nedges(n),min_edges,nnodes(n));
+      continue;
+    end
+    
+    % iterate over edges
+    o.edge_length{n} = zeros(1,o.nedges(n));
+    o.nodes_use{n} = false(1,o.nnodes(n)); o.edges_use{n} = false(1,o.nedges(n));
+    o.edge_length_use{n} = zeros(1,o.nedges(n));
+    for n1=1:o.nnodes(n)
+      % get the supervoxel label at the node point
+      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
 
-o.nedges_use = cellfun(@sum,o.edges_use); nedges = sum(o.nedges_use);
-o.empty_things_use = (o.nedges_use < p.min_edges); nskels = sum(~o.empty_things_use);
-o.nnodes_use = cellfun(@sum,o.nodes_use); nnodes = sum(o.nnodes_use);
+      % skip if node plus radius is out of bounds of the supervoxel area
+      n1subs = n1pt-o.loadcorner+p.matlab_base;
+      if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
+      if any(n1subs - p.node_radius < 1), continue; end
+      if any(n1subs + p.node_radius > o.loadsize), continue; end
+      
+      % this edge and these nodes are within the supervoxel labeled volume so include it
+      o.nodes_use{n}(n1) = true;
+    end
+  end % first pass over nodes to get nodes inside labeled volume
 
-% sanity checks
-assert( all( (o.path_length - cellfun(@sum,o.edge_length)) < p.tol ) );
-assert( all( (o.path_length_use - cellfun(@sum,o.edge_length_use)) < p.tol ) );
-
-fprintf(1,'excluding %d/%d edges, %d/%d nodes and %d/%d things ',...
-  sum(o.nedges)-nedges,sum(o.nedges),sum(o.nnodes)-nnodes,sum(o.nnodes),...
-  sum(~o.empty_things)-nskels,sum(~o.empty_things));
-fprintf(1,'because no edges or outside of labeled volume or subsampling\n');
- 
-% optionally output the skeletons
-if p.nmlout
-  fprintf(1,'\texporting non-empty skeleton within labeled volume\n'); t = now;
-  [~,o.skelname,~] = fileparts(pdata.skelin);
-
-  jnk = struct; 
-  [outThings, nOutNodes] = getOutThings(o);
-  jnk.fn = fullfile(p.outpath, [o.skelname '_use.nml']);
-  knossos_write_nml(jnk.fn,outThings,meta,{});
-  display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
-end 
+  o.nedges_use = cellfun(@sum,o.edges_use); nedges = sum(o.nedges_use);
+  o.nnodes_use = cellfun(@sum,o.nodes_use); nnodes = sum(o.nnodes_use);
+  o.omit_things_use = (o.nnodes_use > p.max_nodes | o.nnodes_use == 0); nskels = sum(~o.omit_things_use);
+  
+  fprintf(1,'excluding %d/%d nodes and %d/%d things ',sum(o.nnodes)-nnodes,sum(o.nnodes),...
+    sum(~o.omit_things)-nskels,sum(~o.omit_things));
+  fprintf(1,'because outside of labeled volume or subsampling\n');
+end % if p.skeleton_mode
 
 %% second pass over all edges for all skeletons by walking along the paths
 % get best and worst case error free path length distributions.
@@ -372,7 +434,7 @@ for prm=1:o.nparams
     o.error_free_diameters{prm} = cell(1,o.nThings); o.error_free_deviations{prm} = cell(1,o.nThings);
     for n=1:o.nThings
       o.error_free_diameters{prm}{n} = nan(o.nedges(n),3); o.error_free_deviations{prm}{n} = nan(o.nedges(n),3);
-      if o.empty_things_use(n), continue; end
+      if o.omit_things_use(n), continue; end
       
       % iterate over edges
       for e=1:o.nedges(n)
@@ -491,7 +553,7 @@ for prm=1:o.nparams
     cnt = p.n_resample; bre = (rand([cnt nskels]) < p.bernoulli_n_resample/nskels);
   end
   % for mapping from sequential non-empty things back to things, random indices in non-empty things
-  seli = 1:o.nThings; seli = seli(~o.empty_things_use); 
+  seli = 1:o.nThings; seli = seli(~o.omit_things_use); 
   bt_are = zeros(cnt,1); bt_are_precrec = zeros(cnt,2); bt_nSMs = zeros(cnt,2); bt_nSMs_segEM = zeros(cnt,2);
   bt_ri = zeros(cnt,1); bt_ari = zeros(cnt,1); 
   bt_error_rates = zeros(cnt,p.npasses_edges); bt_eftpl = zeros(cnt,p.npasses_edges); 
@@ -564,7 +626,7 @@ for prm=1:o.nparams
     nOutThings = length(outThings); allnodes = zeros(nnodes,4); nodecnt = 0; thingcnt = 0;
     n_ef_edges = cellfun(@sum, error_free_edges{3}); all_ef_edges = zeros(sum(n_ef_edges),2); edgecnt = 0;
     for n=1:o.nThings
-      if o.empty_things_use(n), continue; end
+      if o.omit_things_use(n), continue; end
       thingcnt = thingcnt + 1;
       
       cnt = size(outThings{thingcnt}.nodes,1); 
@@ -614,7 +676,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, things_labels_
   cnt = 0;
   for n=thing_list
     % for re-sampling, count duplicate skeletons as if they were new skeletons in confusion matrix
-    if o.empty_things_use(n), continue; end
+    if o.omit_things_use(n), continue; end
     if allThings, cnt = n; else cnt = cnt + 1; end
     
     % iterate over edges
@@ -715,7 +777,7 @@ function [efpl, efpl_thing_ptr, efpl_edges] = ...
   for pass=1:npasses
     
     for n=1:o.nThings
-      if o.empty_things_use(n), continue; end
+      if o.omit_things_use(n), continue; end
       efpl_thing_ptr(n,pass) = efpl_cnt(pass)+1;
       
       % feature added after the paper, associated each edge with it's final efpl for it's "connected edges".
@@ -864,7 +926,7 @@ function error_free_edges = labelsPassEdgesErrors(o,p,edge_split, label_merged, 
 
     % iterate over things
     for n=1:o.nThings
-      if o.empty_things_use(n), continue; end
+      if o.omit_things_use(n), continue; end
   
       % iterate over edges
       for e=1:o.nedges(n)
@@ -906,10 +968,10 @@ end
 
 %% create struct for writing nml file
 function [outThings, nOutNodes] = getOutThings(o)
-  nskels = sum(~o.empty_things_use);
+  nskels = sum(~o.omit_things_use);
   outThings = cell(1,nskels); nOutThings = 0; nOutNodes = 0;
   for n=1:o.nThings
-    if o.empty_things_use(n), continue; end
+    if o.omit_things_use(n), continue; end
 
     % remove empty nodes and edges and write new things... meh
     nOutThings = nOutThings + 1;

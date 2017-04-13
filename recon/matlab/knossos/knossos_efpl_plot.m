@@ -24,7 +24,7 @@ split_mergers_CI = cell(1,ndatasets);
 split_mergers_segEM_CI = cell(1,ndatasets);
 
 for i = 1:ndatasets
-  use = ~o{i}.empty_things_use; nskels(i) = sum(use);
+  use = ~o{i}.omit_things_use; nskels(i) = sum(use);
   
   if p.use_efpl_edges
     % new mode, with one efpl counted per each edge
@@ -44,7 +44,7 @@ for i = 1:ndatasets
   split_mergers_segEM{i} = o{i}.nSMs_segEM;
   nBGnodes{i} = o{i}.nBGnodes; nECSnodes{i} = o{i}.nECSnodes;
   nnodes(i) = sum(o{i}.nnodes_use);
-  nnodes_skel{i} = o{i}.nnodes_use(~o{i}.empty_things_use);
+  nnodes_skel{i} = o{i}.nnodes_use(~o{i}.omit_things_use);
   
   split_mergers_CI{i} = o{i}.nSMs_CI;
   split_mergers_segEM_CI{i} = o{i}.nSMs_segEM_CI;

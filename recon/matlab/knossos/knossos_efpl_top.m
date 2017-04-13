@@ -73,33 +73,33 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-% with almost no ECS
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
-pdata(i).chunk = [12 14 2];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
-%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
-pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_supervoxels.h5';
-pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_probs.h5';
-pdata(i).name = 'none';
-pdata(i).subgroups = {'with_background'};
-pdata(i).segparam_attr = 'thresholds';
-pdata(i).nlabels_attr = 'types_nlabels';
-
-% with ~20% ECS
-i = 2;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
-pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
-pdata(i).name = 'huge';
-pdata(i).subgroups = {'with_background'};
-pdata(i).segparam_attr = 'thresholds';
-pdata(i).nlabels_attr = 'types_nlabels';
+% % with almost no ECS
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+% pdata(i).chunk = [12 14 2];
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
+% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_supervoxels.h5';
+% pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/none_probs.h5';
+% pdata(i).name = 'none';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
+% %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
+% pdata(i).lblsh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_supervoxels.h5';
+% pdata(i).probh5 = '/Data/datasets/labels/supervoxels/newestECSall_20151001/huge_probs.h5';
+% pdata(i).name = 'huge';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = 'thresholds';
+% pdata(i).nlabels_attr = 'types_nlabels';
 
 % % k0725
 % i = 1;
@@ -342,6 +342,33 @@ pdata(i).nlabels_attr = 'types_nlabels';
 %   end
 % end
 
+% K0057 agglomeration somas clean
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+%pdata(i).chunk = [8 9 3];
+% beg and end for superchunked labels (soma mode) are inclusive, matlab-style
+pdata(i).chunk = [2 8 1];
+pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/clean';
+pdata(i).name = 'K0057 clean';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = 39:48;
+pdata(i).nlabels_attr = 'types_nlabels';
+
+% K0057 agglomeration somas agglo
+i = 2;
+pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+%pdata(i).chunk = [8 9 3];
+% beg and end for superchunked labels (soma mode) are inclusive, matlab-style
+pdata(i).chunk = [2 8 1];
+pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
+pdata(i).name = 'K0057 clean';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = 1:48;
+pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -353,7 +380,6 @@ p.knossos_base = [1 1 1];   % knossos starts at 1, verified
 %p.knossos_base = [0 0 0];  % knossos starts at 0 (NO!!! verified)
 p.matlab_base = [1 1 1];  % matlab starts at 1 !!!
 p.empty_label = uint32(2^32-1);
-p.min_edges = 1;  % only include skeletons with at least this many edges
 p.load_data = false;
 p.load_probs = [];
 %p.load_probs = {'MEM', 'ICS', 'ECS'};
@@ -382,7 +408,7 @@ p.skel_subsample_perc = 1;
 %p.skel_subsample_perc = 0.2;
 
 % feature to estimate neurite diameters at error free edges
-p.estimate_diameters = true;
+p.estimate_diameters = false;
 
 % usually set these two to true for interpolation, but false for normal
 % set this to true to remove non-ICS nodes from polluting the rand error
@@ -392,11 +418,30 @@ p.remove_MEM_merged_nodes = false;
 
 
 
-p.nchunks = [8 8 4];
-%p.nchunks = [6 6 3];
-p.offset = [0 0 32];
-%p.offset = [0 0 0];
-p.dataset_data = 'data_mag1';
+p.skeleton_mode = false;
+if p.skeleton_mode
+  p.nchunks = [8 8 4];
+  %p.nchunks = [6 6 3];
+  p.offset = [0 0 32];
+  %p.offset = [0 0 0];
+  p.min_edges = 1;  % only include skeletons with at least this many edges
+else
+  % new feature that counts split mergers for single nodes that were annotated in soma (cell body) centers.
+  % counts over whole large area that might be split between multiple superchunk label files.
+  p.nchunks = [48 30 18];
+  p.supernchunks = [6 6 6];
+  p.offset = [0 0 0];
+  p.max_nodes = 1;  % only count somas that have this number of nodes or less (always 1???)
+  p.node_radius = 50;
+  
+  % xxx - this should have been written to the downsampled hdf5 as an attribute, fix this when fixed in hdf5
+  p.ds_ratio = [3 3 1];
+end
+
+% these could be defined per pdata blocks, but did not see a good reason for this.
+% have to do separate runs if the dataset names are different.
+%p.dataset_data = 'data_mag1';
+p.dataset_data = 'data_mag_x3y3z1';
 p.dataset_lbls = 'labels';
 
 % optional outputs for debug / validation
@@ -421,4 +466,5 @@ end
 % save the results
 %save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');
-save('/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat','p','pdata','o');
+%save('/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat','p','pdata','o');
+save('/home/watkinspv/Downloads/tmp.mat','p','pdata','o');
