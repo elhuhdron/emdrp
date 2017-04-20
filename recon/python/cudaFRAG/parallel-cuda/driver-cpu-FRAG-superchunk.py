@@ -18,22 +18,22 @@ parser.add_argument('--do_cpu_rag', nargs =1, type = bool , default = False , he
 parser.add_argument('--validate', nargs=1, type=bool , default = False , help = 'Perform Valiation')
 parser.add_argument('--adjacencyMatrix', nargs=1, type=bool, default=False, help = 'Use adjacency Matrix in kernel or not')
 parser.add_argument('--label_count', nargs=1, type=np.uint32, default=3000, help = 'The number of labels to be processed at a time on a gpu')
-parser.add_argument('--blockdim', nargs=1, type=np.int32, default=128, help= 'Blocksize on Gpu')
-parser.add_argument('--batch_edges', nargs=1, type=np.int32, default=30000, help= 'Batch size of edges to be processed at a time')
+parser.add_argument('--blockdim', nargs=1, type=np.int32, default=8, help= 'Blocksize on Gpu')
+parser.add_argument('--batch_edges', nargs=1, type=np.uint32, default=30000, help= 'Batch size of edges to be processed at a time')
 args = parser.parse_args()
 size_of_edges = args.size_of_edges
 do_cpu_rag = args.do_cpu_rag
 validate = args.validate
 adjacencyMatrix = args.adjacencyMatrix
-label_count = args.label_count
+label_count = np.uint32(args.label_count)
 block_size = np.int32(args.blockdim)
-batch_size = np.int32(args.batch_edges)
+batch_size = np.uint32(args.batch_edges)
 
 # labeled chunks
 chunk = [16,17,0]
 size = [1024,1024,480]
-#size = [640, 640, 480]
-offset = [0,0,32]#32
+#size = [256, 256, 256]
+offset = [0,0,32]
 has_ECS = True
 
 #username = 'watkinspv'
@@ -91,10 +91,12 @@ frag = dpFRAG.makeTestingFRAG(labelfile, chunk, size, offset,
 # boundary size is saved in frag.eperim
 frag.ovlp_attrs += ['ovlp_cur_dilate']
 
-# get list of edges after creation of rag 
+# get list of edges after creation of rag// 
 list_of_edges = np.zeros((np.uint32(size_of_edges),2), dtype=np.uint32)
 count = np.zeros(2, dtype=np.uint32)
-hybrid_adjacency = np.zeros((np.uint32(label_count)*frag.nsupervox) ,dtype = np.uint8)
+
+##cast with np.uint64 to avoid wronf answers due to overflow//
+hybrid_adjacency = np.zeros((np.uint64(label_count)*np.uint64(frag.nsupervox)) ,dtype = np.uint8)
 
 # calculate the jump steps requied for 1X dilation to get neighborhood
 neigh_sel_size = (2*frag.neighbor_perim)+1
@@ -122,7 +124,7 @@ compliment_index = list(compliment_indices)
 
 #calculate indices for 1X dilation
 steps = np.array([(x[0]*frag.supervoxels.shape[1]*frag.supervoxels.shape[2] + x[1]*frag.supervoxels.shape[2] + x[2]) for x in neigh_sel_indices])
-steps = steps[np.nonzero(steps)]
+steps =steps[np.nonzero(steps)]
 watershed_shape = np.asarray(frag.supervoxels.shape)
 
 #calculate indices for 2X dilation
@@ -131,7 +133,7 @@ steps_border = steps_border[np.nonzero(steps_border)]
 
 # build the rag
 print('Cpp serial generation of rag'); t=time.time()
-FRAG_extension.build_frag(frag.supervoxels, frag.nsupervox, np.uint32(size_of_edges), list_of_edges, bool(validate), steps, np.int(block_size), watershed_shape.astype('int32'), np.uint32(label_count), count, hybrid_adjacency, np.int32(batch_size))
+FRAG_extension.build_frag(frag.supervoxels, np.uint64(frag.nsupervox), np.uint32(size_of_edges), list_of_edges, bool(validate), steps, np.int(block_size), watershed_shape.astype('int32'), label_count, count, hybrid_adjacency, np.int32(batch_size))
 print('done in %.4f s'%  (time.time() - t))
 
 # create graph
@@ -182,11 +184,14 @@ if validate:
     print(reference_edges)
     print(list_of_edges[np.nonzero(list_of_edges)].reshape((-1,2), order = 'C'))
     ref = [tuple(a) for a in reference_edges]
-    gen = [tuple(b) for b in list_of_edges]
+    gen = [tuple(b) for b in list_of_edges if np.all(b != (0,0))]
     unique_indices = set(ref) & set(gen)
-    compliment_indices = set(ref) - unique_indices
-    compliment_index = list(compliment_indices)
-    if(compliment_index == []):
+    false_negatives = set(ref) - unique_indices
+    false_positives = set(gen) - unique_indices
+    false_negatives = list(false_negatives)
+    false_positives = list(false_positives)
+    if(false_positives == [] and false_negatives == []):
       print("The edge list matches for this dataset.")
     else:
-      print(compliment_index)
+      print(false_positives)
+      print(false_negatives)

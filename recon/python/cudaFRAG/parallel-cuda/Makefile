@@ -6,10 +6,11 @@ NVCC=nvcc
 
 NVCCFLAGS=-Xcompiler -fPIC -std=c++11 -DCUCC_ID="nVidia" -DBLD_PROCEDURE -DWITH_GSL -DHAVE_INLINE -DWITH_CUDA -DWITH_MPI -DPARALLEL -DWITH_PARALLEL_IO
 #NVCCFLAGS=--compiler-bindir $(CC) -fPIC
-CUDA_ARCH= -g -G -arch=sm_35 
+
+CUDA_ARCH= -g -G -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_52,code=sm_52
 CCFLAGS= -fPIC -g -std=c++11
 
-CUDA_INSTALL_PATH=/usr/local/cuda
+CUDA_INSTALL_PATH=/usr/local/cuda-8.0
 CUDA_INC_PATH= $(CUDA_INSTALL_PATH)/include 
 CUDA_LIB_PATH= $(CUDA_INSTALL_PATH)/lib64 
 

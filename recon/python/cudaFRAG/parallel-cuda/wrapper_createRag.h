@@ -28,14 +28,14 @@ extern void wrapper_createRag(const int* const gpu_watershed, const npy_intp* co
 
 
 extern void wrapper_createLabelRag(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_uint32 n_pixels,
-                                   const npy_uint32 n_labels, const npy_uint32 label_jump, const unsigned int start_label, 
+                                   const npy_uint64 n_labels, const npy_uint32 label_jump, const unsigned int start_label, 
                                    const npy_int n_steps, unsigned int* gpu_edges, unsigned int* gpu_labels, 
-                                   const npy_int blockdim, npy_int32* d_count, npy_uint8* gpu_edge_test);
+                                   const npy_int blockdim, npy_uint32* d_count, npy_uint8* gpu_edge_test, 
+                                   const int* const watershed_grid_shape, const int* const gpu_grid);
 
-extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int blockdim, const npy_uint32 edge_size_test);
 
-extern void wrapper_post_process(const int n_pixels, const int* const edges, 
-                                 const int* const labels,const int count, int* gpu_uniquelabels, 
-                                 const int blockdim);
+
+extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int blockdim, const npy_uint64 edge_test_size,
+                                 const npy_uint64 n_labels, const npy_uint32 label_jump);
 
 extern void wrapper_sort(const int n_pixlels, int* gpu_list, int size, int* final_order);

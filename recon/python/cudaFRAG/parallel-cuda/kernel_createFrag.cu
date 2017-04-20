@@ -37,33 +37,38 @@ __global__ void create_rag(const int* const gpu_watershed, const npy_intp* const
 }
 
 __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_int n_steps, 
-                                const npy_uint32 num_labels, const npy_uint32 label_jump, const unsigned int start_label, 
+                                const npy_uint64 num_labels, const npy_uint32 label_jump, const unsigned int start_label, 
                                 const npy_uint32 num_pixels, unsigned int* gpu_edges, unsigned int* gpu_labels, 
-                                npy_int32* d_count, npy_uint8* gpu_edge_test){
+                                npy_uint32* d_count, npy_uint8* gpu_edge_test, const int* const gpu_grid_shape){
 
-     unsigned int watershed_idx = blockIdx.x*blockDim.x + threadIdx.x;
+     unsigned int i = blockIdx.z*blockDim.z + threadIdx.z;
+     unsigned int j = blockIdx.y*blockDim.y + threadIdx.y;
+     unsigned int k = blockIdx.x*blockDim.x + threadIdx.x;
+     unsigned int watershed_idx = i*gpu_grid_shape[1]*gpu_grid_shape[2] + j*gpu_grid_shape[2] + k; 
      unsigned int label_val = gpu_watershed[watershed_idx];
-     unsigned int index;
+     unsigned long int index;
      unsigned int factor = start_label/label_jump;
+   
      if(watershed_idx < num_pixels && label_val != 0 && label_val < (start_label + label_jump) && label_val >= start_label){
          for(unsigned int step = 0; step < n_steps; step++){
              unsigned int edge_value = gpu_watershed[watershed_idx + gpu_steps[step]];
              if(label_val <= label_jump){
-                index = (label_val-1)*num_labels + edge_value-1;
+                 index = (label_val-1)*num_labels + edge_value-1;
              } else{
-                   index = (label_val - (factor*label_jump)-1)*num_labels + edge_value-1;
+                 index = (label_val - (factor*label_jump)-1)*num_labels + edge_value-1;
+                 //if(label_val == 146755 && edge_value == 147243)
+                   //printf("%lu ", (label_val - start_label)*num_labels);
              }
              if(edge_value > label_val){
                  // getting the value returned by atomicAdd in a variable and then using
                  // it gives correct values. The atomicAdd of d_count[0] in place gives
                  // wrong resutls.
-
-                    if(gpu_edge_test[index] == 0){
-                         int edge_increment = atomicAdd(&d_count[0],1);
-                          gpu_edges[edge_increment] = edge_value;
-                          gpu_labels[edge_increment] = label_val;
-                          gpu_edge_test[index] = 1;
-                    }
+                 if(gpu_edge_test[index] == 0){
+                     unsigned int edge_increment = atomicAdd(&d_count[0],1);
+                     gpu_edges[edge_increment] = edge_value;
+                     gpu_labels[edge_increment] = label_val;
+                     gpu_edge_test[index] = 1;
+                 }
 
              }
          }
@@ -72,11 +77,16 @@ __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const n
 
 
 
-__global__ void initialize_edge_test(npy_uint8* gpu_edge_test){
+__global__ void initialize_edge_test(npy_uint8* gpu_edge_test, const npy_uint64 n_labels, const npy_uint64 size){
 
 
-   unsigned int idx = blockIdx.x* blockDim.x + threadIdx.x;
-   gpu_edge_test[idx] = 0;
+   unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+   unsigned int j = blockIdx.y*blockDim.y + threadIdx.y;
+   unsigned long int idx = j*n_labels + i;
+
+   if(idx < size){ 
+     gpu_edge_test[idx] = 0;
+   }
 
 }
 
