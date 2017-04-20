@@ -162,6 +162,21 @@ else
   %   or a large area that is unloadable in one-shot.
   o.lblsh5files = glob(fullfile(pdata.lblsh5, '*.h5'));
   o.nlblsh5files = length(o.lblsh5files);
+  % index the lblsh5files by chunk index to avoid string search
+  o.maxchunk = p.nchunks + pdata.chunk;
+  o.lblsh5files_index = -ones(prod(o.maxchunk),1);
+  o.lblsh5files_subs = -ones(o.nlblsh5files,3);
+  for x=pdata.chunk(1):p.supernchunks(1):o.maxchunk(1)-1
+    for y=pdata.chunk(2):p.supernchunks(2):o.maxchunk(2)-1
+      for z=pdata.chunk(3):p.supernchunks(3):o.maxchunk(3)-1
+        ind = sub2ind(o.maxchunk,x,y,z);
+        postfix = sprintf('_x%04d_y%04d_z%04d.h5',x,y,z);
+        sci = find(~(cellfun('isempty', strfind(o.lblsh5files, postfix))));
+        o.lblsh5files_index(ind) = sci;
+        o.lblsh5files_subs(sci,:) = [x y z];
+      end
+    end
+  end
   o.superchunk_size = p.supernchunks.*o.chunksize;
 end
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
@@ -303,6 +318,7 @@ else % if p.skeleton_mode
       end
     end
   end
+  soma_info.size = [2*r+1,2*r+1,2*r+1];
   
 end % if p.skeleton_mode
 
@@ -780,11 +796,9 @@ end % labelsPassEdges
 
 %% single pass over the nodes to get same metrics as labelsPassEdges but for soma-mode.
 function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = labelsPassNodes(o,p,pdata,s,dset)
-  edge_split = cell(1,o.nThings); nodes_to_labels = cell(1,o.nThings);
-  %things_labels_cnt = 0; things_labels = zeros(p.nalloc,3);
-
   % just initialization, edge_split not used, just return to be compatible with non-soma-mode code
   % this assumes one node per thing, should have been asserted for soma-mode
+  edge_split = cell(1,o.nThings); nodes_to_labels = cell(1,o.nThings);
   things_labels_cnt = zeros(o.nThings,1); things_labels = cell(1,o.nThings); nskels = sum(~o.omit_things_use);
   for n=1:o.nThings    
     if o.omit_things_use(n), continue; end
@@ -795,85 +809,103 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
     end % for each node
   end % for each thing
 
-  % iterate things / nodes, get labels that are within node plus radius for the loaded superchunk
-  %tic;
-  for n=1:o.nThings
-    if o.omit_things_use(n), continue; end
-    for n1=1:o.nnodes(n)
-      if ~o.nodes_use{n}(n1), continue; end
-      
-      % convert nodes to subscript within dataset (accounting for any downsampling).
-      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
-      begi = n1pt - p.node_radius; endi = n1pt + p.node_radius;
-      
-      % % get all points within node sphere
-      %allpts = bsxfun(@plus, n1pt, s.pts);
-      
-      % get superchunk postfix that this node center is in
-      superchunk = fix((n1pt - o.loadcorner) ./ o.superchunk_size).*p.supernchunks + pdata.chunk;
-      
-      % iterate over all neighborhood superchunks label files and create mapping from nodes with radius to labels.
-      %   labels are not unique per superchunk, so the mapping must contain a superchunk qualifier.
-      cnt = 0;
-      for i=1:length(s.nbhd)
-        sc = superchunk + s.nbhd{i}.*p.supernchunks; loadcorner = sc .* o.chunksize;
-        % check if neighborhood superchunk is in bounds of dataset
-        n1subs = loadcorner-o.loadcorner+p.matlab_base;
-        if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
+  tic;
+  cVlbls = p.empty_label*ones(s.size, class(p.empty_label));
+  for sci=1:o.nlblsh5files
+    % only load Vlbls if we have to (so that we skip loading superchunks without any somas)
+    Vlbls_loaded = false;
+    
+    % iterate things / nodes, get labels that are within node plus radius for the loaded superchunk
+    for n=1:o.nThings
+      if o.omit_things_use(n), continue; end
+      for n1=1:o.nnodes(n)
+        if ~o.nodes_use{n}(n1), continue; end
         
-        % % check if the sphere overlaps with this superchunk
-        %rpts = bsxfun(@minus, allpts, loadcorner);
-        %if ~any(all(rpts >= 0,2) & all(bsxfun(@lt,rpts,o.superchunk_size),2)), continue; end
+        % convert nodes to subscript within dataset (accounting for any downsampling).
+        n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
+        begi = n1pt - p.node_radius; endi = n1pt + p.node_radius;
+        
+        % get superchunk that this node center is in
+        superchunk = fix((n1pt - o.loadcorner) ./ o.superchunk_size).*p.supernchunks + pdata.chunk;
+        
+        % if this node is not in the neighborhood of loaded superchunk then continue.
+        % this is just for performance.
+        if any(o.lblsh5files_subs(sci,:) < superchunk-1) || any(o.lblsh5files_subs(sci,:) > superchunk+1)
+          continue;
+        end
 
-        % check if the bounding box that inscribes the sphere overlaps with this superchunk
-        if ~((all(begi-loadcorner >= 0) && all(begi-loadcorner < o.superchunk_size)) ||...
-             (all(endi-loadcorner >= 0) && all(endi-loadcorner < o.superchunk_size)))
-          continue; 
-        end
-        
-        % load bounding box that inscribes the sphere around this node
-        cnt = cnt+1;
-        %fn = glob(fullfile(pdata.lblsh5, sprintf('*_x%04d_y%04d_z%04d.h5',sc(1),sc(2),sc(3))));
-        postfix = sprintf('_x%04d_y%04d_z%04d.h5',sc(1),sc(2),sc(3));
-        sci = find(~(cellfun('isempty', strfind(o.lblsh5files, postfix))));
-        Vlbls = h5read(o.lblsh5files{sci},dset,begi,repmat(2*p.node_radius + 1,[1 3]));
-        
-        % assign label mapping for the label that is directly under the node
-        center_pt = Vlbls(p.node_radius+1, p.node_radius+1, p.node_radius+1);
-        if center_pt ~= p.empty_label
-          nodes_to_labels{n}(n1,:) = [center_pt sci];
-        end
-        
-        % get labels in non-empty part of this superchunk within node sphere
-        clbls = Vlbls(s.sel); clbls = labels_unique_nonzeros(clbls(clbls ~= p.empty_label));
-        if isempty(clbls); continue; end
-        %assert(~isempty(clbls));
-        
-        % iterate over unique non-empty labels within node sphere
-        for lbl = clbls
-          % search if the mapping from the thing to this label (with superchunk) already exists.
-          if p.superchunk_labels_unique || lbl == 0
-            % if the labels are unique per superchunk, or this is label zero, search for unique label.
-            % do this by just using superchunk==0 for the label description.
-            csc = 0;
-          else
-            % qualify label with superchunk index
-            csc = sci;
+        % iterate over all neighborhood superchunks label files and create mapping from nodes with radius to labels.
+        %   labels are not unique per superchunk, so the mapping must contain a superchunk qualifier.
+        for i=1:length(s.nbhd)
+          sc = superchunk + s.nbhd{i}.*p.supernchunks; loadcorner = sc .* o.chunksize;
+          % check if neighborhood superchunk is in bounds of dataset
+          n1subs = loadcorner-o.loadcorner+p.matlab_base;
+          if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
+          
+          % check if this is the currently loaded superchunk
+          csci = o.lblsh5files_index(sub2ind(o.maxchunk,sc(1),sc(2),sc(3)));
+          if csci ~= sci, continue; end
+          
+          % check if the bounding box that inscribes the sphere overlaps with this superchunk
+          begsubs = begi-loadcorner+p.matlab_base; endsubs = endi-loadcorner+p.matlab_base;
+          if ~((all(begsubs > 0) && all(begsubs <= o.superchunk_size)) ||...
+              (all(endsubs > 0) && all(endsubs <= o.superchunk_size)))
+            continue;
           end
           
-          % if the mapping from the node to this label is not already in things_labels, add it
-          if ~any(all(bsxfun(@eq, things_labels{n}(1:things_labels_cnt(n),:), [lbl csc]),2))
-            things_labels_cnt(n) = things_labels_cnt(n)+1;
-            things_labels{n}(things_labels_cnt(n),:) = [lbl csc];
+          % only load Vlbls if we have to (so that we skip loading superchunks without any somas)
+          if ~Vlbls_loaded
+            Vlbls_loaded = true;
+            Vlbls = h5read(o.lblsh5files{sci},dset,loadcorner+p.matlab_base,o.superchunk_size);
           end
-        end % for each unique label
-        
-      end % for each neighborhood superchunk
-      assert(cnt > 0 && cnt < 9); % verify possible overlapping superchunk counts
-      %if mod(n,20)==0, toc; tic; end
-    end % for each node
-  end % for each thing
-
+          
+          % slice out bounding box that inscribes the sphere around this node and is in this superchunk
+          %cVlbls = p.empty_label*ones(s.size, class(p.empty_label)); % substantially slower
+          cVlbls(:) = p.empty_label;
+          cbeg = ones(1,3); cend = s.size.*ones(1,3);
+          sel = (begsubs <= 0); 
+          cbeg(sel) = -begsubs(sel)+2; begsubs(sel) = 1; 
+          sel = (endsubs > o.superchunk_size);
+          cend(sel) = cend(sel) - (endsubs(sel) - o.superchunk_size(sel)); endsubs(sel) = o.superchunk_size(sel);
+          cVlbls(cbeg(1):cend(1),cbeg(2):cend(2),cbeg(3):cend(3)) = ...
+            Vlbls(begsubs(1):endsubs(1),begsubs(2):endsubs(2),begsubs(3):endsubs(3));
+          
+          % assign label mapping for the label that is directly under the node
+          center_pt = cVlbls(p.node_radius+1, p.node_radius+1, p.node_radius+1);
+          if center_pt ~= p.empty_label
+            nodes_to_labels{n}(n1,:) = [center_pt sci];
+          end
+          
+          % get labels in non-empty part of this superchunk within node sphere
+          clbls = cVlbls((cVlbls ~= p.empty_label) & s.sel);
+          clbls = labels_unique_nonzeros(clbls);
+          if isempty(clbls); continue; end
+          
+          % iterate over unique non-empty labels within node sphere
+          for lbl = clbls
+            % search if the mapping from the thing to this label (with superchunk) already exists.
+            if p.superchunk_labels_unique || lbl == 0
+              % if the labels are unique per superchunk, or this is label zero, search for unique label.
+              % do this by just using superchunk==0 for the label description.
+              csc = 0;
+            else
+              % qualify label with superchunk index
+              csc = sci;
+            end
+            
+            % if the mapping from the node to this label is not already in things_labels, add it
+            if ~any(all(bsxfun(@eq, things_labels{n}(1:things_labels_cnt(n),:), [lbl csc]),2))
+              things_labels_cnt(n) = things_labels_cnt(n)+1;
+              things_labels{n}(things_labels_cnt(n),:) = [lbl csc];
+            end
+          end % for each unique label
+          
+        end % for each neighborhood superchunk
+      end % for each node
+    end % for each thing
+    toc; tic;
+  end % for each superchunk label file
+  
   % convert from cell array to unrolled array.
   % done this way to save time on search above, since outer loop is nodes/things.
   allthings_labels = zeros(p.nalloc,3); cnt = 0;

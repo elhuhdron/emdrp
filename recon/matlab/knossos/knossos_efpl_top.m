@@ -379,7 +379,7 @@ p = struct;  % input parameters independent of dataset
 p.knossos_base = [1 1 1];   % knossos starts at 1, verified
 %p.knossos_base = [0 0 0];  % knossos starts at 0 (NO!!! verified)
 p.matlab_base = [1 1 1];  % matlab starts at 1 !!!
-p.empty_label = uint32(2^32-1);
+p.empty_label = uint32(2^32-1);  % type needs to match labels
 p.load_data = false;
 p.load_probs = [];
 %p.load_probs = {'MEM', 'ICS', 'ECS'};
@@ -435,7 +435,7 @@ else
   p.supernchunks = [6 6 6];
   p.offset = [0 0 0];
   p.max_nodes = 1;  % only count somas that have this number of nodes or less (always 1???)
-  p.node_radius = 150;
+  p.node_radius = 200;
   p.superchunk_labels_unique = false;
 end
 
@@ -452,7 +452,7 @@ p.outpath = '/home/watkinspv/Downloads';
 p.outdata = 'outdata.gipl';
 p.outlbls = 'outlbls.gipl';
 p.outprobs = 'outprobs.raw';
-p.nmlout = true;
+p.nmlout = false;
 
 
 
