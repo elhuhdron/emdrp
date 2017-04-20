@@ -254,7 +254,11 @@ hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 plot(log10(pl_actual_median(1)),0.5,'x'); plot(log10(pl_actual_median(2)),0.5,'x');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 plot(log10(inpl_actual_median(1)),0.5,'x'); plot(log10(inpl_actual_median(2)),0.5,'x');
-[~,pt] = kstest2(log10(path_lengths{1}),log10(path_lengths{2}));
+if length(path_lengths{1}) > 1
+  [~,pt] = kstest2(log10(path_lengths{1}),log10(path_lengths{2}));
+else
+  pt = inf;
+end
 if length(internode_lengths{1}) > 1
   [~,pin] = kstest2(log10(internode_lengths{1}),log10(internode_lengths{2}));
 else
@@ -350,6 +354,33 @@ xlabel('split edges'); set(gca,'xlim',[0 0.5]);
 set(gca,'ylim',[-0.025 0.8]); box off
 title(sprintf('maxd=%g\n%g %g\n@split edges=%g %g',abs(m(2)-m(1)),m(1),m(2),...
   split_er(1,mi(1)),split_er(2,mi(2))));
+
+%figure(baseno+figno); figno = figno+1; clf
+subplot(2,2,4);
+sumSM = split_fracnodes+merge_fracnodes;
+[m,mi] = min(sumSM,[],2);
+minSM = [[split_fracnodes(1,mi(1)); merge_fracnodes(1,mi(1))] ...
+  [split_fracnodes(2,mi(2)); merge_fracnodes(2,mi(2))]];
+plot(split_fracnodes', merge_fracnodes', '-o', 'markersize', 2);
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(minSM(1,1),minSM(2,1),'x');
+hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(minSM(1,2),minSM(2,2),'x');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(squeeze(split_er_CI(1,:,1)),squeeze(merge_fracnodes_CI(1,:,1)),'--');
+hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(squeeze(split_er_CI(2,:,1)),squeeze(merge_fracnodes_CI(2,:,1)),'--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(squeeze(split_er_CI(1,:,2)),squeeze(merge_fracnodes_CI(1,:,2)),'--');
+hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(squeeze(split_er_CI(2,:,2)),squeeze(merge_fracnodes_CI(2,:,2)),'--');
+set(gca,'plotboxaspectratio',[1 1 1]);
+%set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
+xlabel('split edges'); ylabel('merged nodes');
+title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g',abs(m(2)-m(1)),m(1),...
+  minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2))));
+legend(names)
+
 
 
 
