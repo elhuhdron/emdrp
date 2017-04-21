@@ -132,8 +132,8 @@
 % load_indices = [1 2];
 
 load_files = {
-  '/home/watkinspv/Downloads/soma_run1.mat'
-  '/home/watkinspv/Downloads/soma_run1.mat'
+  '/home/watkinspv/Downloads/soma_run2.mat'
+  '/home/watkinspv/Downloads/soma_run2.mat'
 };
 load_indices = [1 1];
 

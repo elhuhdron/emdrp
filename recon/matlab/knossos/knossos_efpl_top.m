@@ -342,33 +342,30 @@ pdata = struct;  % input parameters depending on dataset
 %   end
 % end
 
-% K0057 agglomeration somas clean
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
-%pdata(i).chunk = [8 9 3];
-% beg and end for superchunked labels (soma mode) are inclusive, matlab-style
-pdata(i).chunk = [2 8 1];
-pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/clean';
-pdata(i).name = 'K0057 clean';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 39:48;
-pdata(i).nlabels_attr = 'types_nlabels';
-
-% % K0057 agglomeration somas agglo
-% i = 2;
+% % K0057 agglomeration somas clean
+% i = 1;
 % pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
-% %pdata(i).chunk = [8 9 3];
-% % beg and end for superchunked labels (soma mode) are inclusive, matlab-style
 % pdata(i).chunk = [2 8 1];
+% %pdata(i).chunk = [20 20 7];
 % pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-% pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
+% pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/clean';
 % pdata(i).name = 'K0057 clean';
 % pdata(i).subgroups = {'agglomeration'};
 % pdata(i).segparam_attr = '';
-% pdata(i).segparams = 1:48;
+% pdata(i).segparams = 39:48;
 % pdata(i).nlabels_attr = 'types_nlabels';
+
+% K0057 agglomeration somas agglo
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+pdata(i).chunk = [2 8 1];
+pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
+pdata(i).name = 'K0057 clean';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = 1:5:48;
+pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -384,7 +381,6 @@ p.load_data = false;
 p.load_probs = [];
 %p.load_probs = {'MEM', 'ICS', 'ECS'};
 %p.load_probs = {'MEM'};
-p.nalloc = 1e6; % for confusion matrix and for stacks
 p.tol = 1e-5; % for assert sanity checks
 
 % true preserves the total path length, false only counts error-free edges in path length
@@ -428,15 +424,19 @@ if p.skeleton_mode
   p.offset = [0 0 32];
   %p.offset = [0 0 0];
   p.min_edges = 1;  % only include skeletons with at least this many edges
+  p.nalloc = 1e6; % for confusion matrix and for stacks
 else
   % new feature that counts split mergers for single nodes that were annotated in soma (cell body) centers.
   % counts over whole large area that might be split between multiple superchunk label files.
   p.nchunks = [48 30 18];
+  %p.nchunks = [12 12 12];
   p.supernchunks = [6 6 6];
   p.offset = [0 0 0];
   p.max_nodes = 1;  % only count somas that have this number of nodes or less (always 1???)
-  p.node_radius = 200;
+  p.node_radius = 20;
   p.superchunk_labels_unique = false;
+  p.nalloc = 1e7; % soma mode requires bigger stacks
+  p.remove_MEM_merged_nodes = true; % absolutely need this on for this to make sense
 end
 
 % these could be defined per pdata blocks, but did not see a good reason for this.

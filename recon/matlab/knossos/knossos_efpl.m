@@ -40,6 +40,13 @@
 %   so that the error "half edges" can work (p.count_half_error_edges)
 %
 % thing is knossos-speak for a connected skeleton
+%
+% new feature "soma-mode" or "node-mode" was added after ECS paper that calculates
+%   number of splits and mergers in a radius around nodes. nodes are intended to be
+%   approximate centers of cell-bodies (somas). this mode can calculate over an
+%   entire dataset either using superchunked or "stitched" supervoxel label hdf5s.
+% xxx - going forward possible need to calculate efpl metrics over volume bigger
+%   than a single superchunk (what can be loaded into memory) as well?
 
 function o = knossos_efpl(p, pdata)
 % initializations
@@ -308,17 +315,9 @@ else % if p.skeleton_mode
   soma_info = struct; r = p.node_radius;
   [x,y,z] = ndgrid(-r:r,-r:r,-r:r);
   soma_info.sel = (x.*x + y.*y + z.*z < r*r);
+  soma_info.size = [2*r+1,2*r+1,2*r+1];
   %soma_info.pts = [x(soma_info.sel) y(soma_info.sel) z(soma_info.sel)];
   %soma_info.inds = find(soma_info.sel); soma_info.cnt = length(soma_info.inds);
-  soma_info.nbhd = cell(1,27); cnt = 1;
-  for x=-1:1
-    for y=-1:1
-      for z=-1:1
-        soma_info.nbhd{cnt} = [x y z]; cnt = cnt+1;
-      end
-    end
-  end
-  soma_info.size = [2*r+1,2*r+1,2*r+1];
   
 end % if p.skeleton_mode
 
@@ -409,14 +408,22 @@ for prm=1:o.nparams
 
   else % if skeleton mode  
     % first pass over all nodes in soma mode to get confusion matrix.
-    % instead of pixels, each tally in the confusion matrix is a node count
+    % each tally in the confusion matrix is a unique node/label combination.
+    %   xxx - this would have to be voxels to really be a confusion matrix but memory-limited.
+    %     also, probably no one cares about an overall voxel-wise rand error.
     fprintf(1,'\titerating nodes (soma-mode) to get confusion matrix\n');
-    [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = labelsPassNodes(o,p,pdata,soma_info,dset);
+    [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = labelsPassNodes(o,p,soma_info,dset);
     display(sprintf('\t\tdone in %.3f s, nlabels = %d',(now-t)*86400,nlabels));
   end % if skeleton mode
   
   fprintf(1,'\tgetting simple split/merger estimates from confusion matrix\n');
-  [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl, p.remove_MEM_merged_nodes); o.nSMs(prm,:) = [nsplits, nmergers]; 
+  [nsplits, nmergers, things_with_mergers] = getSplitMerger(m_ij, m_ijl, p.remove_MEM_merged_nodes); 
+  if p.skeleton_mode
+    o.nSMs(prm,:) = [nsplits, nmergers];
+  else
+    % for soma-mode just count which somas have mergers
+    o.nSMs(prm,:) = [nsplits, sum(things_with_mergers)]; 
+  end
   [nsplits, nmergers] = getSplitMergerSegEM(m_ijl); o.nSMs_segEM(prm,:) = [nsplits, nmergers];
 
   % count number of nodes falling into background (membrane) and into ECS supervoxels
@@ -778,10 +785,16 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, things_labels_
     things_labels = things_labels(1:things_labels_cnt,:);
     edge_split = edge_split(1:cnt); nodes_to_labels = nodes_to_labels(1:cnt); 
   end
-  
+
+  [m_ij, m_ijl, label_merged] = thingsLabelsToConfusion(p, things_labels, cnt, nlabels);
+end % labelsPassEdges
+
+
+% functionized this so that code is shared between labelsPassEdges and labelsPassNodes
+function [m_ij, m_ijl, label_merged] = thingsLabelsToConfusion(p, things_labels, nThings, nlabels)
   % the full confusion matrix that counts duplicates and includes background
   % also overlap matrix, contingency or confusion matrix
-  m_ij = sparse(things_labels(:,1), things_labels(:,2)+1, 1, cnt, nlabels+1);
+  m_ij = sparse(things_labels(:,1), things_labels(:,2)+1, 1, nThings, nlabels+1);
   
   % the logical (binary) confusion matrix that does not count duplicates
   % use specified threshold for binarizing.
@@ -790,30 +803,44 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, things_labels_
   % get boolean of supervoxel labels that contain mergers.
   % do not include background label, as these are counted as splits if either node is in background label.
   label_merged = full(sum(m_ijl,1) > 1); label_merged = label_merged(2:end);
-end % labelsPassEdges
+end
 
 
 
 %% single pass over the nodes to get same metrics as labelsPassEdges but for soma-mode.
-function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = labelsPassNodes(o,p,pdata,s,dset)
+function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = labelsPassNodes(o,p,s,dset)
   % just initialization, edge_split not used, just return to be compatible with non-soma-mode code
   % this assumes one node per thing, should have been asserted for soma-mode
   edge_split = cell(1,o.nThings); nodes_to_labels = cell(1,o.nThings);
   things_labels_cnt = zeros(o.nThings,1); things_labels = cell(1,o.nThings); nskels = sum(~o.omit_things_use);
+  begi = zeros(o.nThings,3); endi = zeros(o.nThings,3);
   for n=1:o.nThings    
     if o.omit_things_use(n), continue; end
     things_labels{n} = zeros(fix(p.nalloc/nskels),2);
+    assert(o.nnodes(n)==1); % just make sure again
     for n1=1:o.nnodes(n)
       if ~o.nodes_use{n}(n1), continue; end
       edge_split{n} = false(1,o.nedges(n)); nodes_to_labels{n} = double(p.empty_label)*ones(o.nnodes(n),2);
+      
+      % convert nodes to subscript within dataset (accounting for any downsampling).
+      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
+      
+      % get superchunk that this node center is in
+      %superchunks(n,:) = fix((n1pt - o.loadcorner) ./ o.superchunk_size).*p.supernchunks + pdata.chunk;
+      
+      % the bounding box for the node sphere
+      begi(n,:) = n1pt - p.node_radius; endi(n,:) = n1pt + p.node_radius;
+      
     end % for each node
   end % for each thing
 
-  tic;
   cVlbls = p.empty_label*ones(s.size, class(p.empty_label));
   for sci=1:o.nlblsh5files
     % only load Vlbls if we have to (so that we skip loading superchunks without any somas)
     Vlbls_loaded = false;
+
+    % the corner for the currently loaded superchunk
+    loadcorner = o.lblsh5files_subs(sci,:) .* o.chunksize;
     
     % iterate things / nodes, get labels that are within node plus radius for the loaded superchunk
     for n=1:o.nThings
@@ -821,93 +848,67 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
       for n1=1:o.nnodes(n)
         if ~o.nodes_use{n}(n1), continue; end
         
-        % convert nodes to subscript within dataset (accounting for any downsampling).
-        n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
-        begi = n1pt - p.node_radius; endi = n1pt + p.node_radius;
-        
-        % get superchunk that this node center is in
-        superchunk = fix((n1pt - o.loadcorner) ./ o.superchunk_size).*p.supernchunks + pdata.chunk;
-        
-        % if this node is not in the neighborhood of loaded superchunk then continue.
-        % this is just for performance.
-        if any(o.lblsh5files_subs(sci,:) < superchunk-1) || any(o.lblsh5files_subs(sci,:) > superchunk+1)
+        % check if the bounding box that inscribes the sphere overlaps with this superchunk.
+        % found 3d version of rectint on matlab central.
+        %   https://www.mathworks.com/matlabcentral/fileexchange/59319-cubeint
+        if cubeint([loadcorner o.superchunk_size], [begi(n,:) s.size]) == 0
           continue;
         end
-
-        % iterate over all neighborhood superchunks label files and create mapping from nodes with radius to labels.
-        %   labels are not unique per superchunk, so the mapping must contain a superchunk qualifier.
-        for i=1:length(s.nbhd)
-          sc = superchunk + s.nbhd{i}.*p.supernchunks; loadcorner = sc .* o.chunksize;
-          % check if neighborhood superchunk is in bounds of dataset
-          n1subs = loadcorner-o.loadcorner+p.matlab_base;
-          if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
-          
-          % check if this is the currently loaded superchunk
-          csci = o.lblsh5files_index(sub2ind(o.maxchunk,sc(1),sc(2),sc(3)));
-          if csci ~= sci, continue; end
-          
-          % check if the bounding box that inscribes the sphere overlaps with this superchunk
-          begsubs = begi-loadcorner+p.matlab_base; endsubs = endi-loadcorner+p.matlab_base;
-          if ~((all(begsubs > 0) && all(begsubs <= o.superchunk_size)) ||...
-              (all(endsubs > 0) && all(endsubs <= o.superchunk_size)))
-            continue;
+        
+        % only load Vlbls if we have to (so that we skip loading superchunks without any somas)
+        if ~Vlbls_loaded
+          Vlbls_loaded = true;
+          Vlbls = h5read(o.lblsh5files{sci},dset,loadcorner+p.matlab_base,o.superchunk_size);
+        end
+        
+        % slice out bounding box that inscribes the sphere around this node and is in this superchunk
+        begsubs = begi(n,:)-loadcorner+p.matlab_base; endsubs = endi(n,:)-loadcorner+p.matlab_base;
+        %cVlbls = p.empty_label*ones(s.size, class(p.empty_label)); % substantially slower
+        cVlbls(:) = p.empty_label;
+        cbeg = ones(1,3); cend = s.size.*ones(1,3);
+        sel = (begsubs <= 0);
+        cbeg(sel) = -begsubs(sel)+2; begsubs(sel) = 1;
+        sel = (endsubs > o.superchunk_size);
+        cend(sel) = cend(sel) - (endsubs(sel) - o.superchunk_size(sel)); endsubs(sel) = o.superchunk_size(sel);
+        cVlbls(cbeg(1):cend(1),cbeg(2):cend(2),cbeg(3):cend(3)) = ...
+          Vlbls(begsubs(1):endsubs(1),begsubs(2):endsubs(2),begsubs(3):endsubs(3));
+        
+        % assign label mapping for the label that is directly under the node
+        center_pt = cVlbls(p.node_radius+1, p.node_radius+1, p.node_radius+1);
+        if center_pt ~= p.empty_label
+          nodes_to_labels{n}(n1,:) = [center_pt sci];
+        end
+        
+        % get labels in non-empty part of this superchunk within node sphere
+        clbls = cVlbls((cVlbls ~= p.empty_label) & s.sel);
+        clbls = labels_unique(clbls);
+        % code above only checked bounding box intersection, so sphere intersection could still be empty.
+        % xxx - theoretically a bit more optimization could be done here by checking the sphere intersection above.
+        if isempty(clbls); continue; end
+        
+        % iterate over unique labels within node sphere
+        for lbl = clbls
+          % search if the mapping from the thing to this label (with superchunk) already exists.
+          if p.superchunk_labels_unique || lbl == 0
+            % if the labels are unique per superchunk, or this is label zero, search for unique label.
+            % do this by just using superchunk==0 for the label description.
+            csc = 0;
+          else
+            % qualify label with superchunk index
+            csc = sci;
           end
           
-          % only load Vlbls if we have to (so that we skip loading superchunks without any somas)
-          if ~Vlbls_loaded
-            Vlbls_loaded = true;
-            Vlbls = h5read(o.lblsh5files{sci},dset,loadcorner+p.matlab_base,o.superchunk_size);
+          % if the mapping from the node to this label is not already in things_labels, add it
+          if ~any(all(bsxfun(@eq, things_labels{n}(1:things_labels_cnt(n),:), [lbl csc]),2))
+            things_labels_cnt(n) = things_labels_cnt(n)+1;
+            things_labels{n}(things_labels_cnt(n),:) = [lbl csc];
           end
-          
-          % slice out bounding box that inscribes the sphere around this node and is in this superchunk
-          %cVlbls = p.empty_label*ones(s.size, class(p.empty_label)); % substantially slower
-          cVlbls(:) = p.empty_label;
-          cbeg = ones(1,3); cend = s.size.*ones(1,3);
-          sel = (begsubs <= 0); 
-          cbeg(sel) = -begsubs(sel)+2; begsubs(sel) = 1; 
-          sel = (endsubs > o.superchunk_size);
-          cend(sel) = cend(sel) - (endsubs(sel) - o.superchunk_size(sel)); endsubs(sel) = o.superchunk_size(sel);
-          cVlbls(cbeg(1):cend(1),cbeg(2):cend(2),cbeg(3):cend(3)) = ...
-            Vlbls(begsubs(1):endsubs(1),begsubs(2):endsubs(2),begsubs(3):endsubs(3));
-          
-          % assign label mapping for the label that is directly under the node
-          center_pt = cVlbls(p.node_radius+1, p.node_radius+1, p.node_radius+1);
-          if center_pt ~= p.empty_label
-            nodes_to_labels{n}(n1,:) = [center_pt sci];
-          end
-          
-          % get labels in non-empty part of this superchunk within node sphere
-          clbls = cVlbls((cVlbls ~= p.empty_label) & s.sel);
-          clbls = labels_unique_nonzeros(clbls);
-          if isempty(clbls); continue; end
-          
-          % iterate over unique non-empty labels within node sphere
-          for lbl = clbls
-            % search if the mapping from the thing to this label (with superchunk) already exists.
-            if p.superchunk_labels_unique || lbl == 0
-              % if the labels are unique per superchunk, or this is label zero, search for unique label.
-              % do this by just using superchunk==0 for the label description.
-              csc = 0;
-            else
-              % qualify label with superchunk index
-              csc = sci;
-            end
-            
-            % if the mapping from the node to this label is not already in things_labels, add it
-            if ~any(all(bsxfun(@eq, things_labels{n}(1:things_labels_cnt(n),:), [lbl csc]),2))
-              things_labels_cnt(n) = things_labels_cnt(n)+1;
-              things_labels{n}(things_labels_cnt(n),:) = [lbl csc];
-            end
-          end % for each unique label
-          
-        end % for each neighborhood superchunk
+        end % for each unique label
       end % for each node
     end % for each thing
-    toc; tic;
   end % for each superchunk label file
   
   % convert from cell array to unrolled array.
-  % done this way to save time on search above, since outer loop is nodes/things.
   allthings_labels = zeros(p.nalloc,3); cnt = 0;
   for n=1:o.nThings
     if o.omit_things_use(n), continue; end
@@ -916,27 +917,23 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
       allthings_labels(cnt+1:cnt+things_labels_cnt(n),:) = ...
         [repmat(n,[things_labels_cnt(n) 1]) things_labels{n}(1:things_labels_cnt(n),:)];
       cnt = cnt+things_labels_cnt(n);
+      things_labels{n} = []; % free memory
     end
   end
   things_labels = allthings_labels(1:cnt,:);
 
   % get all unique combinations of labels and superchunks and relabel things_labels uniquely.
-  [unique_labels, ia, ~] = unique(things_labels(:,[2 3]),'rows');
-  nlabels = size(unique_labels,1); new_labels = 1:nlabels;
-  things_labels = [things_labels(ia, 1) new_labels(:)];
+  [unique_labels, ~, ic] = unique(things_labels(:,[2 3]),'rows','sorted');
+  hasbg = all(unique_labels(1,:) == [0 0]);
+  if hasbg
+    nlabels = size(unique_labels,1)-1; new_labels = (0:nlabels)';
+  else
+    % this is unlikely to ever happen, just for completeness.
+    nlabels = size(unique_labels,1); new_labels = (1:nlabels)';
+  end
+  things_labels = [things_labels(:, 1) new_labels(ic)];
   
-  % the full confusion matrix that counts duplicates and includes background
-  % also overlap matrix, contingency or confusion matrix
-  %m_ij = sparse(things_labels(:,1), things_labels(:,2)+1, 1, o.nThings, nlabels+1);
-  m_ij = sparse(things_labels(:,1), things_labels(:,2), 1, o.nThings, nlabels);
-  
-  % the logical (binary) confusion matrix that does not count duplicates
-  % use specified threshold for binarizing.
-  m_ijl = (m_ij >= p.m_ij_threshold);
-  
-  % get boolean of supervoxel labels that contain mergers.
-  % do not include background label, as these are counted as splits if either node is in background label.
-  label_merged = full(sum(m_ijl,1) > 1); label_merged = label_merged(2:end);
+  [m_ij, m_ijl, label_merged] = thingsLabelsToConfusion(p, things_labels, o.nThings, nlabels);
 end % labelsPassNodes
 
 
@@ -1182,7 +1179,7 @@ function [outThings, nOutNodes] = getOutThings(o, ds)
 end % getOutThings
 
 %% functions that compute the "simple" split merger metrics based on confusion matrix
-function [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl, remove_MEM_merged_nodes)
+function [nsplits, nmergers, things_with_mergers] = getSplitMerger(m_ij, m_ijl, remove_MEM_merged_nodes)
   % tally up splits as the number supervoxels that are assiciated with more than one thing
   %   but do not count background label nodes. this can range from [0,nnodes]
   tmp = full(sum(m_ijl(:,2:end),2)); nsplits = sum(tmp(tmp > 1));
@@ -1191,7 +1188,8 @@ function [nsplits, nmergers] = getSplitMerger(m_ij, m_ijl, remove_MEM_merged_nod
   % count multiple nodes in the background supervoxel label as mergers unless remove_MEM_merged_nodes specified.
   tmp = full(sum(m_ijl,1) > 1);
   if remove_MEM_merged_nodes, tmp(1) = false; end
-  nmergers = full(sum(sum(m_ij(:,tmp),2),1));
+  tmp2 = sum(m_ij(:,tmp),2); nmergers = full(sum(tmp2,1));
+  things_with_mergers = logical(full(tmp2));
 end % getSplitMerger
 
 % very similar to above method, see paper "SegEM: Efficient Image Analysis..."
@@ -1248,7 +1246,11 @@ end % getRandErrors
 %% Very simple function for faster version of the horribly inefficient builtin matlab unique 
 % Get unique nonzero elements. Assume array input and asume non-negative integer elements.
 
-function u = labels_unique_nonzeros(x)
-x = nonzeros(x); u = zeros(1,max(x)); u(x) = 1; u = find(u);
-%x = double(nonzeros(x)); u = sparse(x,ones(length(x),1),1,max(x),1); u = find(u)'; % slower for typical cases
+%function u = labels_unique_nonzeros(x)
+%x = nonzeros(x); u = zeros(1,max(x)); u(x) = 1; u = find(u);
+%%x = double(nonzeros(x)); u = sparse(x,ones(length(x),1),1,max(x),1); u = find(u)'; % slower for typical cases
+%end
+
+function u = labels_unique(x)
+u = zeros(1,max(x)+1); u(x+1) = 1; u = find(u)-1;
 end
