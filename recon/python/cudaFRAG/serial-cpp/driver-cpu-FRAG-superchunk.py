@@ -133,7 +133,6 @@ print('Cpp serial generation of rag'); t=time.time()
 FRAG_extension.build_frag(frag.supervoxels, frag.nsupervox, frag.connectivity, np.uint32(size_of_edges), list_of_edges, bool(validate),steps, bool(adjacencyMatrix), np.uint32(label_count), count, hybrid_adjacency)
 print('done in %.4f s'%  (time.time() - t))
 
-print("%d, %d ", count[0], size_of_borders)
 #allocate space for frag border data structure
 list_of_borders = np.zeros((count[0], size_of_borders), dtype=np.uint32)
 tmp_edges = list_of_edges[0:count[0],:]
@@ -213,7 +212,7 @@ if validate:
         ref.append(np.uint32(re.findall('\d+', line))) 
 
     reference_borders = [x_r for x_r in ref]
-    generated_borders = [np.concatenate((x_g[0:2], x_g[3:3+x_g[2]])) for x_g in list_of_borders]
+    generated_borders = [np.concatenate((x_g[0:2], x_g[3:x_g[2]])) for x_g in list_of_borders]
     for i in range(0,count[0]):
           if(np.all(generated_borders[i] == reference_borders[i])):
             #print("label-edge", list_of_borders[i][0], list_of_borders[i][1])

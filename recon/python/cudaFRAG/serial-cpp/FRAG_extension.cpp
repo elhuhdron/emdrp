@@ -241,7 +241,8 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
     npy_uint32 label;
     npy_uint32 prev_label = watershed[0];
     npy_uint32 edge_val;
-    unsigned int* dilation_1x = (unsigned int*)malloc(n_steps_edges*sizeof(unsigned int)); 
+    unsigned int* dilation1 = (unsigned int*)malloc(n_steps_edges*sizeof(unsigned int)); 
+    unsigned int* dilation2 = (unsigned int*)malloc(n_steps_edges*sizeof(unsigned int));
     unsigned int iter= 0;
     unsigned int dilation_index; 
     std::vector<unsigned int>::iterator it; 
@@ -277,92 +278,90 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
         // finding the borders in the 2X dilation region
         if(!tmp_edges.empty() && label != 0){
             for(int step = 0; step < n_steps_border; step++){
-                it = tmp_edges.begin();
-                while(it != tmp_edges.end()){
-                    if(watershed[vox + steps_border[step]] == *it){
-                        edge_val = *it;
+                edge_val = watershed[vox + steps_border[step]];
+                if(edge_val != label && edge_val != 0){
+                    it = tmp_edges.begin();
+                    while(it != tmp_edges.end()){
+                        if(watershed[vox + steps_border[step]] == *it){
+                            edge_val = *it;
                         //std::cout << "label: " <<  label << "edge: " << edge_val << std::endl;
-                        dilation_index = vox + steps_border[step]; 
-                        // get the index rank of the edge for which boundary is being calculated
-                        ind  = std::find(setofB.begin() + store_index, setofB.end(), edge_val);
-                        if(ind != setofB.end()){
-                            start_index = (ind - setofB.begin())/2;
-                        }
-                        //std::cout << store_index << std::endl;
-                        // calculate the indices of the edge and check if they match to the edges in the structure
-                        if(borders[start_index*n_borders_dim[1] + 0] == label){
-                           if(borders[start_index*n_borders_dim[1] + 1] == edge_val){
+                            dilation_index = vox + steps_border[step]; 
+                            // get the index rank of the edge for which boundary is being calculated
+                            ind  = std::find(setofB.begin() + store_index, setofB.end(), edge_val);
+                            if(ind != setofB.end()){
+                                start_index = (ind - setofB.begin())/2;
+                            }
+                            // calculate the indices of the edge and check if they match to the edges in the structure
+                            if(borders[start_index*n_borders_dim[1] + 0] == label){
+                                if(borders[start_index*n_borders_dim[1] + 1] == edge_val){
 
-                              assert(true);
+                                     assert(true);
 
-                           }else{
+                                }else{
 
-                              assert(false);
-                           }
+                                     assert(false);
+                                } 
 
-                        }else{
+                            }else{
 
-                              assert(false);
-                        }  
+                                assert(false);
+                            }  
                         
-                        //get the indices  that form a border with this edge
-                        get_dilation(dilation_1x, steps_edges, n_steps_edges, dilation_index);
-                        get_comparison(dilation_1x, steps_edges, n_steps_edges, 
-                                       vox, borders, start_index, n_borders_dim[1]);
-                        it++;
-                    }else{
-                        it++;
-                    } 
-                }
-            }
-            
-             //std::cout << "seg" << " " ;
-            //finding borders in the 1X dilation region
-            for(int step = 0;step < n_steps_edges; step++){
-                edge_val = watershed[vox + steps_edges[step]];
-                if(edge_val > label && edge_val !=0){
-                    dilation_index = vox + steps_edges[step];
-                    ind  = std::find(setofB.begin() + store_index, setofB.end(), edge_val);
-                    if(ind != setofB.end()){
-                        start_index = (ind - setofB.begin())/2;
+                            //get the indices  that form a border with this edge
+                            get_dilation(dilation1, dilation2, steps_edges, n_steps_edges, dilation_index, 
+                                         vox, borders, start_index, n_borders_dim[1]);
+                            //get_comparison(dilation_1x, steps_edges, n_steps_edges, 
+                              //         vox, borders, start_index, n_borders_dim[1]);
+                            it++;
+                        }else{
+                            it++;
+                        } 
                     }
-                    if(borders[start_index*n_borders_dim[1] + 0] == label){
-                           if(borders[start_index*n_borders_dim[1] + 1] == edge_val){
+                }
+             } 
 
-                              assert(true);
+             for(int step = 0;step < n_steps_edges; step++){
+                 edge_val = watershed[vox + steps_edges[step]];
+                 if(edge_val > label && edge_val !=0){
+                     dilation_index = vox + steps_edges[step];
+                     ind  = std::find(setofB.begin() + store_index, setofB.end(), edge_val);
+                     if(ind != setofB.end()){
+                         start_index = (ind - setofB.begin())/2;
+                     }
+                     if(borders[start_index*n_borders_dim[1] + 0] == label){
+                         if(borders[start_index*n_borders_dim[1] + 1] == edge_val){
+                             
+                             assert(true);
 
-                           }else{
+                         }else{
 
-                              assert(false);
-                           }
+                             assert(false);
+                         }
 
                      }else{
 
-                         assert(false);
+                        assert(false);
                      }
 
-                    get_dilation(dilation_1x, steps_edges, n_steps_edges, dilation_index);
-                    get_comparison(dilation_1x, steps_edges, n_steps_edges,
-                                   vox, borders, start_index, n_borders_dim[1]);        
-                } 
-            }
+                     get_dilation(dilation1, dilation2, steps_edges, n_steps_edges, dilation_index,
+                                  vox, borders, start_index, n_borders_dim[1]);
+                     //get_comparison(dilation_1x, steps_edges, n_steps_edges,
+                       //             vox, borders, start_index, n_borders_dim[1]);        
+                 } 
+             }
           
-        }
+         }
     }
 
-    //preprocessing
+    //postprocessing
     for(int edge_size = 0; edge_size < count[0] ; edge_size++){ 
-       
+         
          unsigned int start = edge_size*n_borders_dim[1] + 3;
-         unsigned int end = edge_size*n_borders_dim[1] + n_borders_dim[1];
+         unsigned int end = edge_size*n_borders_dim[1] + borders[edge_size*n_borders_dim[1] + 2];
          std::vector<npy_uint32> indices(borders + start, borders + end);
          std::sort(indices.begin() , indices.end());
-         auto last = std::unique(indices.begin(), indices.end());
-         indices.erase(last, indices.end());
-         indices.erase(indices.begin());
-         borders[edge_size*n_borders_dim[1] + 2] = indices.size();
          std::copy(indices.begin(), indices.end(), borders + edge_size*n_borders_dim[1] + 3);
-  
+   
     }
   
     return Py_BuildValue("i",1);
@@ -370,14 +369,37 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
 }
 
 
-void get_dilation(unsigned int* dilation, npy_intp* steps, npy_int n_steps, unsigned int index){
+void get_dilation(unsigned int* dila_1, unsigned int* dila_2, 
+                  npy_intp* steps, npy_int n_steps, unsigned int dila_index1, 
+                  unsigned int dila_index2, npy_uint32* boundary, 
+                  unsigned int start_index, npy_uint32 border_dim){
 
+    //npy_int indices[n_steps];
     for(npy_int k = 0;k < n_steps; k++){
-         dilation[k] = index + steps[k];
-         //if(dilation[k] == 439681)
-           //printf("%d" ,steps[k]);
+         dila_1[k] = dila_index1 + steps[k];
+         dila_2[k] = dila_index2 + steps[k];
     }  
-      
+    bool do_add = true;
+    // using simple hand rolled O(N^2) search is faster than unordered set or vector search
+    for(npy_int h = 0; h < n_steps;h++){
+        for(npy_int j = 0;j < n_steps; j++){
+            if(dila_1[h] == dila_2[j]){
+               do_add = true;
+               assert(boundary[start_index*border_dim + 2] < border_dim); 
+               unsigned int cnt = boundary[start_index*border_dim + 2];
+               for(unsigned int f = 3;f < cnt ;f++){
+                   if(dila_1[h] ==  boundary[start_index*border_dim + f]){
+                      do_add = false;
+                      break;
+                   }                  
+               }
+               if(do_add){
+                   boundary[start_index*border_dim + cnt] = dila_1[h];
+                   boundary[start_index*border_dim + 2] += 1;
+               }
+            }
+        }
+    }    
 }
 
 void get_comparison(unsigned int* dilation, npy_intp* steps, npy_int n_steps, unsigned int ind, 
@@ -387,22 +409,19 @@ void get_comparison(unsigned int* dilation, npy_intp* steps, npy_int n_steps, un
     
     for(npy_int j=0;j < n_steps; j++){
         indices[j] = steps[j] + ind;
-        //if(indices[j] == 439681)
-          //printf("%d" ,steps[j]);
     }
     
-    std::unordered_set<unsigned int> setofA(indices, indices + n_steps); 
+    std::vector<unsigned int> setofA(indices, indices + n_steps); 
 
     // calculate the intersecton of the dilated indices and add them to the structure
-    for (npy_int i = 0; i < n_steps; ++i) {
+    /* for (npy_int i = 0; i < n_steps; ++i) {
         if (setofA.find(dilation[i]) != setofA.end()) {
+         
            assert(boundary[start_index*border_dim + 2] < border_dim); 
            unsigned int cnt = boundary[start_index*border_dim + 2];
            boundary[start_index*border_dim + cnt] = dilation[i];
            boundary[start_index*border_dim + 2] += 1;
-           //std::cout << dilation[i] << std::endl;
-           //std::cout << boundary[start_index*border_dim + cnt] << ":" << boundary[start_index*border_dim + 2] << std::endl;
         }
-    }
+    }*/
     
 }
