@@ -199,7 +199,8 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
     npy_intp* dims;
     npy_intp *n_voxels_dim;
     npy_intp *n_borders_dim;
-    npy_uint32 n_voxels, n_borders;
+    npy_uint32 n_voxels;
+    npy_uint64 n_borders;
     npy_int n_steps_edges,n_steps_border;
 
     // parse arguments
@@ -228,7 +229,6 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
 
     //get the edges and borders 
     npy_uint32 *edges = (npy_uint32*)PyArray_DATA(input_edges);
-    if(verbose) std::cout << "edges" << edges[18313*2 +1] << std::endl;
     npy_int32 *count = (npy_int32*)PyArray_DATA(input_count);
   
     npy_uint32 *borders = (npy_uint32*)PyArray_DATA(input_borders);
@@ -248,10 +248,11 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
     std::vector<unsigned int>::iterator it; 
     unsigned int store_index = 0;
     unsigned int start_index = 0;
+    npy_uint64 start = 0;
     std::vector<npy_int32> setofB(edges, edges + count[0]*2);
     std::vector<npy_int32>::iterator ind;
     for(unsigned int vox = 0;vox < n_voxels; vox++){
-        
+      //std::cout << vox << "done" << std::endl;  
       label = watershed[vox];
         
       if(label != 0 && prev_label != label){
@@ -273,7 +274,7 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
               if(!tmp_edges.empty()) break;
             
             }
-          prev_label = label;      
+            prev_label = label;      
         }
         // finding the borders in the 2X dilation region
         if(!tmp_edges.empty() && label != 0){
@@ -284,7 +285,6 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
                     while(it != tmp_edges.end()){
                         if(watershed[vox + steps_border[step]] == *it){
                             edge_val = *it;
-                        //std::cout << "label: " <<  label << "edge: " << edge_val << std::endl;
                             dilation_index = vox + steps_border[step]; 
                             // get the index rank of the edge for which boundary is being calculated
                             ind  = std::find(setofB.begin() + store_index, setofB.end(), edge_val);
@@ -292,8 +292,9 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
                                 start_index = (ind - setofB.begin())/2;
                             }
                             // calculate the indices of the edge and check if they match to the edges in the structure
-                            if(borders[start_index*n_borders_dim[1] + 0] == label){
-                                if(borders[start_index*n_borders_dim[1] + 1] == edge_val){
+                            start = start_index*n_borders_dim[1];   
+                            if(borders[start] == label){
+                                if(borders[start + 1] == edge_val){
 
                                      assert(true);
 
@@ -309,9 +310,7 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
                         
                             //get the indices  that form a border with this edge
                             get_dilation(dilation1, dilation2, steps_edges, n_steps_edges, dilation_index, 
-                                         vox, borders, start_index, n_borders_dim[1]);
-                            //get_comparison(dilation_1x, steps_edges, n_steps_edges, 
-                              //         vox, borders, start_index, n_borders_dim[1]);
+                                         vox, borders, start, n_borders_dim[1]);
                             it++;
                         }else{
                             it++;
@@ -328,8 +327,9 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
                      if(ind != setofB.end()){
                          start_index = (ind - setofB.begin())/2;
                      }
-                     if(borders[start_index*n_borders_dim[1] + 0] == label){
-                         if(borders[start_index*n_borders_dim[1] + 1] == edge_val){
+                     start = start_index*n_borders_dim[1];
+                     if(borders[start] == label){
+                         if(borders[start + 1] == edge_val){
                              
                              assert(true);
 
@@ -344,9 +344,7 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
                      }
 
                      get_dilation(dilation1, dilation2, steps_edges, n_steps_edges, dilation_index,
-                                  vox, borders, start_index, n_borders_dim[1]);
-                     //get_comparison(dilation_1x, steps_edges, n_steps_edges,
-                       //             vox, borders, start_index, n_borders_dim[1]);        
+                                  vox, borders, start, n_borders_dim[1]);
                  } 
              }
           
@@ -354,13 +352,19 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
     }
 
     //postprocessing
-    for(int edge_size = 0; edge_size < count[0] ; edge_size++){ 
-         
-         unsigned int start = edge_size*n_borders_dim[1] + 3;
-         unsigned int end = edge_size*n_borders_dim[1] + borders[edge_size*n_borders_dim[1] + 2];
-         std::vector<npy_uint32> indices(borders + start, borders + end);
+    npy_uint64 edge_index = 0;
+    npy_uint64 begin = 0;
+    npy_uint64 end = 0;
+    std::cout << "post_processing_started" << std::endl; 
+    for(unsigned int edge_size = 0; edge_size < count[0] ; edge_size++){ 
+         edge_index = edge_size * n_borders_dim[1];
+         if(borders[edge_index + 2] >  20000)
+           std::cout << borders[edge_index + 2] << std::endl; 
+         begin = edge_index + 3;
+         end = edge_index + borders[edge_index + 2];
+         std::vector<npy_uint32> indices(borders + begin, borders + end);
          std::sort(indices.begin() , indices.end());
-         std::copy(indices.begin(), indices.end(), borders + edge_size*n_borders_dim[1] + 3);
+         std::copy(indices.begin(), indices.end(), borders + edge_index + 3);
    
     }
   
@@ -372,8 +376,9 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
 void get_dilation(unsigned int* dila_1, unsigned int* dila_2, 
                   npy_intp* steps, npy_int n_steps, unsigned int dila_index1, 
                   unsigned int dila_index2, npy_uint32* boundary, 
-                  unsigned int start_index, npy_uint32 border_dim){
+                  npy_uint64 start_index, npy_uint32 border_dim){
 
+     unsigned int cnt;
     //npy_int indices[n_steps];
     for(npy_int k = 0;k < n_steps; k++){
          dila_1[k] = dila_index1 + steps[k];
@@ -385,43 +390,22 @@ void get_dilation(unsigned int* dila_1, unsigned int* dila_2,
         for(npy_int j = 0;j < n_steps; j++){
             if(dila_1[h] == dila_2[j]){
                do_add = true;
-               assert(boundary[start_index*border_dim + 2] < border_dim); 
-               unsigned int cnt = boundary[start_index*border_dim + 2];
+               //std::cout << boundary[start_index] << "-" << boundary[start_index + 1] 
+               //<< "-" << boundary[start_index + 2] << std::endl;
+               assert(boundary[start_index + 2] < border_dim); 
+               cnt = boundary[start_index + 2];
                for(unsigned int f = 3;f < cnt ;f++){
-                   if(dila_1[h] ==  boundary[start_index*border_dim + f]){
+                   if(dila_1[h] ==  boundary[start_index + f]){
                       do_add = false;
                       break;
                    }                  
                }
                if(do_add){
-                   boundary[start_index*border_dim + cnt] = dila_1[h];
-                   boundary[start_index*border_dim + 2] += 1;
+                   boundary[start_index  + cnt] = dila_1[h];
+                   boundary[start_index + 2] += 1;
                }
             }
         }
     }    
 }
 
-void get_comparison(unsigned int* dilation, npy_intp* steps, npy_int n_steps, unsigned int ind, 
-                    npy_uint32* boundary, unsigned int start_index, npy_uint32 border_dim){
-
-    npy_int indices[n_steps];
-    
-    for(npy_int j=0;j < n_steps; j++){
-        indices[j] = steps[j] + ind;
-    }
-    
-    std::vector<unsigned int> setofA(indices, indices + n_steps); 
-
-    // calculate the intersecton of the dilated indices and add them to the structure
-    /* for (npy_int i = 0; i < n_steps; ++i) {
-        if (setofA.find(dilation[i]) != setofA.end()) {
-         
-           assert(boundary[start_index*border_dim + 2] < border_dim); 
-           unsigned int cnt = boundary[start_index*border_dim + 2];
-           boundary[start_index*border_dim + cnt] = dilation[i];
-           boundary[start_index*border_dim + 2] += 1;
-        }
-    }*/
-    
-}
