@@ -361,7 +361,7 @@ pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
 pdata(i).chunk = [2 8 1];
 pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
 pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
-pdata(i).name = 'K0057 clean';
+pdata(i).name = 'K0057 agglo';
 pdata(i).subgroups = {'agglomeration'};
 pdata(i).segparam_attr = '';
 pdata(i).segparams = 1:5:48;
@@ -415,7 +415,7 @@ p.remove_MEM_merged_nodes = false;
 
 
 % xxx - this should have been written to the downsampled hdf5 as an attribute, fix this when fixed in hdf5
-p.ds_ratio = [3 3 1];
+%p.ds_ratio = [3 3 1];
 
 p.skeleton_mode = false;
 if p.skeleton_mode
@@ -433,7 +433,7 @@ else
   p.supernchunks = [6 6 6];
   p.offset = [0 0 0];
   p.max_nodes = 1;  % only count somas that have this number of nodes or less (always 1???)
-  p.node_radius = 20;
+  p.node_radius = 100;
   p.superchunk_labels_unique = false;
   p.nalloc = 1e7; % soma mode requires bigger stacks
   p.remove_MEM_merged_nodes = true; % absolutely need this on for this to make sense

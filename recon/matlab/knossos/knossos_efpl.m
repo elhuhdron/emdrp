@@ -58,6 +58,13 @@ ind = find(strcmp({inf.Datasets.Name},p.dataset_data)); % find the dataset in th
 o.chunksize = inf.Datasets(ind).ChunkSize;
 o.datasize = inf.Datasets(ind).Dataspace(1).Size;
 o.scale = h5readatt(pdata.datah5,['/' p.dataset_data],'scale')';
+% get downsampling factor from hdf5 if available
+ind2 = find(strcmp({inf.Datasets(ind).Attributes.Name},'factor'));
+if ~isempty(ind2)
+  o.ds_ratio = inf.Datasets(ind).Attributes(ind2).Value';
+else
+  o.ds_ratio = p.ds_ratio;
+end
 
 % allow for ndgrid parameter spaces, being used in combination with sensitivity analysis.
 % for that mode, this output needs to be set as a cell array of the ndgrid of parameter space.
@@ -289,7 +296,7 @@ else % if p.skeleton_mode
     o.edge_length_use{n} = zeros(1,o.nedges(n));
     for n1=1:o.nnodes(n)
       % get the supervoxel label at the node point
-      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
+      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ o.ds_ratio);
 
       % skip if node plus radius is out of bounds of the supervoxel area
       n1subs = n1pt-o.loadcorner+p.matlab_base;
@@ -327,7 +334,7 @@ if p.nmlout
   [~,o.skelname,~] = fileparts(pdata.skelin);
   
   jnk = struct;
-  [outThings, nOutNodes] = getOutThings(o, p.ds_ratio);
+  [outThings, nOutNodes] = getOutThings(o, o.ds_ratio);
   jnk.fn = fullfile(p.outpath, [o.skelname '_use.nml']);
   knossos_write_nml(jnk.fn,outThings,meta,{});
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
@@ -423,6 +430,7 @@ for prm=1:o.nparams
   else
     % for soma-mode just count which somas have mergers
     o.nSMs(prm,:) = [nsplits, sum(things_with_mergers)]; 
+    fprintf(1,'\t\tsoma mode %.3f splits/node and %.3f %% nodes merged\n',o.nSMs(prm,1)/nskels,o.nSMs(prm,2)/nskels);
   end
   [nsplits, nmergers] = getSplitMergerSegEM(m_ijl); o.nSMs_segEM(prm,:) = [nsplits, nmergers];
 
@@ -823,7 +831,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
       edge_split{n} = false(1,o.nedges(n)); nodes_to_labels{n} = double(p.empty_label)*ones(o.nnodes(n),2);
       
       % convert nodes to subscript within dataset (accounting for any downsampling).
-      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ p.ds_ratio);
+      n1pt = fix(round(o.info(n).nodes(n1,1:3) - p.knossos_base) ./ o.ds_ratio);
       
       % get superchunk that this node center is in
       %superchunks(n,:) = fix((n1pt - o.loadcorner) ./ o.superchunk_size).*p.supernchunks + pdata.chunk;
@@ -834,6 +842,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
     end % for each node
   end % for each thing
 
+  %tic;
   cVlbls = p.empty_label*ones(s.size, class(p.empty_label));
   for sci=1:o.nlblsh5files
     % only load Vlbls if we have to (so that we skip loading superchunks without any somas)
@@ -906,6 +915,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
         end % for each unique label
       end % for each node
     end % for each thing
+    %toc; tic;
   end % for each superchunk label file
   
   % convert from cell array to unrolled array.

@@ -436,6 +436,13 @@ class dpSupervoxelClassifier():
         if self.iterative_mode and self.iterative_frag[ichunk] is None:
             frag.isTraining = False; self.iterative_frag[ichunk] = frag
 
+            # write out the starting labels as as subgroup 0
+            frag.subgroups_out[-1] = '%.8f' % 0.0
+            frag.data_cube = frag.supervoxels_noperim
+            verbose = frag.dpWriteh5_verbose; frag.dpWriteh5_verbose = frag.dpFRAG_verbose;
+            #self.data_attrs['types_nlabels'] = [ncomps]
+            frag.writeCube(); frag.dpWriteh5_verbose = verbose
+
         if not (len(self.test_chunks) == 1 and self.testin):
             frag.createFRAG(update = self.iterative_mode)
             #frag.createFRAG(update = False)
