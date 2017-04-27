@@ -12,7 +12,7 @@
 #chunk='16 17 4'
 #offset='0 0 0'
 
-fnraw=/Data_yello/watkinspv/K0057_D31_dsx3y3z1.h5
+fnraw=/Data/datasets/raw/K0057_D31_dsx3y3z1.h5
 dataset=data_mag_x3y3z1
 tmp=/home/watkinspv/Downloads/K0057_tracing/tmp
 size='256 256 32'
@@ -20,10 +20,10 @@ ctx_size='384 384 64'
 ctx_chunk='0 0 0'
 ctx_offset='64 64 16'
 minsize=9
-fn=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x6_y23_z3o0_labels
-outraw=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x6_y23_z3o0_crop
-chunk='6 23 3'
-offset='0 0 0'
+fn=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x13_y18_z15o64_labels
+outraw=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x13_y18_z15o64_crop
+chunk='13 18 15'
+offset='0 0 64'
 
 # load raw data and write out nrrd
 dpLoadh5.py --srcfile $fnraw --dataset $dataset --outraw $outraw.nrrd --chunk $chunk --size $size --offset $offset

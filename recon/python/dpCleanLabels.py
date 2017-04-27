@@ -123,9 +123,12 @@ class dpCleanLabels(emLabels):
             #rad = 5;                # amount to pad (need greater than one for method 3 because of smoothing
             #contour_level = 0.25;   # binary threshold for calculating surface mesh
             #smooth_size = [3, 3, 3];
-            rad = 7;                # amount to pad (need greater than one for method 3 because of smoothing
-            contour_level = 0.3;    # binary threshold for calculating surface mesh
-            smooth_size = [5, 5, 5];
+            #rad = 7;                # amount to pad (need greater than one for method 3 because of smoothing
+            #contour_level = 0.45;    # binary threshold for calculating surface mesh
+            #smooth_size = [5, 5, 5];
+            smooth_size = self.smooth_size
+            contour_level = self.smooth_contour
+            rad = int(1.5*smooth_size.max())
 
             #emptyLabel = 65535; % should define this in attribs?
             sizes = np.array(self.data_cube.shape); sz = sizes + 2*rad;
@@ -187,36 +190,25 @@ class dpCleanLabels(emLabels):
 
         if self.minsize > 0:
             labels = self.data_cube
-            sel_ECS, ECS_label = self.getECS(labels); labels[sel_ECS] = 0
-
-            if self.dpCleanLabels_verbose:
-                print('Scrubbing labels with minsize %d%s' % (self.minsize,
-                    ', ignoring ECS label %d' % (ECS_label,) if ECS_label else ''))
-                print('\tnlabels = %d, before re-label' % (labels.max(),))
-                t = time.time()
-
-            selbg = np.logical_and((labels == 0), np.logical_not(sel_ECS))
-            labels, sizes = emLabels.thresholdSizes(labels, minSize=self.minsize)
-            if self.minsize_fill:
-                if self.dpCleanLabels_verbose:
-                    print('Nearest neighbor fill scrubbed labels')
-                labels = emLabels.nearest_neighbor_fill(labels, mask=selbg, sampling=self.data_attrs['scale'])
-
-            nlabels = sizes.size
-            labels, nlabels = self.setECS(labels, sel_ECS, ECS_label, nlabels)
+            labels, nlabels = self.minsize_scrub(labels, self.minsize, self.minsize_fill)
             self.data_cube = labels
             # allow this to work before self.get_svox_type or self.write_voxel_type
             self.data_attrs['types_nlabels'] = [nlabels]
 
-            if self.dpCleanLabels_verbose:
-                print('\tnlabels = %d after re-label' % (nlabels,))
-                print('\tdone in %.4f s' % (time.time() - t))
-
-        if self.cavity_fill:
+        # NOTE: cavity_fill not intended to work with ECS labeled with single value (ECS components are fine)
+        if self.cavity_fill or self.cavity_fill_minsize > 1:
             if self.dpCleanLabels_verbose:
                 print('Removing cavities using conn %d' % (self.bg_connectivity,)); t = time.time()
 
-            selbg = (self.data_cube == 0)
+            if self.cavity_fill_minsize > 1:
+                if self.dpCleanLabels_verbose:
+                    print('\tAlso removing labels < %d in cavities' % (self.cavity_fill_minsize,))
+                labels_orig = self.data_cube
+                data, nlabels = self.minsize_scrub(labels_orig, self.cavity_fill_minsize, False)
+            else:
+                data = self.data_cube
+
+            selbg = (data == 0)
             if self.dpCleanLabels_verbose:
                 print('\tnumber bg vox before = %d' % (selbg.sum(dtype=np.int64),))
             labels = np.ones([x + 2 for x in self.data_cube.shape], dtype=np.bool)
@@ -225,13 +217,25 @@ class dpCleanLabels(emLabels):
             labels[1:-1,1:-1,0] = 0; labels[1:-1,1:-1,-1] = 0
             labels, nlabels = nd.measurements.label(labels, self.bgbwconn)
             msk = np.logical_and((labels[1:-1,1:-1,1:-1] != labels[0,0,0]), selbg); del labels
-            self.data_cube[msk] = 0; selbg[msk] = 0
-            self.data_cube = emLabels.nearest_neighbor_fill(self.data_cube, mask=selbg,
-                sampling=self.data_attrs['scale'])
+            #data[msk] = 0; # xxx - had this originally, seems redundant, delete this after verified
+            selbg[msk] = 0
+            self.data_cube = emLabels.nearest_neighbor_fill(data, mask=selbg, sampling=self.data_attrs['scale'])
 
             if self.dpCleanLabels_verbose:
                 print('\tnumber bg vox after = %d' % ((self.data_cube==0).sum(dtype=np.int64),))
                 print('\tdone in %.4f s' % (time.time() - t))
+
+            if self.cavity_fill_minsize > 1:
+                if self.dpCleanLabels_verbose:
+                    print('\tReplacing non-cavity labels')
+                labels = self.data_cube
+                sel_not_fill = np.logical_and(labels_orig > 0, labels == 0)
+                labels[sel_not_fill] = labels_orig[sel_not_fill]; selbg[sel_not_fill] = 0
+                del labels_orig, sel_not_fill
+                # remove any zero labels (that were removed as cavities)
+                self.data_cube, nlabels = self.minsize_scrub(labels, 1, False); del labels
+                # allow this to work before self.get_svox_type or self.write_voxel_type
+                self.data_attrs['types_nlabels'] = [nlabels]
 
             if self.get_svox_type or self.write_voxel_type:
                 if self.dpCleanLabels_verbose:
@@ -242,7 +246,6 @@ class dpCleanLabels(emLabels):
                 else:
                     voxel_type[msk] = 1
                 print('\t\tdone in %.4f s' % (time.time() - t))
-
             del msk, selbg
 
         if self.relabel:
@@ -259,6 +262,8 @@ class dpCleanLabels(emLabels):
 
             labels, nlabels = self.setECS(labels, sel_ECS, ECS_label, nlabels)
             self.data_cube = labels
+            # allow this to work before self.get_svox_type or self.write_voxel_type
+            self.data_attrs['types_nlabels'] = [nlabels]
 
             if self.dpCleanLabels_verbose:
                 print('\tnlabels = %d after re-label' % (nlabels,))
@@ -299,6 +304,41 @@ class dpCleanLabels(emLabels):
             if self.dpCleanLabels_verbose:
                 print('\tdone in %.4f s' % (time.time() - t))
 
+        # this step should not be mixed with other steps
+        if self.replace_ECS:
+            assert( len(self.data_attrs['types_nlabels']) == 2 )
+            sel_ECS = (self.data_cube > self.data_attrs['types_nlabels'][0]);
+            sel_ICS = np.logical_and(self.data_cube > 0, self.data_cube <= self.data_attrs['types_nlabels'][0])
+            self.data_cube[sel_ICS] += self.min_label
+            self.data_cube[sel_ECS] = self.ECS_label
+            # xxx - probably shouldn't be using this anyways?
+            self.data_attrs['types_nlabels'] = self.data_attrs['types_nlabels'][0]
+
+    def minsize_scrub(self, labels, minsize, minsize_fill):
+        sel_ECS, ECS_label = self.getECS(labels); labels[sel_ECS] = 0
+
+        if self.dpCleanLabels_verbose:
+            print('Scrubbing labels with minsize %d%s' % (minsize,
+                ', ignoring ECS label %d' % (ECS_label,) if ECS_label else ''))
+            print('\tnlabels = %d, before re-label' % (labels.max(),))
+            t = time.time()
+
+        selbg = np.logical_and((labels == 0), np.logical_not(sel_ECS))
+        labels, sizes = emLabels.thresholdSizes(labels, minSize=minsize)
+        if minsize_fill:
+            if self.dpCleanLabels_verbose:
+                print('Nearest neighbor fill scrubbed labels')
+            labels = emLabels.nearest_neighbor_fill(labels, mask=selbg, sampling=self.data_attrs['scale'])
+
+        nlabels = sizes.size
+        labels, nlabels = self.setECS(labels, sel_ECS, ECS_label, nlabels)
+
+        if self.dpCleanLabels_verbose:
+            print('\tnlabels = %d after re-label' % (nlabels,))
+            print('\tdone in %.4f s' % (time.time() - t))
+
+        return labels, nlabels
+
     def getECS(self, labels):
         if self.ECS_label > 0:
             sel_ECS = (labels == self.ECS_label); ECS_label = self.ECS_label
@@ -330,6 +370,10 @@ class dpCleanLabels(emLabels):
         # possible actions, suggest running one at a time since no easy way to specify the order
         # 3d smoothing of labels (done per label)
         p.add_argument('--smooth', action='store_true', help='Perform 3d smoothing on labels')
+        p.add_argument('--smooth-size', nargs=3, type=int, default=[3,3,3], metavar=('X', 'Y', 'Z'),
+            help='Size of smoothing kernel')
+        p.add_argument('--contour-lvl', nargs=1, type=float, default=[0.25], metavar=('LVL'),
+            help='Level [0,1] to use to create mesh isocontours')
         # remove components smaller than size (using voxel counts only)
         p.add_argument('--minsize', nargs=1, type=int, default=[-1], metavar=('size'),
             help='Minimum label size in voxels to keep')
@@ -340,12 +384,16 @@ class dpCleanLabels(emLabels):
                        help='Perform 3d adjacency removal using fg-connectivity')
         # remove cavities
         p.add_argument('--cavity-fill', action='store_true', help='Remove all BG not connected to cube faces')
+        # remove any labels less than specified size that are within cavities
+        p.add_argument('--cavity-fill-minsize', nargs=1, type=int, default=[1], metavar=('size'),
+            help='Minimum label size to replace labels in cavities (force cavity fill)')
         # rerun labeling (connected components)
         p.add_argument('--relabel', action='store_true', help='Re-label components (run connected components)')
         # recompute voxel type based on majority winner for each supervoxel
         p.add_argument('--get-svox-type', action='store_true', help='Recompute supervoxel type using majority method')
         p.add_argument('--write-voxel-type', action='store_true',
             help='Perform get-svox-type and also write out voxel-type based on supervoxels')
+        p.add_argument('--replace-ECS', action='store_true', help='Replace all ECS supervoxels with ECS-label')
         # make overlay that traces minpath between particular label value
         p.add_argument('--minpath', nargs=1, type=int, default=[-1], metavar=('label'),
             help='Calculate min foreground path between specified label (default off)')
