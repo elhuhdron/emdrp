@@ -93,7 +93,7 @@ class dpCleanLabels(emLabels):
 
                     # xxx - need something like imregionalmin in 3d, could not quickly find an easy solution
                     #   parameterize the min select percentage?
-                    d = d1+d2; bwlabels = ((d.data < 1.01*d.min()) & ~d.mask); bwlabels[s1 | s2] = 1
+                    d = d1+d2; bwlabels = ((d.data < self.minpath_perc*d.min()) & ~d.mask); bwlabels[s1 | s2] = 1
                     if self.minpath_skel:
                         # optionally skeletonize keeping original minpath points as anchors
                         bwlabels, diff, simpleLUT = binary_warping(bwlabels.copy(order='C'),
@@ -397,6 +397,8 @@ class dpCleanLabels(emLabels):
         # make overlay that traces minpath between particular label value
         p.add_argument('--minpath', nargs=1, type=int, default=[-1], metavar=('label'),
             help='Calculate min foreground path between specified label (default off)')
+        p.add_argument('--minpath-perc', nargs=1, type=float, default=[1.01], metavar=('perc'),
+            help='Percentage away from bwmin to label in minpath overlay')
         p.add_argument('--minpath-skel', action='store_true',
                        help='Whether to skeletonize min foreground path (for use with minpath)')
 
