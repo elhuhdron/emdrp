@@ -376,7 +376,7 @@ hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 plot(squeeze(split_er_CI(2,:,2)),squeeze(merge_fracnodes_CI(2,:,2)),'--');
 set(gca,'plotboxaspectratio',[1 1 1]);
 %set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
-xlabel('split edges'); ylabel('merged nodes');
+xlabel('splits per soma'); ylabel('fraction merged somas');
 title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g',abs(m(2)-m(1)),m(1),...
   minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2))));
 legend(names)
