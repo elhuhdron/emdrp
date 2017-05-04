@@ -27,8 +27,9 @@ CONVNET_OUT_DIR = os.path.join('Data','convnet_out')
 #CONVNET_DIR = os.path.join('workspace_eclipse','ctome_server','cuda-convnet-EM-alpha')
 #CONVNET_DIR = os.path.join('workspace_eclipse','ctome_server','cuda-convnet2')
 CONVNET_DIR = os.path.join('gits','emdrp','cuda-convnet2')
-NEON_DIR = os.path.join('gits','emdrp','neon')
+#NEON_DIR = os.path.join('gits','emdrp','neon')
 #PYTHON_INIT_CMD = 'export PATH="/home/watkinspv/anaconda2/bin:$PATH"'
+NEON_DIR = os.path.join('gits','emdrp','neon3')
 PYTHON_INIT_CMD = 'export PATH="/home/watkinspv/anaconda3/bin:$PATH"'
 
 def run_next_jobs(force=False):
