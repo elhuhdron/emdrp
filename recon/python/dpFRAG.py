@@ -75,6 +75,10 @@ class dpFRAG(emLabels):
     # xxx - usefulness of this parameter is unclear
     ovlp_dilate = 0
 
+    ## xxx - enables "nearest neighbor" only method with neighbor_perim==1.
+    ##   consistently found that having this == True leads to worse segmentations metrics for agglo.
+    #neighbor_only = False
+
     ############ dictionary keys used for saving variables for optimizations
 
     # these are items that are calculated during createFRAG for features.
@@ -253,7 +257,7 @@ class dpFRAG(emLabels):
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k,v in d.items(): setattr(self,k,v)
 
-        self.bperim = 2*max([self.ovlp_dilate, dpFRAG.neighbor_perim])
+        self.bperim = 2*max([self.ovlp_dilate, self.neighbor_perim])
         # external perimeter used to pad all volumes
         self.eperim = self.perim + self.bperim
         self.bwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.connectivity)
@@ -467,7 +471,7 @@ class dpFRAG(emLabels):
 
         if self.dpFRAG_verbose:
             print('Creating FRAG'); t = time.time()
-            useProgressBar = __useProgressBar and features and self.progress_bar
+            useProgressBar = _dpFRAG__useProgressBar and features and self.progress_bar
             if useProgressBar:
                 running_size = 0
                 #total_size = (self.supervoxels > 0).sum(dtype=np.int64)  # use svox volume
@@ -509,7 +513,7 @@ class dpFRAG(emLabels):
                 svox_size = self.svox_sizes[i-1]    # optimization for speed with sizes kept updated
                 lsvox_size = self.voxel_size_xform(svox_size)
                 svox_sel_out = nd.morphology.binary_dilation(svox_sel, structure=self.bwconn,
-                    iterations=dpFRAG.neighbor_perim)
+                    iterations=self.neighbor_perim)
 
                 # save the variables in svox_attrs to node attributes
                 d = locals(); n = { k:d[k] for k in dpFRAG.svox_attrs }; self.FRAG.node[i]['svox_attrs'] = n
@@ -559,7 +563,7 @@ class dpFRAG(emLabels):
                         # dilate the other supervoxel by the same perimeter amount within this bounding box.
                         # use the binary overlap between the two dilations as the boundary for these neighbors.
                         svox_ovlp = np.logical_and(n['svox_sel_out'], nd.morphology.binary_dilation((svox_cur == j),
-                            structure=self.bwconn, iterations=dpFRAG.neighbor_perim))
+                            structure=self.bwconn, iterations=self.neighbor_perim))
 
                         # create another bounding box arond the overlap area. this is simply an optimization for the
                         #   mean features, as this will be a smaller cropped area. in addition, used to calculate
@@ -576,15 +580,11 @@ class dpFRAG(emLabels):
                         ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
                         ovlp_cur[tuple([slice(x,-x) for x in self.perim])] = svox_ovlp[obnd]
 
-                        # xxx - this is an alternative method that does not work as well.
-                        #   replace this to use old method along with outRAG so that overlap is recomputed if the
-                        #   overlap is polluted by a non-adjacent neighbor. keeping other method here for reference:
-                        ## IMPORTANT: consistently did not find benefit of including neighbors that are not directly
-                        ##   adjacent. Avoid these from "polluting" the overlap, which means that the overlap can be
-                        ##   conserved between agglomerations (i.e., the small non-neighbor issue). Do this by only
-                        ##   counting the area that is also contained within the supervoxels as overlap.
-                        ##ovlp_cur = np.logical_and(ovlp_cur, np.logical_or(ovlp_svox_cur==i, ovlp_svox_cur==j))
-                        ##assert( ovlp_cur.sum(dtype=np.int64) > 0 ) # commented for speed, will error below anyways
+                        # Optionally only count the area that is also contained within the supervoxels as overlap.
+                        # If neighbor_perim==1, this should be equivalent to the "neighest neighbor only" method.
+                        if self.neighbor_only:
+                            ovlp_cur = np.logical_and(ovlp_cur, np.logical_or(ovlp_svox_cur==i, ovlp_svox_cur==j))
+                        #assert( ovlp_cur.sum(dtype=np.int64) > 0 ) # commented for speed, will error below anyways
 
                         # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
 
@@ -765,7 +765,7 @@ class dpFRAG(emLabels):
                 # supervoxels in this area that are not adjacent neighbors these will not be included in the
                 #   FRAG but need to be taken into account in optimization to not recompute overlap (ovlp_attrs).
                 svox_sel_outer = nd.morphology.binary_dilation(svox_sel_out, structure=self.bwconn,
-                    iterations=dpFRAG.neighbor_perim)
+                    iterations=self.neighbor_perim)
 
                 # get all supervoxels that would overlap with this one with symmetric dilations (includes neighbors).
                 outlbls = np.unique(svox_cur[svox_sel_outer])
@@ -1033,7 +1033,7 @@ class dpFRAG(emLabels):
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = False;
 
         if self.dpFRAG_verbose:
-            useProgressBar = __useProgressBar and self.progress_bar
+            useProgressBar = _dpFRAG__useProgressBar and self.progress_bar
             print('Threshold agglomeration for thresholds %s' % (' '.join([str(x) for x in thresholds]),))
             t = time.time()
             if useProgressBar:
@@ -1295,6 +1295,8 @@ class dpFRAG(emLabels):
         #    help='Amount to dilate overlap for calculating boundary features')
         #p.add_argument('--connectivity', nargs=1, type=int, default=[3], choices=[1,2,3],
         #    help='Connectivity for binary morphology operations')
+        p.add_argument('--neighbor-only', dest='neighbor_only', action='store_true',
+            help='Only use boundary voxels labeled with neighboring supervoxels (no background / non-neighbor voxels)')
         p.add_argument('--keep-subgroups', action='store_true',
             help='Keep subgroups for labels in path for subgroups-out')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
