@@ -75,9 +75,9 @@ class dpFRAG(emLabels):
     # xxx - usefulness of this parameter is unclear
     ovlp_dilate = 0
 
-    ## xxx - enables "nearest neighbor" only method with neighbor_perim==1.
-    ##   consistently found that having this == True leads to worse segmentations metrics for agglo.
-    #neighbor_only = False
+    # xxx - enables "nearest neighbor" only method with neighbor_perim==1.
+    #   consistently found that having this == True leads to worse segmentations metrics for agglo.
+    neighbor_only = False
 
     ############ dictionary keys used for saving variables for optimizations
 
@@ -1295,8 +1295,8 @@ class dpFRAG(emLabels):
         #    help='Amount to dilate overlap for calculating boundary features')
         #p.add_argument('--connectivity', nargs=1, type=int, default=[3], choices=[1,2,3],
         #    help='Connectivity for binary morphology operations')
-        p.add_argument('--neighbor-only', dest='neighbor_only', action='store_true',
-            help='Only use boundary voxels labeled with neighboring supervoxels (no background / non-neighbor voxels)')
+        #p.add_argument('--neighbor-only', dest='neighbor_only', action='store_true',
+        #    help='Only use boundary voxels labeled with neighboring supervoxels (no background / non-neighbor voxels)')
         p.add_argument('--keep-subgroups', action='store_true',
             help='Keep subgroups for labels in path for subgroups-out')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
