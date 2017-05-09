@@ -129,7 +129,9 @@ class dpResample(dpWriteh5):
         self.readCubeToBuffers()
 
         new_attrs = self.data_attrs
-        new_attrs['factor'] = np.ones((dpLoadh5.ND,),dtype=np.double)
+        # changed this to be added when raw hdf5 is created
+        if 'factor' not in new_attrs:
+            new_attrs['factor'] = np.ones((dpLoadh5.ND,),dtype=np.double)
         new_chunk = self.chunk.copy()
         new_size = self.size.copy()
         new_offset = self.offset.copy()
@@ -141,7 +143,8 @@ class dpResample(dpWriteh5):
             new_attrs['scale'][self.resample_dims] /= f
             new_attrs['boundary'][self.resample_dims] *= f
             new_attrs['nchunks'][self.resample_dims] *= f
-            new_attrs['factor'][self.resample_dims] *= f
+            # this attribute is saved as downsample factor
+            new_attrs['factor'][self.resample_dims] /= f
             new_chunk[self.resample_dims] *= f
             new_size[self.resample_dims] *= f
             new_offset[self.resample_dims] *= f
@@ -156,7 +159,8 @@ class dpResample(dpWriteh5):
             new_attrs['boundary'][self.resample_dims] //= f
             new_attrs['nchunks'][self.resample_dims] = \
                 np.ceil(new_attrs['nchunks'][self.resample_dims] / f).astype(np.int32)
-            new_attrs['factor'][self.resample_dims] /= f
+            # this attribute is saved as downsample factor
+            new_attrs['factor'][self.resample_dims] *= f
             new_chunk[self.resample_dims] //= f
             new_size[self.resample_dims] //= f
             new_offset[self.resample_dims] //= f

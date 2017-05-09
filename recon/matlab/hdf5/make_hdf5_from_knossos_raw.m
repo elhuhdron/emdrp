@@ -136,6 +136,8 @@ for mag = mags
   data_conf.chunkOffset = int32(chunk_sel_offset);
   data_conf.dimOrdering = int32(dim_order);
   data_conf.nchunks = int32(nchunks_sel);
+  % debated on this as downsample or upsample factor, upsampling from native not common, so use downsample factor.
+  data_conf.factor = double([mag mag mag]);
 
   %   if do_Corder, str = 'Corder'; else str = 'Forder'; end
   %   if do_chunk_select
