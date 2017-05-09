@@ -291,7 +291,7 @@ class dpFRAG(emLabels):
 
         # load the probability data
         if self.probfile:
-            if not self.load_prob_perim: offset = self.offset; size = self.size
+            if self.pad_prob_perim: offset = self.offset; size = self.size
             else: offset = self.offset - self.eperim; size = self.size + 2*self.eperim
 
             self.probs = [None]*self.nprob_types
@@ -302,7 +302,7 @@ class dpFRAG(emLabels):
                     offset=offset.tolist(), size=size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
                     verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
 
-                if not self.load_prob_perim:
+                if self.pad_prob_perim:
                     # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                     self.probs[i] = np.lib.pad(data, spad, 'constant',constant_values=0.5)
                 else:
@@ -315,7 +315,7 @@ class dpFRAG(emLabels):
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
                         verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
 
-                    if not self.load_prob_perim:
+                    if self.pad_prob_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                         self.probs_aug[j][i] = np.lib.pad(data, spad, 'constant',constant_values=0.5)
                     else:
@@ -329,7 +329,7 @@ class dpFRAG(emLabels):
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
                         verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
 
-                    if not self.load_prob_perim:
+                    if self.pad_prob_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
                         self.probs_static_aug[j] = np.lib.pad(data, spad, 'constant',constant_values=0.5)
                     else:
@@ -1301,7 +1301,8 @@ class dpFRAG(emLabels):
             help='Keep subgroups for labels in path for subgroups-out')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
         p.add_argument('--pad-raw-perim', action='store_true', help='Pad perimeter of raw EM instead of loading')
-        p.add_argument('--load-prob-perim', action='store_true', help='Load perimeter of probs instead of padding')
+        # using pad prob perim assumes that fill value for probs is 0 (not -1 or other)
+        p.add_argument('--pad-prob-perim', action='store_true', help='Pad perimeter of probs instead of loading')
         p.add_argument('--feature-set', nargs=1, type=str, default='standard',
             choices=['all','standard','medium','reduced','small','minimal'],
             help='Option to control which features are calculated')

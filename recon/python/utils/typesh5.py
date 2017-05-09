@@ -362,7 +362,8 @@ class emProbabilities(dpWriteh5):
     PROBS_DTYPE = np.single
     PROBS_STR_DTYPE = 'float32'
     PROBS_DATASET = 'probabilities'
-    EMPTY_PROB = -1.0
+    #EMPTY_PROB = -1.0
+    EMPTY_PROB = 0.0
 
     def __init__(self, args):
         #self.data_type = self.PROBS_DTYPE

@@ -1666,7 +1666,8 @@ class EMDataParser():
                     shape = shape[::-1]; chunks = tuple(chunks[::-1])
 
                     outfile.create_dataset(label_names[n], shape=shape, dtype=np.float32, compression='gzip',
-                        compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True, fillvalue=-1.0, chunks=chunks)
+                        #compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True, fillvalue=-1.0, chunks=chunks)
+                        compression_opts=self.HDF5_CLVL, shuffle=True, fletcher32=True, fillvalue=0.0, chunks=chunks)
                     # copy the attributes over
                     for name,value in list(self.data_attrs.items()):
                         outfile[label_names[n]].attrs.create(name,value)
