@@ -31,15 +31,15 @@ mags = 1;
 for mag = mags
 
   % Name of the dataset, stored in meta, used in filename
-  %dataset = 'M0007_33';
+  dataset = 'M0027_11';
   %dataset = 'k0725';
-  dataset = 'K0057_D31';
+  %dataset = 'K0057_D31';
 
   % Paths to root of Knossos raw data and path to where hdf5 should be written.
-  %inpath = sprintf('/mnt/fs/common/ECS_paper/ECS_3d_analysis/M0007_33/cubes/M0007_33_mag%d',mag);
+  inpath = sprintf('/mnt/cdcu/Common/ECS_paper/ECS_3d_analysis/M0027_11/cubes/M0027_11_mag%d',mag);
   %outpath = '/Data/big_datasets';
   %inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/%s_mag%d',dataset,mag);
-  inpath = sprintf('/run/media/watkinspv/My Passport/K0057_D31/cubes/K0057_D31_mag%d',mag);
+  %inpath = sprintf('/run/media/watkinspv/My Passport/K0057_D31/cubes/K0057_D31_mag%d',mag);
   outpath = '/Data/watkinspv';
 
   % The raw size of the Knossos cubes
@@ -49,9 +49,9 @@ for mag = mags
   knossos_conf_fn = 'Knossos.conf';
   
   % The prefix of the raw file names (Knossos cubes)
-  %raw_prefix = sprintf('M0007_33_mag%d',mag);
+  raw_prefix = sprintf('M0027_11_mag%d',mag);
   %raw_prefix = sprintf('110629_k0725_mag%d',mag);
-  raw_prefix = sprintf('K0057_D31_mag%d',mag);
+  %raw_prefix = sprintf('K0057_D31_mag%d',mag);
   
   % Chunksize written to hdf5 file, typically same as the Knossos raw size
   chunksize = rawsize;
@@ -71,11 +71,10 @@ for mag = mags
   % Options for only writing a subset of the Knossos raw chunks to the hdf5 file.
   % This will result in chunk indices into the hdf5 file that start at (0,0,0) for the offset defined here.
   % Use false for writing the entire hypercube to the hdf5 file.
-  do_chunk_select = false;
+  do_chunk_select = true;
   assert( ~do_chunk_select || length(mags)==1 ); % xxx - can't do select with multiple mags right now
-  % original 27 frontend "cubes"
-  chunk_sel_offset = [8 9 3];
-  nchunks_sel = [6 6 3];
+  chunk_sel_offset = [12 14 2];
+  nchunks_sel = [8 8 4];
   % if crop is on, dataset size is only the selected size, otherwise chunks written in context of whole dataset
   do_chunk_select_crop = false;
   
@@ -169,7 +168,7 @@ for mag = mags
   end
   
   for ix1 = 1:nchunks(1)
-    t = now;
+    t = now; block_disp = false;
     for ix2 = 1:nchunks(2)
       for ix3 = 1:nchunks(3)
         if chunk_lists(ix1,ix2,ix3)
@@ -180,9 +179,10 @@ for mag = mags
             if ~do_chunk_select_crop
               chunk_ind_write = chunk_ind_write + chunk_sel_offset;
             end
-            if ix2==1 && ix3==1
+            if ~block_disp
               disp(['writing hdf mag' num2str(mag) ' data for all-yz chunks starting at chunk ',num2str(chunk_ind),...
                 ' to all-yz chunks starting at chunk ', num2str(chunk_ind_write),' in ',hdffname]);
+              block_disp = true;
             end
             fn = fullfile(inpath,sprintf('x%04d',chunk_ind(1)),sprintf('y%04d',chunk_ind(2)),...
               sprintf('z%04d',chunk_ind(3)),sprintf('%s_x%04d_y%04d_z%04d.raw',raw_prefix,chunk_ind));
@@ -201,7 +201,9 @@ for mag = mags
         end % if in chunk list
       end % for z chunk
     end % for y chunk
-    display(sprintf('\tdone in %.3f s',(now-t)*86400));
+    if block_disp
+      display(sprintf('\tdone in %.3f s',(now-t)*86400));
+    end
   end % for x chunk
   
   % write all the meta data, knossos conf and data conf
