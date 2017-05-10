@@ -1,8 +1,8 @@
 
 
-%skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-%skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.nml';
+%skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.nml';
+skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.nml';
+%skelin = '/Data/datasets/skeletons/skeleton-kara-mod.054.nml';
 
 skelout = '/home/watkinspv/Downloads/out.nml';
 
@@ -14,8 +14,8 @@ p.rngdiff = [0 inf];
 p.write_new_nml = true;
 p.min_nodes = 2;
 p.interp_dim_rng = [inf -1];  % do not extrapolate
-p.extrap_max = 2;
-p.extrap_do_line = true;
+%p.extrap_max = 2;
+%p.extrap_do_line = true;
 
 tic; [minnodes, rngnodes] = knossos_interpolate(skelin,skelout,p); toc
 

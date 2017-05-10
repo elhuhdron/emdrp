@@ -60,8 +60,9 @@ o.datasize = inf.Datasets(ind).Dataspace(1).Size;
 o.scale = h5readatt(pdata.datah5,['/' p.dataset_data],'scale')';
 % get downsampling factor from hdf5 if available
 ind2 = find(strcmp({inf.Datasets(ind).Attributes.Name},'factor'));
+% xxx - currently ds_ratio only utilized in soma-mode, likely going to want this for skeleton mode also
 if ~isempty(ind2)
-  o.ds_ratio = inf.Datasets(ind).Attributes(ind2).Value';
+  o.ds_ratio = double(inf.Datasets(ind).Attributes(ind2).Value');
 else
   o.ds_ratio = p.ds_ratio;
 end
@@ -75,6 +76,7 @@ if ~isempty(pdata.segparam_attr)
   o.thresholds = h5readatt(pdata.lblsh5,['/' 'voxel_type'],pdata.segparam_attr)';
 else
   if iscell(pdata.segparams)
+    % xxx - haven't validated this code-path in some time
     o.thresholds = 1:length(pdata.segparams{1}(:));
     o.segparams = cellfun(@(x) x(:), pdata.segparams,'UniformOutput',false);
   else
@@ -316,6 +318,8 @@ else % if p.skeleton_mode
   fprintf(1,'excluding %d/%d nodes and %d/%d things ',sum(o.nnodes)-nnodes,sum(o.nnodes),...
     sum(~o.omit_things)-nskels,sum(~o.omit_things));
   fprintf(1,'because outside of labeled volume or subsampling\n');
+  % this possibly could be changed, but several spots currently assume that nnodes==nskels in "soma-mode"
+  %   so would require changes in several spots, including in plotting.
   assert( nskels == nnodes ); % xxx - did not see a point to multiple nodes per soma in "soma-mode"
 
   % centered meshgrid and select for iterating points around radius of each node

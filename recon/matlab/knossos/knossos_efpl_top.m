@@ -196,10 +196,10 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
 % pdata(i).chunk = [16 17 0];
 % %pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.interp.nml';
-% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_supervoxels.h5';
-% pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_probs.h5';
-% pdata(i).name = 'huge_mbf32';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper/huge_supervoxels.h5';
+% %pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/huge_probs.h5';
+% pdata(i).name = 'huge_mf32';
 % pdata(i).subgroups = {'with_background'};
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
@@ -209,16 +209,28 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
 % pdata(i).chunk = [12 14 2];
 % %pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.interp.nml';
-% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/none_supervoxels.h5';
-% pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/none_probs.h5';
-% pdata(i).name = 'none_mbf32';
+% pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper/none_supervoxels.h5';
+% %pdata(i).probh5 = '/Data/watkinspv/full_datasets/neon/mbfergus32all/none_probs.h5';
+% pdata(i).name = 'none_mf32';
 % pdata(i).subgroups = {'with_background'};
-% %pdata(i).segparam_attr = 'thresholds';
-% pdata(i).segparam_attr = '';
-% pdata(i).segparams = [0.5 0.6 0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99999000];
+% pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
 
+
+% with ~20% ECS, agglomeration
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% corner chunk
+pdata(i).chunk = [16 17 0];
+pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
+% supervoxels, all thresholds and watershed types
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper/huge_wbg_ovlp_mfergus32_rf_100iter2p_medium_supervoxels.h5';
+pdata(i).name = 'huge_wbg_ovlp_agglo';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = 1:100;
+pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -355,17 +367,17 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparams = 39:48;
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-% K0057 agglomeration somas agglo
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
-pdata(i).chunk = [2 8 1];
-pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
-pdata(i).name = 'K0057 agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 1:5:48;
-pdata(i).nlabels_attr = 'types_nlabels';
+% % K0057 agglomeration somas agglo
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+% pdata(i).chunk = [2 8 1];
+% pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+% pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
+% pdata(i).name = 'K0057 agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 1:5:48;
+% pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -408,16 +420,17 @@ p.estimate_diameters = false;
 
 % usually set these two to true for interpolation, but false for normal
 % set this to true to remove non-ICS nodes from polluting the rand error
-p.remove_MEM_ECS_nodes = false;
+p.remove_MEM_ECS_nodes = true;
 % set this to true to remove nodes falling into MEM areas from counting as merged nodes
-p.remove_MEM_merged_nodes = false;
+p.remove_MEM_merged_nodes = true;
 
 
 
 % xxx - this should have been written to the downsampled hdf5 as an attribute, fix this when fixed in hdf5
 %p.ds_ratio = [3 3 1];
+p.ds_ratio = [1 1 1];
 
-p.skeleton_mode = false;
+p.skeleton_mode = true;
 if p.skeleton_mode
   p.nchunks = [8 8 4];
   %p.nchunks = [6 6 3];
@@ -441,8 +454,8 @@ end
 
 % these could be defined per pdata blocks, but did not see a good reason for this.
 % have to do separate runs if the dataset names are different.
-%p.dataset_data = 'data_mag1';
-p.dataset_data = 'data_mag_x3y3z1';
+p.dataset_data = 'data_mag1';
+%p.dataset_data = 'data_mag_x3y3z1';
 p.dataset_lbls = 'labels';
 
 % optional outputs for debug / validation
@@ -466,7 +479,7 @@ for i = 1:length(pdata)
 end
 
 % save the results
-%save('/home/watkinspv/Data/efpl/efpl_interp_k0725_agglo','p','pdata','o');
+save('/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat','p','pdata','o');
-save('/home/watkinspv/Downloads/tmp.mat','p','pdata','o');
+%save('/home/watkinspv/Downloads/tmp.mat','p','pdata','o');
