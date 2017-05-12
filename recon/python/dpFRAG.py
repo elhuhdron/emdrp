@@ -82,7 +82,7 @@ class dpFRAG(emLabels):
     # some of them can be saved between agglomerations as an optimization for speed.
     # these are lists of local variables that are saved in some instances where all of the features can not be
     #   preserved, but some of the overlap calculations can still be preserved.
-    svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out','svox_sel_out_perim']
+    svox_attrs = ['pbnd','svox_size','lsvox_size','svox_sel_out','ppbnd','perim_ovlp','svox_sel_out_perim']
     sovlp_attrs = ['sel_size','lsel_size','C','V','angles','Cpts']
     ovlp_attrs = ['mean_probs','mean_probs_aug','mean_probs_static_aug',
                   'mean_grayscale','mean_grayscale_aug','mean_grayscale_static_aug',
@@ -283,17 +283,8 @@ class dpFRAG(emLabels):
         if self.pad_svox_perim:
             self.readCubeToBuffers()
         else:
-            # add perim to size and offset, two potential methods:
-
-            ## (A) load context for both overlap and dilation perims
-            #offset = self.offset; size = self.size
-            #self.offset = self.offset - self.eperim; self.size = self.size + 2*self.eperim; self.inith5()
-            #self.readCubeToBuffers()
-            ## reset size and offset to original
-            #self.offset = offset; self.size = size; self.inith5()
-
-            # (B) load context for overlap perim only and pad dilation perim with zeros
-            #   xxx - not clear this is better, but prevents dilations from potentially exceeding bounding boxes
+            # load context for overlap perim only and pad dilation perim with zeros.
+            #   this prevents dilations from potentially exceeding bounding boxes
             offset = self.offset; size = self.size
             self.offset = self.offset - self.perim; self.size = self.size + 2*self.perim; self.inith5()
             self.readCubeToBuffers()
@@ -307,32 +298,24 @@ class dpFRAG(emLabels):
             self.data_cube[self.data_cube > self.data_attrs['types_nlabels'][0]] = 0
         relabel, sizes = emLabels.relabel_sequential(self.data_cube); self.nsupervox = sizes.size
         self.data_cube = np.zeros((0,))
+        # supervoxel sizes are needed in advance for createFRAG (ignore background size).
+        #self.svox_sizes = emLabels.getSizes(relabel, maxlbls=self.nsupervox)[1:] # keeping this here for reference
+        self.svox_sizes = sizes
             
         if self.pad_svox_perim:
-            self.supervoxels_noperim = relabel
-            self.supervoxels = np.lib.pad(relabel, self.spad, 'constant',
-                constant_values=0).astype(self.data_type_out, copy=False)
-            # supervoxel sizes are needed in advance for createFRAG (ignore background size).
-            #self.svox_sizes = emLabels.getSizes(self.supervoxels_noperim, maxlbls=self.nsupervox)[1:]
-            self.svox_sizes = sizes
+            self.supervoxels_noperim = relabel.astype(self.data_type_out, copy=False)
+            self.supervoxels = np.lib.pad(self.supervoxels_noperim, self.spad, 'constant', constant_values=0)
+            self.supervoxels_zeroperim = self.supervoxels
         else:
-            # remove any supervoxels that are only in the perimeter
-            p = self.eperim
-            svox_perim_only = relabel.copy()
-            svox_perim_only[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]] = 0
-            sizes_perim_only = emLabels.getSizes(svox_perim_only, maxlbls=self.nsupervox)[1:]
-            # if size is same in perimeter only as in the whole volume, then it's a perimeter only supervoxel.
-            sel = np.zeros((self.nsupervox+1,), dtype=np.bool); sel[1:] = (sizes > sizes_perim_only)
-            supervox_map = np.cumsum(sel, dtype=relabel.dtype)
-            self.supervoxels = supervox_map[relabel]
-            self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]].copy()
-            self.svox_sizes = sizes[sel[1:]]; self.nsupervox = supervox_map[-1]
-
-            # use select to not allow any neighbors to be added to rag that either:
+            # if we're using context supervoxels (pad_sox_perim==False) still need a zero perim version so that
+            #   we don't add edges to the rag for supervoxels that:
             #   (1) only overlap in the perimeter
             #   (2) overlap due to a dilation from the perimeter coming back into the non-perimeter volume
+            self.supervoxels = relabel.astype(self.data_type_out, copy=False)
             self.perim_sel = np.ones(self.supervoxels.shape, dtype=np.bool)
-            self.perim_sel[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]] = 0
+            p = self.eperim; self.perim_sel[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]] = 0
+            self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]]
+            self.supervoxels_zeroperim = self.supervoxels.copy(); self.supervoxels_zeroperim[self.perim_sel] = 0
 
         # load the probability data
         if self.probfile:
@@ -491,13 +474,8 @@ class dpFRAG(emLabels):
 
     def createFRAG(self, features=True, update=False):
         # get bounding boxes for each supervoxel
-        #self.svox_bnd = nd.measurements.find_objects(self.supervoxels, self.nsupervox)
-        if self.pad_svox_perim:
-            svox_zero_perim = self.supervoxels
-        else:
-            # do not want bounding boxes to include portions of supervoxels going into the perimeter part of the volume
-            svox_zero_perim = self.supervoxels.copy(); svox_zero_perim[self.perim_sel] = 0
-        self.svox_bnd = nd.measurements.find_objects(svox_zero_perim, self.nsupervox)
+        svox_bnd_perim = nd.measurements.find_objects(self.supervoxels, self.nsupervox)
+        self.svox_bnd = svox_bnd_perim if self.pad_svox_perim else [None]*self.nsupervox 
 
         # use update to only calculate features for nodes and neighbors in FRAG updated by agglomerate()
         make_outRAG = False
@@ -538,6 +516,18 @@ class dpFRAG(emLabels):
 
         # iterate over supervoxels and get neighbors (edges) and add features for each neighbor
         for i in svox_order:
+            if not self.pad_svox_perim:
+                # if perimeter supervoxels were loaded, crop to only inside non-perimeter volume.
+                # this is faster than calling find_objects twice outside the loop.
+                # xxx - slice members are not modifiable, therefore all these riduculous generator statements
+                self.svox_bnd[i-1] = tuple([slice(\
+                    b if x.start < b else e if x.start > e else x.start,
+                    b if x.stop < b else e if x.stop > e else x.stop) \
+                    for x,b,e in zip(svox_bnd_perim[i-1], self.eperim, self.eperim + self.size)])
+                    
+                # this is for supervoxels loaded with context, ignore any supervoxels in the perimeter only
+                if any([x.start == x.stop for x in self.svox_bnd[i-1]]): continue
+            
             # if this is a FRAG update, then skip if all the edges coming out of this node have features.
             # also can't have any features that are in first_pass.
             # NOTE: if there are no neighbors left for this supervoxel, no need to compute supervoxel attributes.
@@ -551,29 +541,33 @@ class dpFRAG(emLabels):
                 n = self.FRAG.node[i]['svox_attrs']
 
                 # this has to be redone because some of the neighbors inside of pbnd may have changed
-                svox_cur = svox_zero_perim[n['pbnd']]
+                svox_cur = self.supervoxels_zeroperim[n['pbnd']]
+
+                # reload perimeter supervoxels, see supervoxel perimeter NOTE above
+                svox_cur_perim = self.supervoxels[n['ppbnd']]
             else:
-                # bound with perimeter around current supervoxel
+                # bound with dilation perimeter around current supervoxel
                 pbnd = tuple([slice(x.start-self.bperim,x.stop+self.bperim) for x in self.svox_bnd[i-1]])
-                svox_cur = svox_zero_perim[pbnd]
 
                 # select the curent supervoxel and dilate it out by perim
-                svox_sel = (svox_cur == i)
-                #svox_size = svox_sel.sum(dtype=np.int64); assert( self.svox_sizes[i-1] == svox_size )
-                svox_size = self.svox_sizes[i-1]    # optimization for speed with sizes kept updated
+                svox_cur = self.supervoxels_zeroperim[pbnd]
+                svox_sel_out = nd.morphology.binary_dilation(svox_cur == i, structure=self.bwconn, 
+                                                             iterations=self.neighbor_perim)
+                
+                # not recalculating sizes every time is big optimization, keep updated during agglo
+                svox_size = self.svox_sizes[i-1]
                 lsvox_size = self.voxel_size_xform(svox_size)
-                svox_sel_out = nd.morphology.binary_dilation(svox_sel, structure=self.bwconn,
-                    iterations=self.neighbor_perim)
 
-                # supervoxel perimeter NOTE: need extra code here because:
-                #   (1) we want the overlap (boundary voxels) to include areas in the perimeter
-                #   (2) we do NOT want anything in the perimeter to influence how the neighbors are defined
-                svox_sel_out_perim = svox_sel_out
+                # calculate perimeter supervoxels, see supervoxel perimeter NOTE above
+                ppbnd = pbnd; perim_ovlp = False; svox_cur_perim = svox_cur; svox_sel_out_perim = svox_sel_out
                 if not self.pad_svox_perim:
-                    # any is just optimization as most supervoxels should not be along volume boundary
-                    if self.perim_sel[pbnd].any():
-                        # dilate this supervoxel in the perimeter areas only and or it with the current dilation.
-                        svox_sel_out_perim = nd.morphology.binary_dilation(self.supervoxels[pbnd] == i, 
+                    ppbnd = tuple([slice(x.start-self.bperim,x.stop+self.bperim) for x in svox_bnd_perim[i-1]])
+                    perim_ovlp = self.perim_sel[ppbnd].any()
+                    if perim_ovlp:
+                        # this supervoxel goes into the perimeter so select out supervoxel including perimeter
+                        svox_cur_perim = self.supervoxels[ppbnd]
+                        # dilate including the perimeter volume
+                        svox_sel_out_perim = nd.morphology.binary_dilation(svox_cur_perim == i, 
                             structure=self.bwconn, iterations=self.neighbor_perim)
 
                 # save the variables in svox_attrs to node attributes
@@ -583,12 +577,6 @@ class dpFRAG(emLabels):
             nbrlbls = np.unique(svox_cur[n['svox_sel_out']])
             # do not add edges to background or to the same supervoxel
             nbrlbls = nbrlbls[np.logical_and(nbrlbls != i, nbrlbls != 0)]
-
-            if self.pad_svox_perim:
-                svox_cur_perim = svox_cur
-            else:
-                # reload svox_cur again to get perimeter supervoxels, see supervoxel perimeter NOTE above
-                svox_cur_perim = self.supervoxels[n['pbnd']]
 
             # udpate the progress bar based on the current supervoxel size divided by its number of neighbors.
             # add all remainders to last update for this supervoxel.
@@ -632,20 +620,29 @@ class dpFRAG(emLabels):
                         svox_ovlp = np.logical_and(nd.morphology.binary_dilation((svox_cur_perim == j),
                             structure=self.bwconn, iterations=self.neighbor_perim), n['svox_sel_out_perim'])
 
-                        # create another bounding box arond the overlap area. this is simply an optimization for the
-                        #   mean features, as this will be a smaller cropped area. in addition, used to calculate
-                        #   more completex features of the objects and the overlap in the local overlap volume.
+                        # get a tight bounding box around the overlap
                         obnd = nd.measurements.find_objects(svox_ovlp,1)[0]
-                        # convert bounding box back to entire volume space.
-                        aobnd = tuple([slice(x.start+y.start-self.perim[k],
-                            x.stop+y.start+self.perim[k]) for x,y,k in zip(obnd,n['pbnd'],range(dpLoadh5.ND))])
+                        # create another bounding box arond the overlap area. this is an optimization for the
+                        #   features, as this will be a smaller cropped area, i.e., compute "local features". 
+                        # make this bounding box relative to the entire volume (with perimeter).
+                        aobnd = tuple([slice(x.start+y.start-z, x.stop+y.start+z) \
+                                       for x,y,z in zip(obnd,n['ppbnd'],self.perim)])
+                        if n['perim_ovlp']:
+                            # adjust perimeter so that we don't go out of bounds if overlap is already into perimeter.
+                            # xxx - slice members are not modifiable, therefore these riduculous generator statements
+                            lperim = [0 if y.start >= 0 else -y.start for x,y in zip(self.perim, aobnd)]
+                            rperim = [0 if y.stop <= z else y.stop-z for x,y,z in zip(self.perim, aobnd, 
+                                                                                      self.supervoxels.shape)]
+                            aobnd = tuple([slice(x.start+l, x.stop-r) for x,l,r in zip(aobnd,lperim,rperim)])
+                            pobnd = tuple([slice(x-l,(-x+r) or None) for x,l,r in zip(self.perim,lperim,rperim)])
+                        else:
+                            pobnd = tuple([slice(x,-x) for x in self.perim])
 
                         # get the supervoxels within the overlap bounding box.
                         ovlp_svox_cur = self.supervoxels[aobnd]
 
                         # convert the overlap to within the same bounding box.
-                        ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
-                        ovlp_cur[tuple([slice(x,-x) for x in self.perim])] = svox_ovlp[obnd]
+                        ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool); ovlp_cur[pobnd] = svox_ovlp[obnd]
 
                         # Optionally only count the area that is also contained within the supervoxels as overlap.
                         # If neighbor_perim==1, this should be equivalent to the "neighest neighbor only" method.
@@ -1021,22 +1018,33 @@ class dpFRAG(emLabels):
             #assert( self.nsupervox+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
             self.outRAG = nx.relabel_nodes(self.outRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
 
-        # create/write the new supervoxels from the supervoxel_map containing mapping from old nodes to agglo nodes.
-        self.data_cube = supervox_map[self.supervoxels_noperim]
+        # create the new supervoxels from the supervoxel_map containing mapping from old nodes to agglo nodes.
+        self.supervoxels = supervox_map[self.supervoxels]
+        p = self.eperim; self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]]
+        self.nsupervox_prev = self.nsupervox; self.nsupervox = ncomps
+        self.svox_sizes = svox_sizes[:ncomps]
+        if self.pad_svox_perim:
+            self.data_cube = self.supervoxels_noperim
+            self.data_attrs['types_nlabels'] = [ncomps]
+            self.supervoxels_zeroperim = self.supervoxels
+        else:
+            # if we loaded supervoxels in perimeter, need to relabel before writing in order to remove
+            #   any supervoxels that are ONLY in the perimeter part of volume.
+            self.data_cube, sizes = emLabels.relabel_sequential(self.supervoxels_noperim)
+            self.data_attrs['types_nlabels'] = [sizes.size]
+            
+            # xxx - which of these is faster???
+            self.supervoxels_zeroperim = self.supervoxels.copy(); self.supervoxels_zeroperim[self.perim_sel] = 0
+            #self.supervoxels_zeroperim = supervox_map[self.supervoxels_zeroperim]
+        # write out the agglomerated supervoxels (without perimeter context)
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = self.dpFRAG_verbose;
-        self.data_attrs['types_nlabels'] = [ncomps]
         if doWrite:
             self.writeCube(); self.dpWriteh5_verbose = verbose
+        self.data_cube = np.zeros((0,))
 
-        # other self updates for the new supervoxels
-        self.supervoxels_noperim = self.data_cube
-        self.supervoxels = np.lib.pad(self.data_cube, self.spad, 'constant',
-            constant_values=0).astype(self.data_type_out, copy=False)
-        self.nsupervox_prev = self.nsupervox; self.nsupervox = ncomps; self.data_cube = np.zeros((0,))
-        self.svox_sizes = svox_sizes[:ncomps]
 
         if self.dpFRAG_verbose:
-            print('\tnsupervox',ncomps)
+            print('\tnsupervox',self.data_attrs['types_nlabels'][0])
             print('\tdone in %.4f s' % (time.time() - t, ))
 
     # "macro" for iterating neighbors for singleton nodes (not being agglomerated) in FRAG and outRAG
