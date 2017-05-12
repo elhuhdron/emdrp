@@ -49,7 +49,7 @@ class dpCleanLabels(emLabels):
     def clean(self):
 
         # read voxel types first, allows for cavity_fill and get_svox_type to be both specified
-        if self.get_svox_type or self.write_voxel_type:
+        if self.get_svox_type or self.write_voxel_type or self.apply_bg_mask:
             if self.dpCleanLabels_verbose:
                 print('Reading supervoxel types'); t = time.time()
 
@@ -269,6 +269,16 @@ class dpCleanLabels(emLabels):
                 print('\tnlabels = %d after re-label' % (nlabels,))
                 print('\tdone in %.4f s' % (time.time() - t))
 
+        # this step re-writes the original background (membrane) mask back to the supervoxels.
+        # this is useful if agglomeration was done using the completely watershedded supervoxels.
+        if self.apply_bg_mask:
+            if self.dpCleanLabels_verbose:
+                print('Applying background (membrane) mask to supervoxels'); t = time.time()
+            sel = (voxel_type == 0)
+            self.data_cube[sel] = 0
+            if self.dpCleanLabels_verbose:
+                print('\tdone in %.4f s' % (time.time() - t))
+
         # this step is always last, as writes new voxel_type depending on the cleaning that was done
         if self.get_svox_type or self.write_voxel_type:
             if self.dpCleanLabels_verbose:
@@ -389,6 +399,9 @@ class dpCleanLabels(emLabels):
             help='Minimum label size to replace labels in cavities (force cavity fill)')
         # rerun labeling (connected components)
         p.add_argument('--relabel', action='store_true', help='Re-label components (run connected components)')
+        # write background (membrane mask) using the voxel type
+        p.add_argument('--apply-bg-mask', action='store_true', 
+                       help='Write voxel-type background (membrane) mask to supervoxels')
         # recompute voxel type based on majority winner for each supervoxel
         p.add_argument('--get-svox-type', action='store_true', help='Recompute supervoxel type using majority method')
         p.add_argument('--write-voxel-type', action='store_true',
