@@ -42,7 +42,8 @@ class dpMergeProbs(object):
         for k, v in vars(args).items():
             if type(v) is list:
                 # do not save items that are known to be lists (even if one element) as single elements
-                if len(v)==1 and k not in ['srcfiles', 'affins', 'types', 'weightings', 'dim_orderings', 'ops']:
+                if len(v)==1 and k not in ['srcfiles', 'affins', 'types', 'weightings', 'dim_orderings', 'ops',
+                        'subgroups_out']:
                     setattr(self,k,v[0])  # save single element lists as first element
                 elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
                     setattr(self,k,np.array(v,dtype=np.int32))
@@ -99,7 +100,7 @@ class dpMergeProbs(object):
                         chunk=self.chunk.tolist(), offset=self.offset.tolist(), size=self.size.tolist(),
                         datasize=self.datasize.tolist(), chunksize=self.chunksize.tolist(), attrs=self.attrs,
                         data_type=emProbabilities.PROBS_STR_DTYPE, data=affins[:,:,:,i,j],
-                        verbose=self.dpMergeProbs_verbose)
+                        verbose=self.dpMergeProbs_verbose, subgroups_out=self.subgroups_out)
         else:
             for k in range(self.nops):
                 for j in range(self.ntypes):
@@ -107,7 +108,7 @@ class dpMergeProbs(object):
                     dpWriteh5.writeData(outfile=self.outprobs, dataset=dataset, chunk=self.chunk.tolist(),
                         offset=self.offset.tolist(), size=self.size.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), attrs=self.attrs, data_type=emProbabilities.PROBS_STR_DTYPE,
-                        data=probs[k][j],verbose=self.dpMergeProbs_verbose)
+                        data=probs[k][j],verbose=self.dpMergeProbs_verbose, subgroups_out=self.subgroups_out)
 
 
     # this function takes the orthogonal reslice affinity outputs from trained convnets, also with multiple types
@@ -188,6 +189,8 @@ class dpMergeProbs(object):
             help='Offset in chunk to read')
         p.add_argument('--size', nargs=3, type=int, default=[256,256,128], metavar=('X', 'Y', 'Z'),
             help='Size in voxels to read')
+        p.add_argument('--subgroups-out', nargs='*', type=str, default=[None], metavar=('GRPS'),
+            help='List of groups to identify subgroup for the output dataset (empty for top level)')
 
         p.add_argument('--outprobs', nargs=1, type=str, default='', metavar='FILE',
             help='Voxel type probs h5 output file')
