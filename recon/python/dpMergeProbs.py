@@ -189,7 +189,7 @@ class dpMergeProbs(object):
             help='Offset in chunk to read')
         p.add_argument('--size', nargs=3, type=int, default=[256,256,128], metavar=('X', 'Y', 'Z'),
             help='Size in voxels to read')
-        p.add_argument('--subgroups-out', nargs='*', type=str, default=[None], metavar=('GRPS'),
+        p.add_argument('--subgroups-out', nargs='*', type=str, default=[], metavar=('GRPS'),
             help='List of groups to identify subgroup for the output dataset (empty for top level)')
 
         p.add_argument('--outprobs', nargs=1, type=str, default='', metavar='FILE',

@@ -516,7 +516,7 @@ class dpWatershedTypes(object):
            help='Optionally crop down outputs before writing')
         p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(5),
             help='Diamond radius of structuring element to try to fill in background (membrane) gaps')
-        p.add_argument('--subgroups', nargs='*', type=str, default=[None], metavar=('GRPS'),
+        p.add_argument('--subgroups', nargs='*', type=str, default=[], metavar=('GRPS'),
             help='List of groups to identify subgroup for the output dataset (empty for top level)')            
         p.add_argument('--dpWatershedTypes-verbose', action='store_true',
             help='Debugging output for dpWatershedTypes')
