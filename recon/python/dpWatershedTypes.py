@@ -53,7 +53,7 @@ class dpWatershedTypes(object):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
             if type(v) is list and k not in ['ThrHi', 'ThrLo', 'fg_types_labels', 'ThrRngSave', 'ThrHiSave',
-                    'ThrLoSave']:
+                    'ThrLoSave', 'subgroups_out']:
                 # do not save items that are known to be lists (even if one element) as single elements
                 if len(v)==1 and k not in ['fg_types', 'Tmins']:
                     setattr(self,k,v[0])  # save single element lists as first element
@@ -374,22 +374,22 @@ class dpWatershedTypes(object):
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), data=labels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=['with_background']+subgroups )
+                        attrs=d, strbits=self.outlabelsbits,subgroups=self.subgroups_out+['with_background']+subgroups )
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), data=wlabels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=['zero_background']+subgroups )
+                        attrs=d, strbits=self.outlabelsbits,subgroups=self.subgroups_out+['zero_background']+subgroups )
                     d['type_nlabels'] = types_ucnlabels;
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), data=uclabels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=['no_adjacencies']+subgroups )
+                        attrs=d, strbits=self.outlabelsbits,subgroups=self.subgroups_out+['no_adjacencies']+subgroups )
                     if self.skeletonize:
                         emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                             offset=self.offset_crop.tolist(), size=self.size_crop.tolist(),
                             datasize=self.datasize.tolist(), chunksize=self.chunksize.tolist(), data=sklabels,
                             verbose=writeVerbose, attrs=d, strbits=self.outlabelsbits,
-                            subgroups=['skeletonized']+subgroups )
+                            subgroups=self.subgroups_out+['skeletonized']+subgroups )
 
     # This labeling method connects zslices layer-by-layer. This can be done by simply overlapping the eroded labeled
     #   regoins or by overlapping by using warped labels (with warps generated externally by some optic flow method).
@@ -516,6 +516,8 @@ class dpWatershedTypes(object):
            help='Optionally crop down outputs before writing')
         p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(5),
             help='Diamond radius of structuring element to try to fill in background (membrane) gaps')
+        p.add_argument('--subgroups-out', nargs='*', type=str, default=[None], metavar=('GRPS'),
+            help='List of groups to identify subgroup for the output dataset (empty for top level)')            
         p.add_argument('--dpWatershedTypes-verbose', action='store_true',
             help='Debugging output for dpWatershedTypes')
 
