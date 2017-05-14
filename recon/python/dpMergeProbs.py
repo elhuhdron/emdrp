@@ -40,10 +40,9 @@ class dpMergeProbs(object):
     def __init__(self, args):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
-            if type(v) is list:
+            if type(v) is list and k not in ['subgroups_out']:
                 # do not save items that are known to be lists (even if one element) as single elements
-                if len(v)==1 and k not in ['srcfiles', 'affins', 'types', 'weightings', 'dim_orderings', 'ops',
-                        'subgroups_out']:
+                if len(v)==1 and k not in ['srcfiles', 'affins', 'types', 'weightings', 'dim_orderings', 'ops']:
                     setattr(self,k,v[0])  # save single element lists as first element
                 elif type(v[0]) is int:   # convert the sizes and offsets to numpy arrays
                     setattr(self,k,np.array(v,dtype=np.int32))
