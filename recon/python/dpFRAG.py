@@ -267,7 +267,7 @@ class dpFRAG(emLabels):
         # this is if training cubes with context overlap each other so need to be stored in separate datasets.
         if self.chunk_subgroups: 
             self.keep_subgroups = True
-            self.subgroups = ['chunk_%04d_%04d_%04d4' % tuple(self.chunk.tolist())] + self.subgroups
+            self.subgroups = ['chunk_%04d_%04d_%04d' % tuple(self.chunk.tolist())] + self.subgroups
 
         # print out all initialized variables in verbose mode
         if self.dpFRAG_verbose: print('dpFRAG, verbose mode:\n'); print(vars(self))
