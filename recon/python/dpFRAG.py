@@ -334,7 +334,7 @@ class dpFRAG(emLabels):
             for i in range(self.nprob_types):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.prob_types[i], chunk=self.chunk.tolist(),
                     offset=offset.tolist(), size=size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
-                    subgroups=self.subgroups[0] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                    subgroups=[self.subgroups[0]] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
                 data = loadh5.data_cube
 
                 if self.pad_prob_perim:
@@ -348,7 +348,7 @@ class dpFRAG(emLabels):
                 for j in range(self.naugments):
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.prob_types[i]+self.augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        subgroups=self.subgroups[0] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                        subgroups=[self.subgroups[0]] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
                     data = loadh5.data_cube
 
                     if self.pad_prob_perim:
@@ -363,7 +363,7 @@ class dpFRAG(emLabels):
                 if self.static_augments[j][0] != '_':
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.static_augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        subgroups=self.subgroups[0] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                        subgroups=[self.subgroups[0]] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
                     data = loadh5.data_cube
 
                     if self.pad_prob_perim:
