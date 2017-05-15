@@ -72,9 +72,9 @@ class dpFRAG(emLabels):
     # xxx - usefulness of this parameter is unclear
     ovlp_dilate = 0
 
-    # xxx - enables "nearest neighbor" only method with neighbor_perim==1.
-    #   consistently found that having this == True leads to worse segmentations metrics for agglo.
-    neighbor_only = False
+    ## xxx - enables "nearest neighbor" only method with neighbor_perim==1.
+    ##   consistently found that having this == True leads to worse segmentations metrics for agglo.
+    #neighbor_only = False
 
     ############ dictionary keys used for saving variables for optimizations
 
@@ -263,6 +263,12 @@ class dpFRAG(emLabels):
         # external perimeter used to pad all volumes
         self.eperim = self.perim + self.bperim
 
+        # force to keep subgroups in output if the chunk subgroup mode is set.
+        # this is if training cubes with context overlap each other so need to be stored in separate datasets.
+        if self.chunk_subgroups: 
+            self.keep_subgroups = True
+            self.subgroups = ['chunk_%04d_%04d_%04d4' % tuple(self.chunk.tolist())] + self.subgroups
+
         # print out all initialized variables in verbose mode
         if self.dpFRAG_verbose: print('dpFRAG, verbose mode:\n'); print(vars(self))
 
@@ -328,7 +334,8 @@ class dpFRAG(emLabels):
             for i in range(self.nprob_types):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.prob_types[i], chunk=self.chunk.tolist(),
                     offset=offset.tolist(), size=size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
-                    verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+                    subgroups=self.subgroups[0] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                data = loadh5.data_cube
 
                 if self.pad_prob_perim:
                     # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
@@ -341,7 +348,8 @@ class dpFRAG(emLabels):
                 for j in range(self.naugments):
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.prob_types[i]+self.augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+                        subgroups=self.subgroups[0] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                    data = loadh5.data_cube
 
                     if self.pad_prob_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
@@ -355,7 +363,8 @@ class dpFRAG(emLabels):
                 if self.static_augments[j][0] != '_':
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.static_augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        verbose=self.dpLoadh5_verbose); data = loadh5.data_cube
+                        subgroups=self.subgroups[0] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                    data = loadh5.data_cube
 
                     if self.pad_prob_perim:
                         # pad data, xxx - what to pad with, zeros just easy, not clear any other method is better
@@ -1261,7 +1270,8 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile,
-            subgroups=[], G=None, progressBar=False, feature_set=None, has_ECS=True, verbose=False):
+            subgroups=[], G=None, progressBar=False, feature_set=None, has_ECS=True, chunk_subgroups=False, 
+            neighbor_only=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1279,6 +1289,8 @@ class dpFRAG(emLabels):
         arg_str += ' --gtfile ' + gtfile
         if feature_set: arg_str += ' --feature-set ' + feature_set
         if not has_ECS: arg_str += ' --no-ECS '
+        if chunk_subgroups: arg_str += ' --chunk-subgroups '
+        if neighbor_only: arg_str += ' --neighbor-only '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1291,7 +1303,8 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile, subgroups=[],
-            subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, verbose=False):
+            subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, chunk_subgroups=False, 
+            neighbor_only=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1310,6 +1323,8 @@ class dpFRAG(emLabels):
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         if feature_set: arg_str += ' --feature-set ' + feature_set
         if not has_ECS: arg_str += ' --no-ECS '
+        if chunk_subgroups: arg_str += ' --chunk-subgroups '
+        if neighbor_only: arg_str += ' --neighbor-only '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1322,7 +1337,8 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile,
-            subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True, verbose=False):
+            subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True, 
+            neighbor_only=False, chunk_subgroups=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1342,6 +1358,8 @@ class dpFRAG(emLabels):
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         if feature_set: arg_str += ' --feature-set ' + feature_set
         if not has_ECS: arg_str += ' --no-ECS '
+        if chunk_subgroups: arg_str += ' --chunk-subgroups '
+        if neighbor_only: arg_str += ' --neighbor-only '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1381,8 +1399,10 @@ class dpFRAG(emLabels):
         #    help='Amount to dilate overlap for calculating boundary features')
         #p.add_argument('--connectivity', nargs=1, type=int, default=[3], choices=[1,2,3],
         #    help='Connectivity for binary morphology operations')
-        #p.add_argument('--neighbor-only', dest='neighbor_only', action='store_true',
-        #    help='Only use boundary voxels labeled with neighboring supervoxels (no background / non-neighbor voxels)')
+        p.add_argument('--neighbor-only', dest='neighbor_only', action='store_true',
+            help='Only use boundary voxels labeled with neighboring supervoxels (no background / non-neighbor voxels)')
+        p.add_argument('--chunk-subgroups', action='store_true',
+            help='This mode is for probs and labels that have overlapping context so need to be stored separately.')
         p.add_argument('--keep-subgroups', action='store_true',
             help='Keep subgroups for labels in path for subgroups-out')
         p.add_argument('--progress-bar', action='store_true', help='Enable progress bar if available')
