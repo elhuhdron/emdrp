@@ -1302,9 +1302,9 @@ class dpFRAG(emLabels):
         return frag
 
     @classmethod
-    def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile, subgroups=[],
-            subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, chunk_subgroups=False, 
-            neighbor_only=False, verbose=False):
+    def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile=None, 
+            subgroups=[], subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, 
+            chunk_subgroups=False, neighbor_only=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1318,7 +1318,7 @@ class dpFRAG(emLabels):
         if rawfiles[0]: arg_str += ' --rawfile ' + rawfiles[0]
         if rawfiles[1]: arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
-        arg_str += ' --outfile ' + outfile
+        if outfile: arg_str += ' --outfile ' + outfile
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         if feature_set: arg_str += ' --feature-set ' + feature_set
@@ -1336,7 +1336,7 @@ class dpFRAG(emLabels):
         return frag
 
     @classmethod
-    def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile,
+    def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile=None,
             subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True, 
             neighbor_only=False, chunk_subgroups=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
@@ -1353,7 +1353,7 @@ class dpFRAG(emLabels):
         if rawfiles[1]: arg_str += ' --rawaugfile ' + rawfiles[1]
         arg_str += ' --raw-dataset ' + raw_dataset
         arg_str += ' --gtfile ' + gtfile
-        arg_str += ' --outfile ' + outfile
+        if outfile: arg_str += ' --outfile ' + outfile
         if subgroups: arg_str += ' --subgroups %s ' % ' '.join(subgroups)
         if subgroups_out: arg_str += ' --subgroups-out %s ' % ' '.join(subgroups_out)
         if feature_set: arg_str += ' --feature-set ' + feature_set

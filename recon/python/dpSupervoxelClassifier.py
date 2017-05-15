@@ -204,17 +204,20 @@ class dpSupervoxelClassifier():
         self.iterative_mode = (self.iterate_count > 0)
         self.iterative_frag = [None] * self.nchunks
         self.iterative_mode_count = 0
-        if len(self.iterate_save_ranges) > 0:
-            assert(len(self.iterate_save_ranges) % 3 == 0) # must specify as python-style ranges
-            n = len(self.iterate_save_ranges)//3
-            self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=np.bool)
-            for i in range(n):
-                start, stop, step = self.iterate_save_ranges[3*i:3*i+3]
-                self.iterate_save_mask[range(start,stop,step)] = 1
-            self.iterate_save_mask[stop:] = 1
+        if self.outfile:
+            if len(self.iterate_save_ranges) > 0:
+                assert(len(self.iterate_save_ranges) % 3 == 0) # must specify as python-style ranges
+                n = len(self.iterate_save_ranges)//3
+                self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=np.bool)
+                for i in range(n):
+                    start, stop, step = self.iterate_save_ranges[3*i:3*i+3]
+                    self.iterate_save_mask[range(start,stop,step)] = 1
+                self.iterate_save_mask[stop:] = 1
+            else:
+                self.iterate_save_mask = np.ones((self.iterate_count,), dtype=np.bool)
         else:
-            self.iterate_save_mask = np.ones((self.iterate_count,), dtype=np.bool)
-
+            self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=np.bool)
+    
         if self.iterative_mode:
             # expand the list out to the number of iterations by repeating the last merge percentage
             tmp = np.zeros((self.iterate_count,), dtype=np.double)
