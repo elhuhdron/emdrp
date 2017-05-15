@@ -36,6 +36,7 @@ def run_next_jobs(force=False):
     job_path, convnet_out_path, convnet_paths = get_paths()
     
     # iterate over gpus looking for ready gpus and jobs to start
+    started_job = False
     for gpu in range(NUM_GPUS):
         cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(gpu))
         outfile = open(os.path.join(job_path, GPU_STATUS % (gpu,)), 'w')
@@ -107,6 +108,11 @@ def run_next_jobs(force=False):
         #print 'Starting (see log) "' + cmd_to_start + '"'
         outfile2 = open(os.path.join(job_path, GPU_STARTED % (gpu,)), 'a')
         outfile2.write(time.strftime('%Y-%m-%d %H:%M:%S') + '\t\t' + cmd_to_start + '\n\n'); outfile2.close()
+        # xxx - found that at least for neon jobs two jobs starting one right after another results in intermittent
+        #   errors, possibly regarding the neon cache? either way it helps to pause for a short bit before submitting
+        #   the next job.
+        if started_job: time.sleep(18)
+        else: started_job = True
         os.system(cmd_to_start)
         os.remove(job_script)
         
