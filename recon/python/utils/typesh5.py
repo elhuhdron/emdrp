@@ -76,7 +76,7 @@ class emVoxelType(dpWriteh5):
 
     @classmethod
     def writeVoxType(cls, outfile, chunk, offset, size, datasize, chunksize, fillvalue=None, data=None, inraw='',
-            outraw='', attrs={}, verbose=False):
+            outraw='', attrs={}, subgroups_out=[], verbose=False):
         assert( data is not None or inraw )
         parser = argparse.ArgumentParser(description='class:emVoxelType',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -90,6 +90,7 @@ class emVoxelType(dpWriteh5):
         if fillvalue: arg_str += ' --fillvalue ' + str(fillvalue)
         if inraw: arg_str += ' --inraw ' + inraw
         if outraw: arg_str += ' --outraw ' + outraw
+        if subgroups_out: arg_str += ' --subgroups-out ' + ' '.join(subgroups_out)
         if verbose: arg_str += ' --dpWriteh5-verbose '
         if verbose: print(arg_str)
         args = parser.parse_args(arg_str.split())
