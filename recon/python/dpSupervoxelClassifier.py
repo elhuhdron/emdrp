@@ -297,10 +297,10 @@ class dpSupervoxelClassifier():
                     if self.iterative_frag[chunk] is None:
                         frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset,
                             [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
-                            self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, ['training','thr'],
-                            progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
-                            chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only,
-                            verbose=self.dpSupervoxelClassifier_verbose)
+                            self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, 
+                            ['agglomeration_training'], progressBar=self.progress_bar, feature_set=self.feature_set, 
+                            has_ECS=self.has_ECS, chunk_subgroups=self.chunk_subgroups, 
+                            neighbor_only=self.neighbor_only, verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
                         frag = self.iterative_frag[chunk]
@@ -431,10 +431,8 @@ class dpSupervoxelClassifier():
             with open(self.testin, 'rb') as f: data = dill.load(f)
             FRAG = data['FRAG']; data = data['data']
 
-        frag = None; subgroups_out= list(self.label_subgroups_out)
-        if self.iterative_mode:
-            if self.iterative_frag[ichunk] is None: subgroups_out += ['thr']
-            else: frag = self.iterative_frag[ichunk]
+        frag = self.iterative_frag[ichunk] if self.iterative_mode else None
+        subgroups_out = list(self.label_subgroups_out)
 
         if frag is None:
             if self.doplots:
@@ -496,7 +494,7 @@ class dpSupervoxelClassifier():
                 #except AttributeError:
             except:
                 # if the classifier doesn't do probabilities just export single prediction
-                frag.subgroups_out += ['single_' + self.classifier]
+                frag.subgroups_out[-1] = ('single_' + self.classifier)
                 frag.agglomerate(self.clf.predict(sdata))
 
         return data,sdata,thr

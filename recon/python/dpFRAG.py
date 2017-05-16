@@ -269,6 +269,11 @@ class dpFRAG(emLabels):
             self.keep_subgroups = True
             self.subgroups = ['chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())] + self.subgroups
 
+        # setup the subgroups out for writing hdf5 outputs
+        if self.keep_subgroups: self.subgroups_out += self.subgroups
+        # this is just a placeholder for the agglomeration parameter
+        self.subgroups_out += ['aggloparam']
+
         # print out all initialized variables in verbose mode
         if self.dpFRAG_verbose: print('dpFRAG, verbose mode:\n'); print(vars(self))
 
@@ -933,13 +938,6 @@ class dpFRAG(emLabels):
     # also used by iterative supervoxel agglomeration method.
     # this method updates the FRAG (but not the FRAG edge features) based on the target agglomeration.
     def agglomerate(self, target, doWrite=True):
-        if self.keep_subgroups:
-            # the agglomerated labels depend on the input labels, so keep that information in output subgroups
-            if self.subgroups_out:
-                self.subgroups_out = self.subgroups + self.subgroups_out
-            else:
-                self.subgroups_out = self.subgroups
-
         ntargets = target.size
         assert( ntargets == self.FRAG.number_of_edges() ); # agglomerate input data must match FRAG edges
 
@@ -1114,15 +1112,6 @@ class dpFRAG(emLabels):
         else:
             assert( nthresholds == len(threshold_subgroups) )   # output subgroups must match length of actual thrs
 
-        self_subgroups_out = self.subgroups_out
-        if self.keep_subgroups:
-            # the agglomerated labels depend on the input labels, so keep that information in output subgroups
-            if self.subgroups_out:
-                self.subgroups_out = self.subgroups + self.subgroups_out + ['thr']
-            else:
-                self.subgroups_out = self.subgroups + ['thr']
-        else:
-            self.subgroups_out += ['thr']
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = False;
 
         if self.dpFRAG_verbose:
@@ -1168,7 +1157,6 @@ class dpFRAG(emLabels):
             if useProgressBar: pbar.finish()
             print('\n\tdone in %.4f s' % (time.time() - t))
 
-        self.subgroups_out = self_subgroups_out
         self.dpWriteh5_verbose = verbose
 
     def voxel_size_xform(self, size):
