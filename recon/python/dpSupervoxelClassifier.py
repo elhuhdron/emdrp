@@ -238,6 +238,19 @@ class dpSupervoxelClassifier():
             else:
                 assert( len(self.thresholds) == len(self.threshold_subgroups) )
 
+        # new mode where saving classifiers separately for iterative mode
+        if self.classifierout and self.iterative_mode:
+            [self.classifierout_path, tmp] = os.path.split(self.classifierout)
+            [self.classifierout_name, self.classifierout_ext] = os.path.splitext(tmp)
+            # make a subdirectory of the same name without ext and put all the iterative classifier dills into it
+            self.classifierout_path = os.path.join(self.classifierout_path,self.classifierout_name)
+            os.makedirs(self.classifierout_path, exist_ok=True)
+
+        # for loading new mode where each classifier stored in separate dill file.
+        # if classifierin is not a directory then use old mode where all classifiers stored in a single file.
+        if self.classifierin and self.iterative_mode and not os.path.isfile(self.classifierin):
+            [tmp, self.classifierin_name] = os.path.split(self.classifierin)
+
         # dpFRAG features are now selectable as sets
         #self.FEATURES, self.FEATURES_NAMES, self.nfeatures = dpFRAG.make_FEATURES()
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
@@ -358,7 +371,7 @@ class dpSupervoxelClassifier():
             # train to the normalized data and merge or no merge targets
             self.clf.fit(sdata, target)
 
-            if self.classifierout:
+            if self.classifierout and not self.iterative_mode:
                 with open(self.classifierout, 'wb') as f: dill.dump({'classifier':self.clf}, f)
 
         if self.dpSupervoxelClassifier_verbose:
@@ -491,7 +504,8 @@ class dpSupervoxelClassifier():
     def iterative_classify(self):
         assert(self.iterative_mode)
 
-        if self.classifierin:
+        if self.classifierin and os.path.isfile(self.classifierin):
+            # this is a legacy mode where all classifiers are stored in same dill
             if self.dpSupervoxelClassifier_verbose:
                 print('\nLoading iterative classifiers:'); t = time.time()
 
@@ -517,8 +531,14 @@ class dpSupervoxelClassifier():
                     self.iterate_merge_perc = self.iterate_merge_perc_list[i]; self.iterative_mode_count = i
                     print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,self.iterate_merge_perc))
 
-                    assert( self.clfs[i] is not None) # classifierin must be specified for test only
-                    self.clf = self.clfs[i]
+                    if self.clfs[i] is None and self.classifierin and not os.path.isfile(self.classifierin):
+                        with open(os.path.join(self.classifierin,self.classifierin_name+'_'+\
+                            str(self.iterative_mode_count)+'.dill', 'rb')) as f: d = dill.load(f)
+                        self.clf = d['classifier']
+                    else:
+                        self.clf = self.clfs[i]
+
+                    assert( self.clf is not None) # classifierin must be specified for test only
                     self._test(chunk, cchunk, chunk_list_index, chunk_range_index)
 
                 # let the previous chunk get garbage collected to save memory.
@@ -530,15 +550,23 @@ class dpSupervoxelClassifier():
                 self.iterate_merge_perc = self.iterate_merge_perc_list[i]; self.iterative_mode_count = i
                 print('Iteration %d, merge perc %.4f' % (self.iterative_mode_count+1,self.iterate_merge_perc))
 
-                if self.clfs[i] is None:
-                    train_metrics[i] = self.train(); self.clfs[i] = self.clf
+                if self.clfs[i] is None and self.classifierin and not os.path.isfile(self.classifierin):
+                    with open(os.path.join(self.classifierin,self.classifierin_name+'_'+\
+                        str(self.iterative_mode_count)+'.dill', 'rb')) as f: d = dill.load(f)
+                    self.clf = d['classifier']
                 else:
                     self.clf = self.clfs[i]
+
+                if self.clf is None:
+                    train_metrics[i] = self.train()
                 test_metrics[i] = self.test()
 
                 if self.classifierout:
-                    with open(self.classifierout, 'wb') as f:
-                        dill.dump({'classifiers':self.clfs,'train_metrics':train_metrics,'test_metrics':test_metrics},f)
+                    # new mode that stores all classifiers in separate dill files
+                    fn = os.path.join(self.classifierout_path,self.classifierout_name+'_'+\
+                        str(self.iterative_mode_count)+self.classifierout_ext)
+                    with open(fn, 'wb') as f:
+                        dill.dump({'classifier':self.clf,'train_metrics':train_metrics,'test_metrics':test_metrics},f)
 
     def get_merge_predict_thr(self,data):
         thr = -1; #ntargets = data.shape[0]
