@@ -518,7 +518,7 @@ class dpSupervoxelClassifier():
 
         # each iteration loop trains on the current supervoxels and
         #   then performs a merge (test) based with a normal sklearn predict based on a small merge prior.
-        self.classifierin = ''; self.trainin = ''; self.trainout = ''; self.testin = ''; self.testout = ''
+        self.trainin = ''; self.trainout = ''; self.testin = ''; self.testout = ''
         if self.test_only:
             print('Test-only iterative mode with merge prior %.4f' % (self.merge_prior,))
             for chunk in range(self.nchunks):
@@ -531,7 +531,7 @@ class dpSupervoxelClassifier():
 
                     if self.clfs[i] is None and self.classifierin and not os.path.isfile(self.classifierin):
                         with open(os.path.join(self.classifierin,self.classifierin_name+'_'+\
-                            str(self.iterative_mode_count)+'.dill', 'rb')) as f: d = dill.load(f)
+                            str(self.iterative_mode_count)+'.dill'), 'rb') as f: d = dill.load(f)
                         self.clf = d['classifier']
                     else:
                         self.clf = self.clfs[i]
@@ -550,7 +550,7 @@ class dpSupervoxelClassifier():
 
                 if self.clfs[i] is None and self.classifierin and not os.path.isfile(self.classifierin):
                     with open(os.path.join(self.classifierin,self.classifierin_name+'_'+\
-                        str(self.iterative_mode_count)+'.dill', 'rb')) as f: d = dill.load(f)
+                        str(self.iterative_mode_count)+'.dill'), 'rb') as f: d = dill.load(f)
                     self.clf = d['classifier']
                 else:
                     self.clf = self.clfs[i]
