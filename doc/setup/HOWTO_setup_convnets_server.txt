@@ -11,7 +11,8 @@ NOTE: commands that can be directly pasted to terminal are prepended with >
   blue    ---             Phantek Gigabyte     02051609   1-980TiSC 1-980TiFTW 4 Core i7-6700K CPU @ 4.00GHz   32G
   green   ---             Phantek ASUS         02021553   1-780Ti              4 Core i7-6700K CPU @ 4.00GHz   48G
   xgreen  ---             X99P-SLI (5 clones)  02021565   4 980Ti              6 Core i7-5930K @ 3.5Ghz        16G
-  xgreen  ---             Synology DS1515      ---        ---                  xxx                             2G (?)
+  xgreen  ---             Synology DS1515      ---        ---                  xxx                             2G
+  xgreen  ---             Synology DS1815+     ---        ---                  xxx                             6G
 Names are all prefixed with ndsw-cdcu-
 xgreen are all behind second local interface on green (sssd disabled, local logins only).
 infra and ultra are virtual machines (virt-install/kvm) running on green with minimal centos7 install.
@@ -23,10 +24,15 @@ Local interface is 10.42.55.xxx/255.255.255.192, using 4 subnets:
   red                  *       1       72
   infra (green kvm)    *       2       136
   ultra (green kvm)    *       3       200
-  synology                     0       60
-  synology                     1       124
-  synology                     2       188
-  synology                     3       252
+  indig (red kvm)      *       0       9
+  synology ds1515              0       60
+  synology ds1515              1       124
+  synology ds1515              2       188
+  synology ds1515              3       252
+  synology ds1815+             0       61
+  synology ds1815+             1       125
+  synology ds1815+             2       189
+  synology ds1815+             3       253
   clone ($g1)                  0       1
   clone ($g2)                  0       2
   clone ($g3)                  1       65
@@ -632,21 +638,35 @@ search for few other useful ones (forgot to copy command line for install) with 
 
 use centos7 minimal install
 
+have to modify image so that the console connection will work to the virtual machine
 http://serverfault.com/questions/257962/kvm-guest-installed-from-console-but-how-to-get-to-the-guests-console
   use "Modifying the image" solution, use mkisfs so that ttyS0 added to command line for install
   http://linuxpitstop.com/edit-iso-files-using-mkisofs-in-linux/
 
-have to modify 
+disable network manager (see notes in networking)
+setup network (need separate interfaces for vm), see checked in networking scripts
+disable ipv6 on vm network interfaces in /etc/sysctl.conf
 
+Install necessary packages:
+> sudo yum install qemu-kvm libvirt libvirt-python libguestfs-tools virt-install virt-manager
+
+follow the instructions in dell howto to setup so that selinux doesn't get in the way for /Data/vm-images
+
+This is some kindof bug, easy workaround to prevent error during virt-install, change back afterwards:
 https://github.com/adrahon/vagrant-kvm/issues/163
   chmod go+x $HOME
 
-checked in networking scripts
+create the machine with install, i.e.:
+virt-install --network bridge=br0 --network bridge=br1 --name infra --ram 16384 --vcpus=2 --disk path=/Data/vm-images/infra.img,size=200,sparse=false --graphics none --location /home/watkinspv/Downloads/CentOS-7-x86_64-Minimal-1611-custom.iso --os-type linux --os-variant centos7.0 --extra-args "console=tty0 console=ttyS0,115200"
 
 extra packages installed:
-  > sudo yum install net-tools
-  > sudo yum install bind-utils
-  > sudo yum install nfs-utils
+  > sudo yum install net-tools bind-utils nfs-utils
+
+disable network manage, verify ifcfg scripts, disable ipv6 for local interface
+
+Copy over bin/.gaterc and modify .bashrc, make sure can mount synologys, copy over bbcp
+
+Once vm created on the machine, faster to clone than to create another, easiest with virt-manager gui.
 
 start (stop by shutdown):
   > sudo virsh start infra
@@ -916,6 +936,11 @@ NOTE: Most likely have to set time after clone, DO this before starting network:
 
 Need to change hostname for networking to work, see notes below.
 
+Had better reliability with GPU jobs by dropping to runlevel 3 default.
+http://www.itzgeek.com/how-tos/linux/centos-how-tos/change-default-runlevel-in-centos-7-rhel-7.html
+  > sudo systemctl set-default multi-user.target
+
+
 
 
 OLD (original) mondoarchive / mondorestore notes:
@@ -1048,7 +1073,7 @@ OR
     > sudo mount $g1:/Data/cdcu /mnt/g1 -o ro,async,rsize=65536,timeo=1,retrans=5    
 
 Enabled jumbo frames on all local interfaces (MTU=9000), can test with:
-  > ping -M do -c 4 -s 8972 $gsyn
+  > ping -M do -c 4 -s 8972 $syn
 MUST enable jumbo frame support on the switch also, then reboot switch
 
 
@@ -1099,6 +1124,10 @@ To prevent broken pipe timeout for ssh:
   > sudo vi /etc/ssh/sshd_config
 ClientAliveInterval 600
 ClientAliveCountMax 3
+
+# this one for 24 hours (first is seconds, second is count)
+ClientAliveInterval 120
+ClientAliveCountMax 720
   > sudo systemctl restart sshd
 
 
@@ -1154,8 +1183,7 @@ https://wiki.centos.org/HowTos/SELinux#head-0f6390ddacfab39ee973ed8018a32212c2a0
 
 
 
-xxx - old, kept for reference
-For the "lan" machines, had to disable network manager for ethernet to load on boot:
+For disabling network manager (doesn't work well with bridge, weird configs):
 systemctl stop NetworkManager
 systemctl disable NetworkManager
 chkconfig network on
