@@ -316,30 +316,30 @@ title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g',abs(m(2)-m(1)),m(1),...
   minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2))));
 legend(names)
 
-%figure(baseno+figno); figno = figno+1; clf
-subplot(2,2,2);
-plot(norm_params',combined_eftpl');
-hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-% plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
-hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(norm_params',squeeze(combined_eftpl_CI(:,:,1))','--');
-hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(norm_params',squeeze(combined_eftpl_CI(:,:,2))','--');
-set(gca,'plotboxaspectratio',[1 1 1]);
-ylabel('combined eftpl (%PL)');
-if p.param_name
-  set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
-  xlabel(p.param_name)
-else
-  xlabel('norm parameter')
-end
-[m,mi] = max(combined_eftpl,[],2);
-set(gca,'ylim',[-0.025 0.8]); box off
-title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
-  params{1}(mi(1)),params{2}(mi(2))));
+% %figure(baseno+figno); figno = figno+1; clf
+% subplot(2,2,3);
+% plot(norm_params',combined_eftpl');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(norm_params',squeeze(combined_eftpl_CI(:,:,1))','--');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(norm_params',squeeze(combined_eftpl_CI(:,:,2))','--');
+% set(gca,'plotboxaspectratio',[1 1 1]);
+% ylabel('combined eftpl (%PL)');
+% if p.param_name
+%   set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
+%   xlabel(p.param_name)
+% else
+%   xlabel('norm parameter')
+% end
+% [m,mi] = max(combined_eftpl,[],2);
+% set(gca,'ylim',[-0.025 0.8]); box off
+% title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+%   params{1}(mi(1)),params{2}(mi(2))));
 
 %figure(baseno+figno); figno = figno+1; clf
-subplot(2,2,3);
+subplot(2,2,2);
 plot(split_er',combined_eftpl', '-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
@@ -357,6 +357,22 @@ title(sprintf('maxd=%g\n%g %g\n@split edges=%g %g',abs(m(2)-m(1)),m(1),m(2),...
 
 %figure(baseno+figno); figno = figno+1; clf
 subplot(2,2,4);
+plot(merge_fracnodes',combined_eftpl', '-o', 'markersize', 2);
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(squeeze(split_er_CI(:,:,1))',squeeze(combined_eftpl_CI(:,:,1))','--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(squeeze(split_er_CI(1,:,2))',squeeze(combined_eftpl_CI(:,:,2))','--');
+set(gca,'plotboxaspectratio',[1 1 1]);
+ylabel('combined eftpl (%PL)');
+xlabel('merged nodes'); set(gca,'xlim',[0 0.5]);
+[m,mi] = max(combined_eftpl,[],2);
+set(gca,'ylim',[-0.025 0.8],'xlim',[-0.025 0.5]); box off
+title(sprintf('maxd=%g\n%g %g\n@split edges=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+  merge_fracnodes(1,mi(1)),merge_fracnodes(2,mi(2))));
+
+subplot(2,2,3);
 sumSM = split_fracnodes+merge_fracnodes;
 [m,mi] = min(sumSM,[],2);
 minSM = [[split_fracnodes(1,mi(1)); merge_fracnodes(1,mi(1))] ...
@@ -380,7 +396,6 @@ xlabel('splits per node'); ylabel('merged nodes');
 title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g\nnode radius=%d',abs(m(2)-m(1)),m(1),...
   minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2)),p.node_radius));
 %legend(names)
-
 
 
 
@@ -439,7 +454,7 @@ end
 
 
 figure(baseno+figno); figno = figno+1; clf
-subplot(1,2,1);
+subplot(2,2,1);
 plot(squeeze(are_precrec(:,:,1))',squeeze(are_precrec(:,:,2))', '-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 plot(squeeze(are_precrec_CI(:,:,1,1))',squeeze(are_precrec_CI(:,:,2,1))','--');
@@ -452,8 +467,8 @@ set(gca,'plotboxaspectratio',[1 1 1]);
 legend(names)
 
 %figure(baseno+figno); figno = figno+1; clf
-subplot(1,2,2);
-plot(norm_params',are');
+subplot(2,2,3);
+plot(norm_params',are','-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 plot(norm_params',squeeze(are_CI(:,:,1))','--');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
@@ -473,6 +488,52 @@ if p.param_name
 else
   xlabel('norm parameter')
 end
+if p.are_sum 
+  set(gca,'ylim',[0.4 2.025]);
+  ylabel('ARE, [0,2], 1-sum prec/rec');
+else
+  set(gca,'ylim',[0.4 1.025]);
+  ylabel('ARE, [0,1], 1-Fscore');
+end
+
+subplot(2,2,2)
+plot(split_er',are','-o', 'markersize', 2);
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(squeeze(combined_eftpl_CI(:,:,1))','--');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(squeeze(combined_eftpl_CI(:,:,2))','--');
+set(gca,'plotboxaspectratio',[1 1 1]); box off
+xlabel('split edges'); set(gca,'xlim',[0 0.5]);
+[m,mi] = max(combined_eftpl,[],2);
+plot(split_er(1,mi(1)),are(1,mi(1)),'x');
+plot(split_er(2,mi(2)),are(2,mi(2)),'x');
+title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
+  nlabels(1,mi(1)),nlabels(2,mi(2))));
+if p.are_sum 
+  set(gca,'ylim',[0.4 2.025]);
+  ylabel('ARE, [0,2], 1-sum prec/rec');
+else
+  set(gca,'ylim',[0.4 1.025]);
+  ylabel('ARE, [0,1], 1-Fscore');
+end
+
+subplot(2,2,4)
+plot(merge_fracnodes',are','-o', 'markersize', 2);
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(squeeze(combined_eftpl_CI(:,:,1))','--');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(squeeze(combined_eftpl_CI(:,:,2))','--');
+set(gca,'plotboxaspectratio',[1 1 1]); box off
+xlabel('merged nodes'); set(gca,'xlim',[0 0.5]);
+[m,mi] = max(combined_eftpl,[],2);
+plot(merge_fracnodes(1,mi(1)),are(1,mi(1)),'x');
+plot(merge_fracnodes(2,mi(2)),are(2,mi(2)),'x');
+title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
+  nlabels(1,mi(1)),nlabels(2,mi(2))));
 if p.are_sum 
   set(gca,'ylim',[0.4 2.025]);
   ylabel('ARE, [0,2], 1-sum prec/rec');
@@ -517,7 +578,7 @@ end
 legend(names)
 
 subplot(2,2,2)
-plot(split_er',lnlabels');
+plot(split_er',lnlabels','-o', 'markersize', 2);
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
 % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
 hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
@@ -530,6 +591,23 @@ xlabel('split edges'); set(gca,'xlim',[0 0.5]);
 [m,mi] = max(combined_eftpl,[],2);
 plot(split_er(1,mi(1)),lnlabels(1,mi(1)),'x');
 plot(split_er(2,mi(2)),lnlabels(2,mi(2)),'x');
+title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
+  nlabels(1,mi(1)),nlabels(2,mi(2))));
+
+subplot(2,2,4)
+plot(merge_fracnodes',lnlabels','-o', 'markersize', 2);
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(squeeze(combined_eftpl_CI(:,:,1))','--');
+% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot(squeeze(combined_eftpl_CI(:,:,2))','--');
+set(gca,'plotboxaspectratio',[1 1 1]); box off
+ylabel(str); set(gca,'ylim',lim);
+xlabel('merged nodes'); set(gca,'xlim',[0 0.5]);
+[m,mi] = max(combined_eftpl,[],2);
+plot(merge_fracnodes(1,mi(1)),lnlabels(1,mi(1)),'x');
+plot(merge_fracnodes(2,mi(2)),lnlabels(2,mi(2)),'x');
 title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
   nlabels(1,mi(1)),nlabels(2,mi(2))));
 

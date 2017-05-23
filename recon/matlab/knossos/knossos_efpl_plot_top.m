@@ -132,10 +132,20 @@
 % load_indices = [1 2];
 
 load_files = {
-  '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper.mat'
-  '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper_ctx.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper_ctx.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_ctx.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_ctx.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_ctx.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_ctx.mat'
 };
-load_indices = [1 2];
+load_indices = [3 4 3 4];
 
 % load_files = {
 %   '/home/watkinspv/Downloads/soma_run2.mat'
@@ -163,7 +173,7 @@ pplot = struct;
 
 % copy node radius over (assume all same, mostly informative for soma mode)
 if pefpl{1}.skeleton_mode
-  pplot.node_radius = 0;
+  pplot.node_radius = -1;
 else
   pplot.node_radius = pefpl{1}.node_radius;
 end
@@ -209,7 +219,7 @@ pplot.are_sum = false;
 pplot.save_plot_results = '';
 %pplot.save_plot_results = '/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2_meta.mat';
 
-pplot.baseno = 4000;
+pplot.baseno = 6000;
 
 % for "meta-plots"
 
