@@ -50,6 +50,7 @@ from dpWriteh5 import dpWriteh5
 from typesh5 import emLabels, emProbabilities
 from Kuwahara import Kuwahara
 
+import _dilation_Extension as dilation
 try:
     from progressbar import ProgressBar, Percentage, Bar, ETA, RotatingMarker
     _dpFRAG__useProgressBar = True
@@ -527,7 +528,6 @@ class dpFRAG(emLabels):
         #svox_order = np.argsort(self.svox_sizes)[::-1] + 1    # order of decreasing supervoxel size, slowest
         svox_order = np.argsort(self.svox_sizes) + 1    # order of increasing supervoxel size, fastest
         assert( svox_order.size == self.nsupervox )     # supervoxel count/sizes not updated properly
-
         # iterate over supervoxels and get neighbors (edges) and add features for each neighbor
         for i in svox_order:
             if not self.pad_svox_perim:
@@ -583,7 +583,15 @@ class dpFRAG(emLabels):
                         # dilate including the perimeter volume
                         svox_sel_out_perim = nd.morphology.binary_dilation(svox_cur_perim == i, 
                             structure=self.bwconn, iterations=self.neighbor_perim)
-
+                #if self.do_gpu:
+                 #   svox_sel_out = np.zeros((svox_sel.shape), dtype=np.uint8)
+                 #   dilation.dilate(svox_sel, self.bwconn, svox_sel_out, dpFRAG.neighbor_perim , self.blockdim, 
+                                    np.asarray((svox_sel.shape), dtype=np.uint32))
+                 #   svox_sel_out = svox_sel_out.astype(dtype=bool)
+                
+#               else:
+                    svox_sel_out = nd.morphology.binary_dilation(svox_sel, structure=self.bwconn,
+                    iterations=dpFRAG.neighbor_perim)
                 # save the variables in svox_attrs to node attributes
                 d = locals(); n = { k:d[k] for k in dpFRAG.svox_attrs }; self.FRAG.node[i]['svox_attrs'] = n
 
@@ -591,7 +599,6 @@ class dpFRAG(emLabels):
             nbrlbls = np.unique(svox_cur[n['svox_sel_out']])
             # do not add edges to background or to the same supervoxel
             nbrlbls = nbrlbls[np.logical_and(nbrlbls != i, nbrlbls != 0)]
-
             # udpate the progress bar based on the current supervoxel size divided by its number of neighbors.
             # add all remainders to last update for this supervoxel.
             #if self.dpFRAG_verbose and useProgressBar:
@@ -1405,6 +1412,11 @@ class dpFRAG(emLabels):
         p.add_argument('--pad-prob-perim', action='store_true', help='Pad perimeter of probs instead of loading')
         p.add_argument('--pad-svox-perim', action='store_true', help='Pad perimeter of supervoxels instead of loading')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
+        
+        # add arguments for gpu computations
+        p.add_argument('--do_gpu', type=bool, default=False, help='Enable gpu mode in FRAG')
+        p.add_argument('--blockdim', type=int , default=8, help='Size of each block on the gpu')
+
 
 if __name__ == '__main__':
     import dill

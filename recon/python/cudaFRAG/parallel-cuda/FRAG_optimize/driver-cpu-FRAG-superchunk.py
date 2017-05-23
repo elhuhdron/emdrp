@@ -14,12 +14,14 @@ import _FRAG_extension as FRAG_extension
 #read the input arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--size_of_edges',nargs =1, type= np.uint32, default = 300000, help = 'Enter the size of maximum edges in a dataset')
+parser.add_argument('--size_of_borders', nargs=1,type=np.uint32, default=30000, help = 'Enter size of maximum borders for a label-edge pair in a dataset')
 parser.add_argument('--do_cpu_rag', nargs =1, type = bool , default = False , help = 'Turn the python-serial creation of rag on/off')
 parser.add_argument('--validate', nargs=1, type=bool , default = False , help = 'Perform Valiation')
 parser.add_argument('--adjacencyMatrix', nargs=1, type=bool, default=False, help = 'Use adjacency Matrix in kernel or not')
 parser.add_argument('--label_count', nargs=1, type=np.uint32, default=3000, help = 'The number of labels to be processed at a time on a gpu')
 parser.add_argument('--blockdim', nargs=1, type=np.int32, default=8, help= 'Blocksize on Gpu')
-parser.add_argument('--batch_edges', nargs=1, type=np.uint32, default=30000, help= 'Batch size of edges to be processed at a time')
+parser.add_argument('--batch_edges', nargs=1, type=np.uint32, default=30000, help= 'Batch size of label-edges to be processed at a time')
+parser.add_argument('--shared_size', nargs=1, type=np.int, default=100, help='Shared memory size for edgelist for each label on gpu')
 args = parser.parse_args()
 size_of_edges = args.size_of_edges
 do_cpu_rag = args.do_cpu_rag
@@ -28,11 +30,13 @@ adjacencyMatrix = args.adjacencyMatrix
 label_count = np.uint32(args.label_count)
 block_size = np.int32(args.blockdim)
 batch_size = np.uint32(args.batch_edges)
+shared_size = args.shared_size
+size_of_borders = np.uint32(args.size_of_borders)
 
 # labeled chunks
 chunk = [16,17,0]
-size = [1024,1024,480]
-#size = [256, 256, 256]
+#size = [1024,1024,480]
+size = [128, 128, 128]
 offset = [0,0,32]
 has_ECS = True
 
@@ -44,17 +48,17 @@ labelfile           = '/Data/' + username + '/full_datasets/neon/mbfergus32all/h
 label_subgroups     = ['with_background','0.99999000']
 
 # Input probability data (hdf5)
-#probfile            = '/Data/' + username + '/full_datasets/neon/mbfergus32all/huge_probs.h5'
-probfile = ''
+probfile            = '/Data/' + username + '/full_datasets/neon/mbfergus32all/huge_probs.h5'
+#probfile = ''
 
 # Input segmented labels (hdf5)
 #gtfile              = '/Data/datasets/labels/gt/M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5'
 #gt_dataset          = 'labels'
 
 # Input raw EM data
-#rawfile             = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5'
+rawfile             = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5'
 raw_dataset         = 'data_mag1'
-rawfile = ''
+#rawfile = ''
 
 # Output agglomerated labels
 outfile             = '/Data/' + username + '/tmp_agglo_out.h5'
@@ -75,7 +79,7 @@ progressBar = True
 verbose = True
 
 # use getFeatures=False to only get the RAG (without boundary voxels or features)
-getFeatures = False
+getFeatures = True
 
 # must specify rawfile and probfile for computing features (and boundary voxels)
 assert( not getFeatures or (rawfile and probfile) )
@@ -106,6 +110,7 @@ binary_struct=scipy.ndimage.morphology.generate_binary_structure(frag.supervoxel
 neigh_sel = scipy.ndimage.morphology.binary_dilation(dilate_array, binary_struct, frag.neighbor_perim)
 neigh_sel_indices = np.transpose(np.nonzero(neigh_sel))
 neigh_sel_indices = neigh_sel_indices - (neigh_sel_size//2)
+neigh_sel_indices = np.array(neigh_sel_indices, dtype = np.int)
 
 #calculate the jump steps required for 2X dilation to check for borders. Always look two times the actual dilation to
 # calculate the borders
@@ -120,7 +125,7 @@ set_border = [tuple(a) for a in border_sel_indices]
 set_neigh = [tuple(b) for b in neigh_sel_indices]
 unique_indices = set(set_border) & set(set_neigh)
 compliment_indices = set(set_border) - unique_indices
-compliment_index = list(compliment_indices)
+compliment_index = np.array(list(compliment_indices), dtype = np.int)
 
 #calculate indices for 1X dilation
 steps = np.array([(x[0]*frag.supervoxels.shape[1]*frag.supervoxels.shape[2] + x[1]*frag.supervoxels.shape[2] + x[2]) for x in neigh_sel_indices])
@@ -128,14 +133,35 @@ steps =steps[np.nonzero(steps)]
 watershed_shape = np.asarray(frag.supervoxels.shape)
 
 #calculate indices for 2X dilation
-steps_border = np.array([(y[0]*frag.supervoxels.shape[1]*frag.supervoxels.shape[2] + y[1]*frag.supervoxels.shape[2] + y[2]) for y in compliment_index])
+steps_border = np.array([(y[0]*(block_size+(block_size/2))*(block_size+(block_size/2)) + y[1]*(block_size+(block_size/2)) + y[2]) for y in compliment_index], dtype = np.int)
 steps_border = steps_border[np.nonzero(steps_border)]
+
+steps_edges = np.array([(x[0]*(block_size+(block_size/2))*(block_size+(block_size/2)) + x[1]*(block_size+(block_size/2)) + x[2]) for x in neigh_sel_indices], dtype = np.int)
+
 
 # build the rag
 print('Cpp serial generation of rag'); t=time.time()
 FRAG_extension.build_frag(frag.supervoxels, np.uint64(frag.nsupervox), np.uint32(size_of_edges), list_of_edges, bool(validate), steps, np.int(block_size), watershed_shape.astype('int32'), label_count, count, hybrid_adjacency, np.int32(batch_size))
 print('done in %.4f s'%  (time.time() - t))
 
+#allocate space for frag border data structure
+list_of_borders = np.zeros((count[0], size_of_borders), dtype=np.uint32)
+tmp_edges = list_of_edges[0:count[0],:]
+list_of_borders[:,0] = tmp_edges[:,0]
+list_of_borders[:,1] = tmp_edges[:,1]
+list_of_borders[:,2] = 3;
+
+# tmp data structure for edges calculated for each label 
+tmp_lab_edges = np.zeros((frag.nsupervox,np.int(shared_size)), dtype = np.uint32)
+tmp_lab_edges[:,0] = 2;
+tmp_lab_edges[:,1] = np.arange(1,frag.nsupervox+1)
+for i in range(0, count[0]):
+    tmp_lab_edges[list_of_edges[i][0]-1,tmp_lab_edges[list_of_edges[i][0]-1,0]] = list_of_edges[i][1]
+    tmp_lab_edges[list_of_edges[i][0]-1,0] += 1
+
+print('Cpp serial generation of borders for rag'); t=time.time()
+FRAG_extension.build_frag_borders(frag.supervoxels, np.uint64(frag.nsupervox), tmp_lab_edges, list_of_borders, count, bool(validate), neigh_sel_indices, compliment_index, steps_edges, steps_border, block_size, watershed_shape.astype('int32'), np.int(shared_size))
+print('border calculation done in %.4f s'% (time.time() - t))
 # create graph
 
 if do_cpu_rag:
@@ -166,13 +192,13 @@ if do_cpu_rag:
         #    fout.write("%d "%b)
             boundary_subs = np.transpose(np.nonzero(g_test[edge[0]][edge[1]]['ovlp_attrs']['ovlp_cur_dilate']))
             start_sub = np.array([x.start for x in g_test[edge[0]][edge[1]]['ovlp_attrs']['aobnd']])
-            #global_subs_padded = boundary_subs + start_sub
-            #global_inds = np.ravel_multi_index(global_subs_padded.T.reshape(3,-1), frag.supervoxels.shape)
-            #for b in global_inds:
-       #    fout.write("%d "%b)
-            global_subs_unpadded = boundary_subs + start_sub - frag.eperim
-            for b in range(global_subs_unpadded.shape[0]):
-                fout.write("(%d,%d,%d) " % tuple(global_subs_unpadded[b,:].tolist()))
+            global_subs_padded = boundary_subs + start_sub
+            global_inds = np.ravel_multi_index(global_subs_padded.T.reshape(3,-1), frag.supervoxels.shape)
+            for b in global_inds:
+                fout.write("%d "%b)
+            #global_subs_unpadded = boundary_subs + start_sub - frag.eperim
+            #for b in range(global_subs_unpadded.shape[0]):
+             #   fout.write("(%d,%d,%d) " % tuple(global_subs_unpadded[b,:].tolist()))
             fout.write("\n")
         fout.close()
         print('\tdone in %.4f s' % (time.time() - t))
@@ -195,3 +221,19 @@ if validate:
     else:
       print(false_positives)
       print(false_negatives)
+
+    fn = 'tmp-boundary_pixel_indices-cpu.txt'
+    ref = []
+    import re
+    for line in open(fn, 'r'):
+        ref.append(np.uint32(re.findall('\d+', line)))
+
+    reference_borders = [x_r for x_r in ref]
+    generated_borders = [np.concatenate((x_g[0:3], x_g[3:3+x_g[2]])) for x_g in list_of_borders]
+    for i in range(0,4):
+          if(np.all(generated_borders[i] == reference_borders[i])):
+            #print("label-edge", list_of_borders[i][0], list_of_borders[i][1])
+            pass
+          else:
+            print(generated_borders[i])
+ 

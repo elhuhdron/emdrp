@@ -5,6 +5,7 @@
  * *************************************************************************************/
 
 static PyObject *build_frag(PyObject *self, PyObject *args);
+static PyObject *build_frag_borders(PyObject *self, PyObject *args);
 bool pairCompare(const std::tuple<int, int>& firstElem, const std::tuple<int, int>& secondElem);
 
 

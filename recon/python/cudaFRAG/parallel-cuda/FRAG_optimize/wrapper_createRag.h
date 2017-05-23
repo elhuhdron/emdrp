@@ -33,6 +33,13 @@ extern void wrapper_createLabelRag(const unsigned int* const gpu_watershed, cons
                                    const npy_int blockdim, npy_uint32* d_count, npy_uint8* gpu_edge_test, 
                                    const int* const watershed_grid_shape, const int* const gpu_grid);
 
+extern void wrapper_get_borders(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps_edges,
+                                const npy_intp* const gpu_steps_borders, const unsigned int* const gpu_edges,
+                                unsigned int* gpu_borders, npy_uint32* gpu_count_edges, 
+                                const npy_intp* const gpu_subind_edges, const npy_intp* const gpu_subind_borders,
+                                npy_int n_subind_edges , npy_int n_subind_borders, npy_int n_steps_borders , npy_int n_steps_edges,
+                                const int* const gpu_grid, const int* const grid, const npy_int blockdim, const npy_int cnst_size,
+                                const npy_int border_max_size, unsigned char* gpu_tile_chk);
 
 
 extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int blockdim, const npy_uint64 edge_test_size,

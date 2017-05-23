@@ -28,7 +28,7 @@ static PyMethodDef _frag_ExtensionMethods[] = {
     // EM data extensions
     {"build_frag", build_frag, METH_VARARGS},
     {"build_frag_borders", build_frag_borders, METH_VARARGS},
-
+    {"build_frag_borders_nearest_neigh", build_frag_borders_nearest_neigh, METH_VARARGS},
     {NULL, NULL}     /* Sentinel - marks the end of this structure */
 };
 
@@ -186,6 +186,9 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     
 }
 
+
+// this is the border get features using Pauls dilation method. Slower than python on 
+// gpu. 
 static PyObject *build_frag_borders(PyObject *self, PyObject *args){
 
     PyArrayObject *input_watershed;
@@ -280,7 +283,7 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
         if(!tmp_edges.empty() && label != 0){
             for(int step = 0; step < n_steps_border; step++){
                 edge_val = watershed[vox + steps_border[step]];
-                if(edge_val != label && edge_val != 0){
+                if(edge_val > label && edge_val != 0){
                     it = tmp_edges.begin();
                     while(it != tmp_edges.end()){
                         if(watershed[vox + steps_border[step]] == *it){
@@ -367,7 +370,9 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
          std::copy(indices.begin(), indices.end(), borders + edge_index + 3);
    
     }
-  
+ 
+    free(dilation1);
+    free(dilation2); 
     return Py_BuildValue("i",1);
 
 }
@@ -392,6 +397,7 @@ void get_dilation(unsigned int* dila_1, unsigned int* dila_2,
                do_add = true;
                //std::cout << boundary[start_index] << "-" << boundary[start_index + 1] 
                //<< "-" << boundary[start_index + 2] << std::endl;
+               // chaeckimg to see id inex already present
                assert(boundary[start_index + 2] < border_dim); 
                cnt = boundary[start_index + 2];
                for(unsigned int f = 3;f < cnt ;f++){
@@ -409,3 +415,121 @@ void get_dilation(unsigned int* dila_1, unsigned int* dila_2,
     }    
 }
 
+// get border features using the nearest neighour similar to GALA.
+static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args){
+
+    PyArrayObject *input_watershed;
+    PyArrayObject *input_edges;
+    PyArrayObject *input_borders;
+    PyArrayObject *input_steps;
+    PyArrayObject *input_count;
+    npy_uint32 n_supervoxels;
+    bool verbose;
+    npy_intp* dims;
+    npy_intp *n_voxels_dim;
+    npy_intp *n_borders_dim;
+    npy_uint32 n_voxels;
+    npy_uint64 n_borders;
+    npy_int n_steps;
+    npy_int tmp_size;
+
+   
+//parse arguments
+    if (!PyArg_ParseTuple(args,"OiOOOiOi", &input_watershed, &n_supervoxels, &input_edges, &input_borders, &input_count, &verbose, &input_steps, &tmp_size))
+        return NULL;
+             
+     // get the watershed voxels
+    unsigned int *h_watershed = (unsigned int*)PyArray_DATA(input_watershed);
+    dims = PyArray_DIMS(input_watershed);
+    n_voxels_dim = dims;
+    n_voxels = n_voxels_dim[0]*n_voxels_dim[1]*n_voxels_dim[2];
+    if(verbose) std::cout << "number of watershed pixels" << n_voxels << " " << n_voxels_dim[0] << " " << n_voxels_dim[1] << " " <<  n_voxels_dim[2] << std::endl;
+
+    // necessary to typecast "steps" with npy_intp* ,otherwise we get wrong results
+    // get steps for checking neighborhood 
+    npy_intp *h_steps_edges = (npy_intp*)PyArray_DATA(input_steps);
+    dims = PyArray_DIMS(input_steps);
+    n_steps = dims[0];
+    if (verbose) std::cout << "number of steps " << n_steps << " " << h_steps_edges[1] << " " << h_steps_edges[2] << " " << h_steps_edges[25] << std::endl;
+
+    //get the edges and borders 
+    npy_uint32 *h_edges = (npy_uint32*)PyArray_DATA(input_edges);
+    npy_int32 *h_count = (npy_int32*)PyArray_DATA(input_count);
+
+    // get the structure to store borders
+    npy_uint32 *h_borders = (npy_uint32*)PyArray_DATA(input_borders);
+    dims = PyArray_DIMS(input_borders);
+    n_borders_dim = dims;
+    n_borders = n_borders_dim[0]*n_borders_dim[1];
+    if(verbose) std::cout << "size of borders: " << n_borders << "-" << n_borders_dim[1] << std::endl;
+
+    // get the borders for the list of edges 
+    
+    npy_uint32 edge_value = 0;   
+    npy_uint32 label = 0;
+    npy_uint32 store_index = 0;
+    npy_uint32 cnt_index= 0;
+    npy_uint32 start_index = 0;
+    for(unsigned int vox = 0; vox < n_voxels; vox++){
+        label = h_watershed[vox]; 
+        if(label!=0){
+            // calculate the number of edges before the current edge in ascending order
+            cnt_index = 0; 
+            start_index = 0;
+            for(int cnt_id = 0;cnt_id < (label-1);cnt_id++){
+ 
+                cnt_index += h_edges[cnt_id*tmp_size];
+
+            }
+            cnt_index =  cnt_index - (2*(label-1));
+            for(int step = 0;step < n_steps;step++){
+                edge_value = h_watershed[vox + h_steps_edges[step]];
+                store_index = 0;
+                if(edge_value > label){
+                    for(int index = 2;index < h_edges[(label-1)*tmp_size];index++){
+
+                        if(h_edges[(label-1)*tmp_size + index] == edge_value){
+
+                          store_index = index-2;
+                          break;        
+                        }
+                    }
+                    start_index = cnt_index + store_index;
+                    if(h_borders[start_index*n_borders_dim[1]] != label){
+                        std::cout << "label do not match" << label << std::endl;
+                        assert(false);             
+                    }       
+                    if(h_borders[start_index*n_borders_dim[1] + 1] != edge_value){
+                        std::cout << "edge do not match" << edge_value << std::endl;
+                        assert(false);
+                    }
+                    h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox + h_steps_edges[step];
+                    h_borders[start_index*n_borders_dim[1]+2] += 1;  
+                    h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox;
+                    h_borders[start_index*n_borders_dim[1]+2] += 1;
+        
+                }
+            }
+        }
+    }
+
+     //postprocessing
+    npy_uint64 edge_index = 0;
+    npy_uint64 begin = 0;
+    npy_uint64 end = 0;
+    std::cout << "post_processing_started" << std::endl;
+    for(unsigned int edge_size = 0; edge_size < 1/*h_count[0]*/ ; edge_size++){
+         edge_index = edge_size * n_borders_dim[1];
+         begin = edge_index + 3;
+         end = edge_index + h_borders[edge_index + 2];
+         std::vector<npy_uint32> indices(h_borders + begin, h_borders + end);
+         std::sort(indices.begin() , indices.end());
+         auto last = std::unique(indices.begin(),indices.end());
+         indices.erase(last, indices.end());
+         std::copy(indices.begin(), indices.end(), h_borders + edge_index + 3);
+         h_borders[edge_index + 2] = indices.size();
+    }
+
+
+    return Py_BuildValue("i",1);
+}

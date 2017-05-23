@@ -5,22 +5,6 @@
 *************************************************************************/
 #include "wrapper_createRag.h"
 
-extern void wrapper_createRag(const int* const gpu_watershed, const npy_intp* const gpu_steps, const int n_pixels,
-                              const int n_labels, const int n_steps,
-                              int* gpu_edges, int* gpu_labels, const int blockdim, int* d_count, int* gpu_edge_test){
-
-     dim3 dim_grid((n_pixels/blockdim)+1), dim_block(blockdim); 
-     // launch the kernel 
-     create_rag<<<dim_grid,dim_block>>>(gpu_watershed, gpu_steps, n_steps, n_labels,
-                                        n_pixels, gpu_edges, gpu_labels, d_count, gpu_edge_test);
-     cudaDeviceSynchronize();
-     
-     // get the error
-     CALL_CUDA(cudaGetLastError());
-
-}
-
-
 extern void wrapper_createLabelRag(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_uint32 n_pixels,
                                    const npy_uint64 n_labels, const npy_uint32 label_jump, const unsigned int start_label, 
                                    const npy_int n_steps, unsigned int* gpu_edges, unsigned int* gpu_labels, const npy_int blockdim, 
@@ -40,6 +24,30 @@ extern void wrapper_createLabelRag(const unsigned int* const gpu_watershed, cons
 }
 
 
+extern void wrapper_get_borders(const unsigned int* gpu_watershed, const npy_intp* const gpu_steps_edges, 
+                                const npy_intp* const gpu_steps_borders, const unsigned int* const gpu_edges, 
+                                unsigned int* gpu_borders, npy_uint32* gpu_count_edges, 
+                                const npy_intp* const gpu_subind_edges, const npy_intp* const gpu_subind_borders,
+                                npy_int n_subind_edges , npy_int n_subind_borders, npy_int n_steps_borders , npy_int n_steps_edges,
+                                const int* const gpu_grid, const int* const grid, const npy_int blockdim, const npy_int cnst_size,
+                                const npy_int border_max_size, unsigned char* gpu_tile_chk)
+{
+     dim3 dim_grid((grid[2]/blockdim)+1, (grid[1]/blockdim)+1, (grid[0]/blockdim)+1), dim_block(blockdim, blockdim, blockdim);
+
+     int blockdim_padded = 2;
+     int shared_mem_size = (int)std::pow((blockdim+(blockdim_padded*2)),3) + n_subind_edges + n_subind_borders;
+     //launch the kernel
+     get_borders<<<dim_grid, dim_block, shared_mem_size*sizeof(unsigned int)>>>(gpu_watershed, gpu_steps_edges, gpu_steps_borders, 
+                                               gpu_edges, gpu_borders, gpu_count_edges, gpu_subind_edges, gpu_subind_borders,
+                                               n_subind_edges, n_subind_borders, n_steps_borders, n_steps_edges, gpu_grid, 
+                                               blockdim, blockdim_padded, cnst_size, border_max_size, gpu_tile_chk);
+     //cudaDeviceSynchronize();
+
+     // get the error
+     CALL_CUDA(cudaGetLastError());
+}
+
+
 extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int blockdim, const npy_uint64 edge_test_size,
                                          const npy_uint64 n_labels, const npy_uint32 label_jump){
 
@@ -53,12 +61,13 @@ extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int
 
 }
 
+// attempts at performing post processing on gpu side- but slower than host side
 
-
-extern void wrapper_post_process(const int n_pixels, const int* edges, const int* labels,const int count, int* gpu_uniquelabels, const int blockdim){
+/*extern void wrapper_post_process(const int n_pixels, const int* edges, const int* labels,const int count, int* gpu_uniquelabels, const int blockdim){
 
      dim3 dim_grid((count/blockdim)+1), dim_block(blockdim);
-     // launch the kernel 
+ 
+    // launch the kernel 
      create_unique<<<dim_grid,dim_block>>>(edges, labels, count, gpu_uniquelabels);
      cudaDeviceSynchronize();
 
@@ -78,8 +87,9 @@ extern void wrapper_sort(const int n_pixels, int* gpu_list, int size, int* final
 
      // get the error
      CALL_CUDA(cudaGetLastError());
-}
+}*/
 
+//thrust method to sort tuples -- very slow 
     /*intlabelptr dev_dataptr = thrust::device_pointer_cast(labels);
     intlabelptr dev_edgeptr = thrust::device_pointer_cast(edges);
     thrust::device_vector<int> d_vec(dev_dataptr, dev_dataptr + count[0]);
