@@ -170,12 +170,12 @@ class emLabels(dpWriteh5):
 
     # relabel sequential using thresholdSizes, just for a more clear name and if mappings are not needed
     @staticmethod
-    def relabel_sequential(lbls):
-        return emLabels.thresholdSizes(lbls, minSize=1)
+    def relabel_sequential(lbls, return_mapping=False):
+        return emLabels.thresholdSizes(lbls, minSize=1, return_mapping=return_mapping)
 
     # calculate sizes for a label volume and remove labels below specified threshold, returns sizes for labels only
     @staticmethod
-    def thresholdSizes(lbls, minSize=1):
+    def thresholdSizes(lbls, minSize=1, return_mapping=False):
         # xxx - all these methods should do something like this, would be better to move to normal class member methods
         assert( lbls.dtype.kind in 'ui' )
 
@@ -185,7 +185,12 @@ class emLabels(dpWriteh5):
         else: bgsel = (sizes < minSize)
         fgsel = np.logical_not(bgsel); sizes = sizes[fgsel]; fgcomps = np.cumsum(fgsel,dtype=emLabels.LBLS_DTYPE);
         fgcomps[bgsel] = 0; fgcomps = np.insert(fgcomps,0,0); L = fgcomps[lbls.flatten()].reshape(lbls.shape)
-        return L, sizes
+        if return_mapping:
+            # return mapping from new supervoxels to old ones
+            mapping = np.transpose(np.nonzero(fgsel)).reshape((-1,))
+            return L, sizes, mapping
+        else:
+            return L, sizes
 
     # returns sizes for bg (first element) and for labels
     @staticmethod

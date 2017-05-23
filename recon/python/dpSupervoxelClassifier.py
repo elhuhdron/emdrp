@@ -299,8 +299,9 @@ class dpSupervoxelClassifier():
                             [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                             self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, 
                             ['agglomeration_training'], progressBar=self.progress_bar, feature_set=self.feature_set, 
-                            has_ECS=self.has_ECS, chunk_subgroups=self.chunk_subgroups, 
-                            neighbor_only=self.neighbor_only, verbose=self.dpSupervoxelClassifier_verbose)
+                            has_ECS=self.has_ECS, chunk_subgroups=self.chunk_subgroups, no_agglo_ECS=self.no_agglo_ECS,
+                            pad_prob_svox_perim = not self.prob_svox_context, neighbor_only=self.neighbor_only, 
+                            verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
                         frag = self.iterative_frag[chunk]
@@ -309,7 +310,8 @@ class dpSupervoxelClassifier():
                         [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                         self.raw_dataset, self.gtfile, self.label_subgroups, feature_set=self.feature_set,
                         has_ECS=self.has_ECS, chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only,
-                        progressBar=self.progress_bar, verbose=self.dpSupervoxelClassifier_verbose)
+                        pad_prob_svox_perim = not self.prob_svox_context, progressBar=self.progress_bar, 
+                        no_agglo_ECS=self.no_agglo_ECS, verbose=self.dpSupervoxelClassifier_verbose)
                 frag.createFRAG(update = self.iterative_mode)
                 #frag.createFRAG(update = False)
                 data = frag.createDataset()
@@ -440,7 +442,8 @@ class dpSupervoxelClassifier():
                     [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                     self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out,
                     G=FRAG, progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
-                    chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only,
+                    chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only, 
+                    pad_prob_svox_perim = not self.prob_svox_context, no_agglo_ECS=self.no_agglo_ECS, 
                     verbose=self.dpSupervoxelClassifier_verbose)
             else:
                 frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset,
@@ -448,6 +451,7 @@ class dpSupervoxelClassifier():
                     self.raw_dataset, self.outfile, self.label_subgroups, subgroups_out, G=FRAG,
                     progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
                     chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only,
+                    pad_prob_svox_perim = not self.prob_svox_context, no_agglo_ECS=self.no_agglo_ECS,
                     verbose=self.dpSupervoxelClassifier_verbose)
 
         if self.iterative_mode and self.iterative_frag[ichunk] is None:
@@ -818,6 +822,10 @@ class dpSupervoxelClassifier():
             help='This mode is for probs and labels that have overlapping context so need to be stored separately.')
         p.add_argument('--neighbor-only', dest='neighbor_only', action='store_true',
             help='Only use boundary voxels labeled with neighboring supervoxels (no background / non-neighbor voxels)')
+        p.add_argument('--prob-svox-context', dest='prob_svox_context', action='store_true',
+            help='Use context for loading probs and supervoxels along edge faces')
+        p.add_argument('--no-agglo-ECS', action='store_true', help='Do not agglomerate ECS supervoxels')
+        
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
             help='Debugging output for dpSupervoxelClassifier')
 

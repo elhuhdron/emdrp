@@ -304,22 +304,33 @@ class dpFRAG(emLabels):
             # now pad the dilation perimeter with zeros.
             opad = tuple((np.ones((3,2),dtype=np.int32)*self.bperim).tolist())
             self.data_cube = np.lib.pad(self.data_cube, opad, 'constant', constant_values=0)
-            
-        if self.remove_ECS:
+
+        # optionally remove ECS supervoxels entirely (set to background)            
+        if self.remove_ECS and self.has_ECS:
             self.data_cube[self.data_cube > self.data_attrs['types_nlabels'][0]] = 0
-        relabel, sizes = emLabels.relabel_sequential(self.data_cube); self.nsupervox = sizes.size
-        self.data_cube = np.zeros((0,))
-        # supervoxel sizes are needed in advance for createFRAG (ignore background size).
-        #self.svox_sizes = emLabels.getSizes(relabel, maxlbls=self.nsupervox)[1:] # keeping this here for reference
-        self.svox_sizes = sizes
-            
+        relabel, sizes, mapping = emLabels.relabel_sequential(self.data_cube, return_mapping=True)
+        self.nsupervox = sizes.size; self.data_cube = np.zeros((0,)); self.svox_sizes = sizes
+
+        # "do not merge" list allows some supervoxels to not be added to the RAG and never merged.
+        # this is as opposed to training them not be be merged which would not guarantee they are never merged.
+        # keep the "do not merge" supervoxels at the end (highest valued supervoxel labels).
+        self.nsupervox_merge = self.nsupervox; self.nsupervox_nomerge = 0
+
+        # optionally never merge any supervoxels that were classified as ECS on input
+        if self.no_agglo_ECS and self.has_ECS:
+            # this assumes the relabel sequential does not change the order of the supervoxels,
+            #   except removing empty labels (which is what it does).
+            #self.isECS = (mapping > self.data_attrs['types_nlabels'][0])
+            self.nsupervox_merge = np.searchsorted(mapping, self.data_attrs['types_nlabels'][0])
+            self.nsupervox_nomerge = self.nsupervox - self.nsupervox_merge
+        
         if self.pad_svox_perim:
             self.supervoxels_noperim = relabel.astype(self.data_type_out, copy=False)
             self.supervoxels = np.lib.pad(self.supervoxels_noperim, self.spad, 'constant', constant_values=0)
             self.supervoxels_zeroperim = self.supervoxels
         else:
             # if we're using context supervoxels (pad_sox_perim==False) still need a zero perim version so that
-            #   we don't add edges to the rag for supervoxels that:
+            #     we don't add edges to the rag for supervoxels that:
             #   (1) only overlap in the perimeter
             #   (2) overlap due to a dilation from the perimeter coming back into the non-perimeter volume
             self.supervoxels = relabel.astype(self.data_type_out, copy=False)
@@ -327,6 +338,23 @@ class dpFRAG(emLabels):
             p = self.eperim; self.perim_sel[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]] = 0
             self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]]
             self.supervoxels_zeroperim = self.supervoxels.copy(); self.supervoxels_zeroperim[self.perim_sel] = 0
+
+            # move supervoxels that are only in the perimeter into the "do not merge", highest labeled supervoxels
+            sizes = emLabels.getSizes(self.supervoxels_zeroperim, maxlbls=self.nsupervox)
+            sel = np.ones((self.nsupervox+1,), dtype=np.bool); sel[:sizes.size] = (sizes == 0); sel[0] = 0
+            # don't move anything that's already "no merge", note that background size in sizes
+            sel[self.nsupervox_merge+1:] = 0; csel = sel.sum(dtype=np.int64)
+            nbeg = self.nsupervox-csel; nsel = np.logical_not(sel); nsel[0] = 0; 
+            if csel > 0:
+                supervox_map = np.zeros((self.nsupervox+1,),dtype=self.data_type_out)
+                supervox_map[nsel] = np.arange(1,nbeg+1); supervox_map[sel] = np.arange(nbeg+1,nbeg+csel+1)
+                self.supervoxels = supervox_map[self.supervoxels]
+                self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]]
+                self.supervoxels_zeroperim = self.supervoxels.copy(); self.supervoxels_zeroperim[self.perim_sel] = 0
+    
+                # can just sum with nomerge since we didn't move any labels that were already "no merge"
+                self.nsupervox_nomerge += csel; self.nsupervox_merge -= csel
+                assert(self.nsupervox_merge + self.nsupervox_nomerge == self.nsupervox)
 
         # load the probability data
         if self.probfile:
@@ -494,7 +522,7 @@ class dpFRAG(emLabels):
         # use update to only calculate features for nodes and neighbors in FRAG updated by agglomerate()
         make_outRAG = False
         if update and hasattr(self,'FRAG') and self.FRAG is not None:
-            assert( self.nsupervox == self.FRAG.number_of_nodes() )
+            assert( self.nsupervox == self.FRAG.number_of_nodes() + self.nsupervox_nomerge )
         else:
             # create emtpy FRAG, using networkx for now for graph
             self.FRAG = nx.Graph(); self.FRAG.add_nodes_from(range(1,self.nsupervox+1))
@@ -527,6 +555,11 @@ class dpFRAG(emLabels):
         #svox_order = np.argsort(self.svox_sizes)[::-1] + 1    # order of decreasing supervoxel size, slowest
         svox_order = np.argsort(self.svox_sizes) + 1    # order of increasing supervoxel size, fastest
         assert( svox_order.size == self.nsupervox )     # supervoxel count/sizes not updated properly
+
+        # completely remove any "do not merge" supervoxels from the list of supervoxels to be iterated.
+        # this keeps them out of the RAG entirely (but still present in the supervoxel labels).
+        if self.nsupervox_nomerge > 0:
+            svox_order = svox_order[svox_order <= self.nsupervox_merge]
 
         # iterate over supervoxels and get neighbors (edges) and add features for each neighbor
         for i in svox_order:
@@ -572,7 +605,12 @@ class dpFRAG(emLabels):
                 svox_size = self.svox_sizes[i-1]
                 lsvox_size = self.voxel_size_xform(svox_size)
 
-                # calculate perimeter supervoxels, see supervoxel perimeter NOTE above
+                # if we're using context supervoxels (pad_sox_perim==False) calculate overlaps in the perimeter.
+                # we did not use supervoxels including the perimeter before this so that neighbors are not added
+                #     to the RAG that:
+                #   (1) only overlap in the perimeter
+                #   (2) overlap due to a dilation from the perimeter coming back into the non-perimeter volume
+                # , see supervoxel perimeter NOTE above
                 ppbnd = pbnd; perim_ovlp = False; svox_cur_perim = svox_cur; svox_sel_out_perim = svox_sel_out
                 if not self.pad_svox_perim:
                     ppbnd = tuple([slice(x.start-self.bperim,x.stop+self.bperim) for x in svox_bnd_perim[i-1]])
@@ -591,6 +629,10 @@ class dpFRAG(emLabels):
             nbrlbls = np.unique(svox_cur[n['svox_sel_out']])
             # do not add edges to background or to the same supervoxel
             nbrlbls = nbrlbls[np.logical_and(nbrlbls != i, nbrlbls != 0)]
+
+            # do not add edges to "do not merge" supervoxels
+            if self.nsupervox_nomerge > 0:
+                nbrlbls = nbrlbls[nbrlbls <= self.nsupervox_merge]
 
             # udpate the progress bar based on the current supervoxel size divided by its number of neighbors.
             # add all remainders to last update for this supervoxel.
@@ -1025,6 +1067,14 @@ class dpFRAG(emLabels):
             #assert( self.nsupervox+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
             self.outRAG = nx.relabel_nodes(self.outRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
 
+        if self.nsupervox_nomerge > 0:
+            # add back any "do not merge" supervoxel labels
+            supervox_map[self.nsupervox_merge+1:] = \
+                np.arange(ncomps+1,ncomps+self.nsupervox_nomerge+1,dtype=self.data_type_out)
+            print(self.svox_sizes.shape, self.nsupervox_merge, self.nsupervox_nomerge, ncomps)
+            svox_sizes[ncomps:ncomps+self.nsupervox_nomerge] = self.svox_sizes[self.nsupervox_merge:]
+            self.nsupervox_merge = ncomps; ncomps += self.nsupervox_nomerge
+
         # create the new supervoxels from the supervoxel_map containing mapping from old nodes to agglo nodes.
         self.supervoxels = supervox_map[self.supervoxels]
         p = self.eperim; self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]]
@@ -1259,7 +1309,7 @@ class dpFRAG(emLabels):
     @classmethod
     def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile,
             subgroups=[], G=None, progressBar=False, feature_set=None, has_ECS=True, chunk_subgroups=False, 
-            neighbor_only=False, verbose=False):
+            neighbor_only=False, pad_prob_svox_perim=False, no_agglo_ECS=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1279,6 +1329,8 @@ class dpFRAG(emLabels):
         if not has_ECS: arg_str += ' --no-ECS '
         if chunk_subgroups: arg_str += ' --chunk-subgroups '
         if neighbor_only: arg_str += ' --neighbor-only '
+        if pad_prob_svox_perim: arg_str += ' --pad-prob-perim --pad-svox-perim '
+        if no_agglo_ECS: arg_str += ' --no-agglo-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1292,7 +1344,7 @@ class dpFRAG(emLabels):
     @classmethod
     def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile=None, 
             subgroups=[], subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, 
-            chunk_subgroups=False, neighbor_only=False, verbose=False):
+            chunk_subgroups=False, neighbor_only=False, pad_prob_svox_perim=False, no_agglo_ECS=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1313,6 +1365,8 @@ class dpFRAG(emLabels):
         if not has_ECS: arg_str += ' --no-ECS '
         if chunk_subgroups: arg_str += ' --chunk-subgroups '
         if neighbor_only: arg_str += ' --neighbor-only '
+        if pad_prob_svox_perim: arg_str += ' --pad-prob-perim --pad-svox-perim '
+        if no_agglo_ECS: arg_str += ' --no-agglo-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1326,7 +1380,7 @@ class dpFRAG(emLabels):
     @classmethod
     def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile=None,
             subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True, 
-            neighbor_only=False, chunk_subgroups=False, verbose=False):
+            neighbor_only=False, chunk_subgroups=False, pad_prob_svox_perim=False, no_agglo_ECS=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         dpFRAG.addArgs(parser); arg_str = ''
@@ -1348,6 +1402,8 @@ class dpFRAG(emLabels):
         if not has_ECS: arg_str += ' --no-ECS '
         if chunk_subgroups: arg_str += ' --chunk-subgroups '
         if neighbor_only: arg_str += ' --neighbor-only '
+        if pad_prob_svox_perim: arg_str += ' --pad-prob-perim --pad-svox-perim '
+        if no_agglo_ECS: arg_str += ' --no-agglo-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
         if progressBar: arg_str += ' --progress-bar '
@@ -1404,6 +1460,7 @@ class dpFRAG(emLabels):
         # using pad prob perim assumes that fill value for probs is 0 (not -1 or other)
         p.add_argument('--pad-prob-perim', action='store_true', help='Pad perimeter of probs instead of loading')
         p.add_argument('--pad-svox-perim', action='store_true', help='Pad perimeter of supervoxels instead of loading')
+        p.add_argument('--no-agglo-ECS', action='store_true', help='Do not agglomerate ECS supervoxels')
         p.add_argument('--dpFRAG-verbose', action='store_true', help='Debugging output for dpFRAG')
 
 if __name__ == '__main__':
