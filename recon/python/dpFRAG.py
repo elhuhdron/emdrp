@@ -586,7 +586,7 @@ class dpFRAG(emLabels):
             #   In this special case the supervoxel is skipped because all([]) evaluates to True.
             if update:
                 if all([('features' in x and not x['first_pass']) for x in self.FRAG[i].values()]): continue
-                previ = self.nsupervox_prev + i
+                previ = self.prev_max_node + i
 
             # if the supervoxel itself has not changed but some neighbors have, load from node attributes.
             if update and 'svox_attrs' in self.FRAG.node[i]:
@@ -649,7 +649,7 @@ class dpFRAG(emLabels):
 
             # add each corresponding neighbor label to the FRAG
             for j in nbrlbls:
-                if update: prevj = self.nsupervox_prev + j
+                if update: prevj = self.prev_max_node + j
 
                 if not features:
                     # only make RAG without features (like for agglomeration without fit)
@@ -1006,6 +1006,13 @@ class dpFRAG(emLabels):
         supervox_map = np.zeros((self.nsupervox+1,),dtype=self.data_type_out)
         compsG = nx.connected_components(aggloG); ncomps = 0
         svox_sizes = np.zeros((self.nsupervox,),dtype=np.int64)
+        
+        # this is used for re-creating the graph after agglo without creating a new graph.
+        # appends nodes that are beyond current last node. typcially this was nsupervox, but added the "do not merge"
+        #   mode for which these supervoxels are not added to the graph at all.
+        # this property indicates the last max node of the graph (also used in optimization).
+        self.prev_max_node = self.nsupervox_merge
+        
         for nodes in compsG:
             # SINGLETON NODE: single supervoxel that is not undergoing any merging (agglomeration)
 
@@ -1015,7 +1022,7 @@ class dpFRAG(emLabels):
 
             # update the FRAG by creating a new agglomerated node and moving neighboring edges to this node.
             # make a new singleton node for if this node is not containing any agglomerations.
-            newnode = ncomps+self.nsupervox; self.FRAG.add_node(newnode)
+            newnode = ncomps+self.prev_max_node; self.FRAG.add_node(newnode)
             if self.outRAG is not None: self.outRAG.add_node(newnode)
 
             if len(nodes) == 1:
@@ -1065,16 +1072,17 @@ class dpFRAG(emLabels):
 
         # sanity checks
         assert( ncomps == self.FRAG.number_of_nodes() )
-        #assert( self.nsupervox+ncomps == max(self.FRAG.nodes()) )  # commented for speed, HIASSERT
+        assert( self.prev_max_node+ncomps == max(self.FRAG.nodes()) )  # commented for speed, HIASSERT
         # relabel the FRAG starting at supervoxel 1
-        self.FRAG = nx.relabel_nodes(self.FRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
+        self.FRAG = nx.relabel_nodes(self.FRAG, {x+self.prev_max_node:x for x in range(1,ncomps+1)}, copy=False)
 
         # same steps for outRAG as for FRAG
         if self.outRAG is not None:
             assert( ncomps == self.outRAG.number_of_nodes() )
-            #assert( self.nsupervox+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
-            self.outRAG = nx.relabel_nodes(self.outRAG, {x+self.nsupervox:x for x in range(1,ncomps+1)}, copy=False)
+            assert( self.prev_max_node+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
+            self.outRAG = nx.relabel_nodes(self.outRAG, {x+self.prev_max_node:x for x in range(1,ncomps+1)}, copy=False)
 
+        # xxx - this block is identical in threshold_agglomerate()
         if self.nsupervox_nomerge > 0:
             assert( ncomps < self.nsupervox_merge ) # sanity check
             # add back any "do not merge" supervoxel labels
@@ -1087,11 +1095,10 @@ class dpFRAG(emLabels):
         self.supervoxels = supervox_map[self.supervoxels]
         p = self.eperim; self.supervoxels_noperim = self.supervoxels[p[0]:-p[0],p[1]:-p[1],p[2]:-p[2]]
         self.nsupervox_merge = ncomps; ncomps += self.nsupervox_nomerge
-        self.nsupervox_prev = self.nsupervox; self.nsupervox = ncomps
-        self.svox_sizes = svox_sizes[:ncomps]
+        self.nsupervox = ncomps; self.svox_sizes = svox_sizes[:ncomps]
         if self.pad_svox_perim:
             self.data_cube = self.supervoxels_noperim
-            self.data_attrs['types_nlabels'] = [ncomps]
+            self.data_attrs['types_nlabels'] = [self.nsupervox]
             self.supervoxels_zeroperim = self.supervoxels
         else:
             # if we loaded supervoxels in perimeter, need to relabel before writing in order to remove
@@ -1125,8 +1132,8 @@ class dpFRAG(emLabels):
                 # both new nodes must be singleton components to not require any feature updates.
                 # edges not requiring feature updates are marked by having features copied over from previous FRAG.
                 # only copy the features if the other node was already visited and was also singleton (has features)
-                #   or if the other node was not visited yet (neighbor node <= previous nsupervox).
-                if neighbor <= self.nsupervox or 'features' in f:
+                #   or if the other node was not visited yet (neighbor node <= previous max node (nsupervox_merge)).
+                if neighbor <= self.prev_max_node or 'features' in f:
                     features_copied = True
                     cRAG[neighbor][newnode]['features'] = f['features']
                     cRAG[neighbor][newnode]['first_pass'] = False
@@ -1134,7 +1141,7 @@ class dpFRAG(emLabels):
                     features_copied = False
 
                 # copy over overlap attributes but only if features are not copied over to final new edge.
-                if neighbor <= self.nsupervox or not features_copied:
+                if neighbor <= self.prev_max_node or not features_copied:
                     # if the overlap attributes are present, then copy them over to the new edge.
                     if 'ovlp_attrs' in f:
                         cRAG[neighbor][newnode]['ovlp_attrs'] = f['ovlp_attrs']
@@ -1202,17 +1209,18 @@ class dpFRAG(emLabels):
             for nodes in compsG:
                 # supervoxel mapping from previous to new agglomerated supervoxels
                 ncomps += 1; supervox_map[np.array(tuple(nodes),dtype=np.int64)] = ncomps
+            # xxx - this block is identical in agglomerate()
             if self.nsupervox_nomerge > 0:
                 assert( ncomps < self.nsupervox_merge ) # sanity check
                 # add back any "do not merge" supervoxel labels
                 supervox_map[self.nsupervox_merge+1:] = \
                     np.arange(ncomps+1,ncomps+self.nsupervox_nomerge+1,dtype=self.data_type_out)
                 ncomps += self.nsupervox_nomerge
-        # create the new supervoxels from the supervoxel_map containing mapping from agglo nodes to new nodes
+            # create the new supervoxels from the supervoxel_map containing mapping from agglo nodes to new nodes
             self.data_cube = supervox_map[self.supervoxels_noperim]
 
             if self.dpFRAG_verbose:
-                print('nsupervox',ncomps)
+                print('\tnsupervox',ncomps)
                 if useProgressBar: pbar.update(i)
             #print(self.offset, self.size, self.chunk, self.data_type, self.data_type_out)
             self.data_attrs['types_nlabels'] = [ncomps]
