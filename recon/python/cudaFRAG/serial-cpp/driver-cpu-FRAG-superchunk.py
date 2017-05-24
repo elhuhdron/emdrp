@@ -15,7 +15,7 @@ import _FRAG_extension as FRAG_extension
 parser = argparse.ArgumentParser()
 parser.add_argument('--size_of_edges',nargs =1, type= np.uint32, default = 30000, help = 'Enter the size of maximum edges that the supervoxels can have')
 parser.add_argument('--do_cpu_rag', nargs =1, type = bool , default = False , help = 'Turn the python-serial creation of rag on/off')
-parser.add_argument('--validate', nargs=1, type=bool , default = False , help = 'Perform Valiation')
+parser.add_argument('--validate', nargs=1, type=bool , default = True , help = 'Perform Valiation')
 parser.add_argument('--adjacencyMatrix', nargs=1, type=bool, default=False, help = 'Use adjacency Matrix in kernel or not')
 parser.add_argument('--label_count', nargs=1, type=np.uint32, default=30000, help = 'The number of labels to be processed at a time on a gpu')
 parser.add_argument('--size_of_borders', nargs=1, type=np.uint32, default=30000, help= ' The number of borders for a single edge')
@@ -88,6 +88,7 @@ frag = dpFRAG.makeTestingFRAG(labelfile, chunk, size, offset,
     [probfile, probaugfile], [rawfile, rawaugfile],
     raw_dataset, outfile, label_subgroups, ['testing','thr'],
     progressBar=progressBar, feature_set=feature_set, has_ECS=has_ECS,
+    neighbor_only=True, pad_prob_svox_perim=True,
     verbose=verbose)
 
 # hack to save raveled indices of overlap in context of whole volume (including boundary)
@@ -225,16 +226,22 @@ if validate:
 
     fn = 'tmp-boundary_pixel_indices-cpu.txt'
     ref = []
+    all_pass = True
     import re
     for line in open(fn, 'r'):
         ref.append(np.uint32(re.findall('\d+', line))) 
 
     reference_borders = [x_r for x_r in ref]
     generated_borders = [np.concatenate((x_g[0:2], x_g[3:x_g[2]])) for x_g in list_of_borders]
-    for i in range(0,1):
+    for i in range(0,count[0]):
           if(np.all(generated_borders[i] == reference_borders[i])):
-            #print("label-edge", list_of_borders[i][0], list_of_borders[i][1])
             pass
           else:
+            all_pass = False
             print(generated_borders[i])
             print(reference_borders[i])
+            
+    if all_pass:
+        print("the borders match for this dataset")
+    else:
+        print("mismatch")

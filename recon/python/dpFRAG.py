@@ -626,7 +626,6 @@ class dpFRAG(emLabels):
                         # dilate including the perimeter volume
                         svox_sel_out_perim = nd.morphology.binary_dilation(svox_cur_perim == i, 
                             structure=self.bwconn, iterations=self.neighbor_perim)
-
                 # save the variables in svox_attrs to node attributes
                 d = locals(); n = { k:d[k] for k in dpFRAG.svox_attrs }; self.FRAG.node[i]['svox_attrs'] = n
 

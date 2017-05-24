@@ -486,6 +486,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
                 edge_value = h_watershed[vox + h_steps_edges[step]];
                 store_index = 0;
                 if(edge_value > label){
+                    // calculate the index of the current edge 
                     for(int index = 2;index < h_edges[(label-1)*tmp_size];index++){
 
                         if(h_edges[(label-1)*tmp_size + index] == edge_value){
@@ -503,10 +504,16 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
                         std::cout << "edge do not match" << edge_value << std::endl;
                         assert(false);
                     }
-                    h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox + h_steps_edges[step];
-                    h_borders[start_index*n_borders_dim[1]+2] += 1;  
-                    h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox;
-                    h_borders[start_index*n_borders_dim[1]+2] += 1;
+                    //check if the borders do not overshoot the allocated space and then add 
+                    if(h_borders[start_index*n_borders_dim[1] + 2] < n_borders_dim[1]){
+                        h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox + h_steps_edges[step];
+                        h_borders[start_index*n_borders_dim[1]+2] += 1;  
+                        h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox;
+                        h_borders[start_index*n_borders_dim[1]+2] += 1;}
+                    else{
+                       std::cout << "The size of borders maxed out." << std::endl;
+                       assert(false);
+                    }
         
                 }
             }
@@ -518,7 +525,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint64 begin = 0;
     npy_uint64 end = 0;
     std::cout << "post_processing_started" << std::endl;
-    for(unsigned int edge_size = 0; edge_size < 1/*h_count[0]*/ ; edge_size++){
+    for(unsigned int edge_size = 0; edge_size < h_count[0] ; edge_size++){
          edge_index = edge_size * n_borders_dim[1];
          begin = edge_index + 3;
          end = edge_index + h_borders[edge_index + 2];
@@ -527,7 +534,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
          auto last = std::unique(indices.begin(),indices.end());
          indices.erase(last, indices.end());
          std::copy(indices.begin(), indices.end(), h_borders + edge_index + 3);
-         h_borders[edge_index + 2] = indices.size();
+         h_borders[edge_index + 2] = indices.size()+3;
     }
 
 
