@@ -250,6 +250,14 @@ class dpFRAG(emLabels):
 
         if not self.data_type_out: self.data_type_out = self.data_type
 
+        # force to keep subgroups in output if the chunk subgroup mode is set.
+        # this is if training cubes with context overlap each other so need to be stored in separate datasets.
+        # NOTE: MUST do this here before most inits so that dataset properties are loaded properly
+        if self.chunk_subgroups: 
+            self.keep_subgroups = True
+            self.subgroups = ['chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())] + self.subgroups
+            self.inith5() # MUST so that dataset properties are loaded
+
         # create features based on feature_set mode
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k,v in d.items(): setattr(self,k,v)
@@ -262,12 +270,6 @@ class dpFRAG(emLabels):
         self.bperim = 2*max([self.ovlp_dilate, self.neighbor_perim])
         # external perimeter used to pad all volumes
         self.eperim = self.perim + self.bperim
-
-        # force to keep subgroups in output if the chunk subgroup mode is set.
-        # this is if training cubes with context overlap each other so need to be stored in separate datasets.
-        if self.chunk_subgroups: 
-            self.keep_subgroups = True
-            self.subgroups = ['chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())] + self.subgroups
 
         # setup the subgroups out for writing hdf5 outputs
         if self.keep_subgroups: self.subgroups_out += self.subgroups

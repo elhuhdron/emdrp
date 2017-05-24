@@ -196,6 +196,7 @@ class emLabels(dpWriteh5):
     @staticmethod
     def getSizes(lbls, maxlbls=None):
         assert( lbls.dtype.kind in 'ui' )
+        #assert( ~(lbls == np.iinfo(lbls.dtype).max).any() ) # HIASSERT
         #if maxlbls is None:
         #    maxlbls = lbls.max()
         # xxx - could not find an efficient method that uses maxlbls, would have to write C-function
