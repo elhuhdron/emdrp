@@ -164,6 +164,7 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     list_of_edges.erase(last, list_of_edges.end()); 
     count[0] = list_of_edges.size();
     std::cout << "total edges generated for this volume: " <<  count[0] << std::endl; 
+    std::cout << "size of edges " << size_of_edges << std::endl;
     timer1.Stop();
     float total_time = timer1.Elapsed()/1000;
     std::cout << "total rag_creation time: " << total_time << std::endl;
@@ -419,7 +420,6 @@ void get_dilation(unsigned int* dila_1, unsigned int* dila_2,
 static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args){
 
     PyArrayObject *input_watershed;
-    PyArrayObject *input_edges;
     PyArrayObject *input_borders;
     PyArrayObject *input_steps;
     PyArrayObject *input_count;
@@ -431,11 +431,11 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint32 n_voxels;
     npy_uint64 n_borders;
     npy_int n_steps;
-    npy_int tmp_size;
+   
 
    
 //parse arguments
-    if (!PyArg_ParseTuple(args,"OiOOOiOi", &input_watershed, &n_supervoxels, &input_edges, &input_borders, &input_count, &verbose, &input_steps, &tmp_size))
+    if (!PyArg_ParseTuple(args,"OiOOiO", &input_watershed, &n_supervoxels, &input_borders, &input_count, &verbose, &input_steps))
         return NULL;
              
      // get the watershed voxels
@@ -453,7 +453,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     if (verbose) std::cout << "number of steps " << n_steps << " " << h_steps_edges[1] << " " << h_steps_edges[2] << " " << h_steps_edges[25] << std::endl;
 
     //get the edges and borders 
-    npy_uint32 *h_edges = (npy_uint32*)PyArray_DATA(input_edges);
+    //npy_uint32 *h_edges = (npy_uint32*)PyArray_DATA(input_edges);
     npy_int32 *h_count = (npy_int32*)PyArray_DATA(input_count);
 
     // get the structure to store borders
@@ -467,76 +467,67 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     
     npy_uint32 edge_value = 0;   
     npy_uint32 label = 0;
-    npy_uint32 store_index = 0;
-    npy_uint32 cnt_index= 0;
-    npy_uint32 start_index = 0;
+
+    GpuTimer timer1;
+    GpuTimer timer2;
+    float time_processing = 0;
+    npy_uint32 border_index_1 = 0;
+    npy_uint32 border_index_2 = 0;
+    std::vector<std::tuple<npy_uint32,npy_uint32,npy_uint32>>borders;
     for(unsigned int vox = 0; vox < n_voxels; vox++){
         label = h_watershed[vox]; 
         if(label!=0){
             // calculate the number of edges before the current edge in ascending order
-            cnt_index = 0; 
-            start_index = 0;
-            for(int cnt_id = 0;cnt_id < (label-1);cnt_id++){
- 
-                cnt_index += h_edges[cnt_id*tmp_size];
 
-            }
-            cnt_index =  cnt_index - (2*(label-1));
             for(int step = 0;step < n_steps;step++){
                 edge_value = h_watershed[vox + h_steps_edges[step]];
-                store_index = 0;
                 if(edge_value > label){
                     // calculate the index of the current edge 
-                    for(int index = 2;index < h_edges[(label-1)*tmp_size];index++){
-
-                        if(h_edges[(label-1)*tmp_size + index] == edge_value){
-
-                          store_index = index-2;
-                          break;        
-                        }
-                    }
-                    start_index = cnt_index + store_index;
-                    if(h_borders[start_index*n_borders_dim[1]] != label){
-                        std::cout << "label do not match" << label << std::endl;
-                        assert(false);             
-                    }       
-                    if(h_borders[start_index*n_borders_dim[1] + 1] != edge_value){
-                        std::cout << "edge do not match" << edge_value << std::endl;
-                        assert(false);
-                    }
-                    //check if the borders do not overshoot the allocated space and then add 
-                    if(h_borders[start_index*n_borders_dim[1] + 2] < n_borders_dim[1]){
-                        h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox + h_steps_edges[step];
-                        h_borders[start_index*n_borders_dim[1]+2] += 1;  
-                        h_borders[start_index*n_borders_dim[1] + h_borders[start_index*n_borders_dim[1]+2]] = vox;
-                        h_borders[start_index*n_borders_dim[1]+2] += 1;}
-                    else{
-                       std::cout << "The size of borders maxed out." << std::endl;
-                       assert(false);
-                    }
-        
+                    border_index_1 = vox  + h_steps_edges[step];
+                    border_index_2 = vox;
+                    borders.push_back(std::tuple<npy_uint32, npy_uint32, npy_uint32>(label,edge_value,border_index_1));
+                    borders.push_back(std::tuple<npy_uint32, npy_uint32, npy_uint32>(label,edge_value,border_index_2));
                 }
+                    
+                
             }
         }
     }
-
-     //postprocessing
+    //postprocessing
     npy_uint64 edge_index = 0;
     npy_uint64 begin = 0;
     npy_uint64 end = 0;
     std::cout << "post_processing_started" << std::endl;
-    for(unsigned int edge_size = 0; edge_size < h_count[0] ; edge_size++){
-         edge_index = edge_size * n_borders_dim[1];
-         begin = edge_index + 3;
-         end = edge_index + h_borders[edge_index + 2];
-         std::vector<npy_uint32> indices(h_borders + begin, h_borders + end);
-         std::sort(indices.begin() , indices.end());
-         auto last = std::unique(indices.begin(),indices.end());
-         indices.erase(last, indices.end());
-         std::copy(indices.begin(), indices.end(), h_borders + edge_index + 3);
-         h_borders[edge_index + 2] = indices.size()+3;
+    timer2.Start();
+    std::sort(borders.begin(), borders.end());
+    auto last = std::unique(borders.begin(), borders.end());
+    borders.erase(last, borders.end());
+    std::vector<std::tuple<npy_uint32,npy_uint32,npy_uint32>>::iterator i = borders.begin();
+    npy_uint32 cnt = 0;
+    npy_uint32 cur_label = std::get<0>(borders.at(0));
+    npy_uint32 cur_edge = std::get<1>(borders.at(0));
+    for(i = borders.begin(); i != borders.end();i++){
+        if(std::get<0>(*i) == cur_label){
+            if(std::get<1>(*i) == cur_edge){
+                h_borders[cnt*n_borders_dim[1] + h_borders[cnt*n_borders_dim[1]+2]] = std::get<2>(*i);  
+                h_borders[cnt*n_borders_dim[1]+2] += 1;
+            }else{
+                cnt++;
+                cur_edge = std::get<1>(*i);
+                h_borders[cnt*n_borders_dim[1] + h_borders[cnt*n_borders_dim[1]+2]] = std::get<2>(*i);
+                h_borders[cnt*n_borders_dim[1]+2] += 1;
+            }
+        }else{
+            cnt++;
+            cur_label = std::get<0>(*i);
+            cur_edge = std::get<1>(*i);
+            h_borders[cnt*n_borders_dim[1] + h_borders[cnt*n_borders_dim[1]+2]] = std::get<2>(*i);
+            h_borders[cnt*n_borders_dim[1]+2] += 1;
+        }        
     }
-
-
+    timer2.Stop();
+    float post_processing = timer2.Elapsed()/1000;
+    std::cout << "the processing time is" << time_processing << std::endl;
+    std::cout << "the post processing time is" << post_processing << std::endl;
     return Py_BuildValue("i",1);
 }

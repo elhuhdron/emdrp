@@ -36,6 +36,7 @@ static PyMethodDef _FRAG_ExtensionMethods[] = {
     // EM data extensions
     {"build_frag", build_frag, METH_VARARGS},
     {"build_frag_borders", build_frag_borders, METH_VARARGS},
+    {"build_frag_borders_nearest_neigh", build_frag_borders_nearest_neigh, METH_VARARGS},
     {NULL, NULL}     /* Sentinel - marks the end of this structure */
 };
 
@@ -496,7 +497,90 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
       
 }
 
+// get border features using the nearest neighour similar to GALA.
+static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args){
 
+    PyArrayObject *input_watershed;
+    PyArrayObject *input_borders;
+    PyArrayObject *input_steps;
+    PyArrayObject *input_count;
+    npy_uint32 n_supervoxels;
+    bool verbose;
+    npy_intp* dims;
+    npy_intp *n_voxels_dim;
+    npy_intp *n_borders_dim;
+    npy_uint32 n_voxels;
+    npy_uint64 n_borders;
+    npy_int n_steps;
+    npy_int tmp_edge_size;
+
+
+//parse arguments
+    if (!PyArg_ParseTuple(args,"OiOOiOi", &input_watershed, &n_supervoxels, &input_borders, &input_count, &verbose, &input_steps, &tmp_edge_size))
+        return NULL;
+
+     // get the watershed voxels
+    unsigned int *h_watershed = (unsigned int*)PyArray_DATA(input_watershed);
+    dims = PyArray_DIMS(input_watershed);
+    n_voxels_dim = dims;
+    n_voxels = n_voxels_dim[0]*n_voxels_dim[1]*n_voxels_dim[2];
+    if(verbose) std::cout << "number of watershed pixels" << n_voxels << " " << n_voxels_dim[0] << " " << n_voxels_dim[1] << " " <<  n_voxels_dim[2] << std::endl;
+
+    // necessary to typecast "steps" with npy_intp* ,otherwise we get wrong results
+    // get steps for checking neighborhood 
+    npy_intp *h_steps_edges = (npy_intp*)PyArray_DATA(input_steps);
+    dims = PyArray_DIMS(input_steps);
+    n_steps = dims[0];
+    if (verbose) std::cout << "number of steps " << n_steps << " " << h_steps_edges[1] << " " << h_steps_edges[2] << " " << h_steps_edges[25] << std::endl;
+
+    //get the edges and borders 
+    //npy_uint32 *h_edges = (npy_uint32*)PyArray_DATA(input_edges);
+    npy_int32 *h_count = (npy_int32*)PyArray_DATA(input_count);
+
+    // get the structure to store borders
+    npy_uint32 *h_borders = (npy_uint32*)PyArray_DATA(input_borders);
+    dims = PyArray_DIMS(input_borders);
+    n_borders_dim = dims;
+    n_borders = n_borders_dim[0]*n_borders_dim[1];
+
+    //Set the gpu to use for the application
+    CALL_CUDA(cudaSetDevice(0));
+
+    //get device properties
+    cudaDeviceProp prop;
+    CALL_CUDA(cudaGetDeviceProperties(&prop, 0));
+    unsigned int threads = prop.maxThreadsDim[1];
+    unsigned int max_blocks[3];
+    max_blocks[0] = prop.maxGridSize[0];
+    max_blocks[1] = prop.maxGridSize[1];
+    max_blocks[2] = prop.maxGridSize[2];
+
+    if(verbose) std::cout << "the max number of threads in each direction and max number of blocks in each direction "
+                          << threads << " " << max_blocks[0] << " " << max_blocks[1] << " " << max_blocks[2] << std::endl;
+
+
+    // initialize the timers
+    GpuTimer timer1;
+    GpuTimer timer2;
+    GpuTimer timer3;
+    float time_memtransfer=0.0;
+    float time_kernelProcessing=0.0;
+    float time_postprocessing=0.0;
+
+    // gpu_variables 
+    unsigned int *d_watershed;
+    npy_intp *d_steps_edges;
+
+    timer1.Start();
+    CALL_CUDA(cudaMalloc((void**)&h_watershed,n_voxels*sizeof(unsigned int)));
+    CALL_CUDA(cudaMemcpy(d_watershed, h_watershed, n_voxels*sizeof(unsigned int),cudaMemcpyHostToDevice));
+    CALL_CUDA(cudaMalloc((void**)&h_steps_edges, n_steps*sizeof(npy_intp)));
+    CALL_CUDA(cudaMemcpy(d_steps_edges, h_steps_edges, n_steps*sizeof(npy_intp), cudaMemcpyHostToDevice));
+
+    //return 
+    return Py_BuildValue("i",1);
+ 
+}
  //test code to measure time taken to sort
    
     /*int* list = (int*)malloc(1000000*sizeof(int));

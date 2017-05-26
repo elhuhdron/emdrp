@@ -21,7 +21,9 @@ parser.add_argument('--adjacencyMatrix', nargs=1, type=bool, default=False, help
 parser.add_argument('--label_count', nargs=1, type=np.uint32, default=3000, help = 'The number of labels to be processed at a time on a gpu')
 parser.add_argument('--blockdim', nargs=1, type=np.int32, default=8, help= 'Blocksize on Gpu')
 parser.add_argument('--batch_edges', nargs=1, type=np.uint32, default=30000, help= 'Batch size of label-edges to be processed at a time')
-parser.add_argument('--shared_size', nargs=1, type=np.int, default=100, help='Shared memory size for edgelist for each label on gpu')
+parser.add_argument('--tmp_edge_size', nargs=1, type=np.int, default=100, help='Temporary memory size for edgelist for each label on gpu')
+parser.add_argument('--no_dilation', nargs =1, type=bool , default=True, help= 'Use the dilation method to calculate the borders or not')
+
 args = parser.parse_args()
 size_of_edges = args.size_of_edges
 do_cpu_rag = args.do_cpu_rag
@@ -30,8 +32,9 @@ adjacencyMatrix = args.adjacencyMatrix
 label_count = np.uint32(args.label_count)
 block_size = np.int32(args.blockdim)
 batch_size = np.uint32(args.batch_edges)
-shared_size = args.shared_size
+tmp_edge_size = args.tmp_edge_size
 size_of_borders = np.uint32(args.size_of_borders)
+no_dilation = args.no_dilation
 
 # labeled chunks
 chunk = [16,17,0]
@@ -152,18 +155,24 @@ list_of_borders[:,1] = tmp_edges[:,1]
 list_of_borders[:,2] = 3;
 
 # tmp data structure for edges calculated for each label 
-tmp_lab_edges = np.zeros((frag.nsupervox,np.int(shared_size)), dtype = np.uint32)
+tmp_lab_edges = np.zeros((frag.nsupervox,np.int(tmp_edge_size)), dtype = np.uint32)
 tmp_lab_edges[:,0] = 2;
 tmp_lab_edges[:,1] = np.arange(1,frag.nsupervox+1)
 for i in range(0, count[0]):
     tmp_lab_edges[list_of_edges[i][0]-1,tmp_lab_edges[list_of_edges[i][0]-1,0]] = list_of_edges[i][1]
     tmp_lab_edges[list_of_edges[i][0]-1,0] += 1
 
-print('Cpp serial generation of borders for rag'); t=time.time()
-FRAG_extension.build_frag_borders(frag.supervoxels, np.uint64(frag.nsupervox), tmp_lab_edges, list_of_borders, count, bool(validate), neigh_sel_indices, compliment_index, steps_edges, steps_border, block_size, watershed_shape.astype('int32'), np.int(shared_size))
-print('border calculation done in %.4f s'% (time.time() - t))
-# create graph
+if no_dilation:
+    print('Cpp serial generation of borders for rag using nearest neigh');
+    t=time.time()
+    FRAG_extension.build_frag_borders_nearest_neigh(frag.supervoxels, frag.nsupervox, list_of_borders, count, bool(validate), steps, np.int(tmp_edge_size))
+    print('border calculation done in %.4f s'% (time.time() - t))
+else:
+    print('Cpp serial generation of borders for rag'); t=time.time()
+    FRAG_extension.build_frag_borders(frag.supervoxels, np.uint64(frag.nsupervox), tmp_lab_edges, list_of_borders, count, bool(validate), neigh_sel_indices, compliment_index, steps_edges, steps_border, block_size, watershed_shape.astype('int32'), np.int(tmp_edge_size))
+    print('border calculation done in %.4f s'% (time.time() - t))
 
+# create graph
 if do_cpu_rag:
     frag.createFRAG(features=getFeatures)
 

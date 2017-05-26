@@ -15,7 +15,7 @@ import _FRAG_extension as FRAG_extension
 parser = argparse.ArgumentParser()
 parser.add_argument('--size_of_edges',nargs =1, type= np.uint32, default = 30000, help = 'Enter the size of maximum edges that the supervoxels can have')
 parser.add_argument('--do_cpu_rag', nargs =1, type = bool , default = False , help = 'Turn the python-serial creation of rag on/off')
-parser.add_argument('--validate', nargs=1, type=bool , default = True , help = 'Perform Valiation')
+parser.add_argument('--validate', nargs=1, type=bool , default = False , help = 'Perform Valiation')
 parser.add_argument('--adjacencyMatrix', nargs=1, type=bool, default=False, help = 'Use adjacency Matrix in kernel or not')
 parser.add_argument('--label_count', nargs=1, type=np.uint32, default=30000, help = 'The number of labels to be processed at a time on a gpu')
 parser.add_argument('--size_of_borders', nargs=1, type=np.uint32, default=30000, help= ' The number of borders for a single edge')
@@ -35,7 +35,7 @@ tmp_edge_size = args.tmp_edge_size
 # labeled chunks
 chunk = [16,17,0]
 #size = [1024,1024,480]
-size = [128, 128, 128]
+size = [256, 256, 256]
 offset = [0,0,32]#32
 has_ECS = True
 
@@ -148,23 +148,25 @@ list_of_borders[:,1] = tmp_edges[:,1]
 list_of_borders[:,2] = 3;
 
 # tmp data structure for edges calculated for each label 
-tmp_lab_edges = np.zeros((frag.nsupervox,np.int(tmp_edge_size)), dtype = np.uint32)
+'''tmp_lab_edges = np.zeros((frag.nsupervox,np.int(tmp_edge_size)), dtype = np.uint32)
 tmp_lab_edges[:,0] = 2;
 tmp_lab_edges[:,1] = np.arange(1,frag.nsupervox+1)
 for i in range(0, count[0]):
     tmp_lab_edges[list_of_edges[i][0]-1,tmp_lab_edges[list_of_edges[i][0]-1,0]] = list_of_edges[i][1]
     tmp_lab_edges[list_of_edges[i][0]-1,0] += 1
+'''
 
 if no_dilation:
     print('Cpp serial generation of borders for rag using nearest neigh'); 
     t=time.time()
-    FRAG_extension.build_frag_borders_nearest_neigh(frag.supervoxels, frag.nsupervox, tmp_lab_edges, list_of_borders, count, bool(validate),    steps, np.int(tmp_edge_size))    
+    FRAG_extension.build_frag_borders_nearest_neigh(frag.supervoxels, frag.nsupervox, list_of_borders, count, bool(validate),steps)    
     print('border calculation done in %.4f s'% (time.time() - t))
 else:
     print('Cpp serial generation of borders for rag using dilation'); t=time.time()
     FRAG_extension.build_frag_borders(frag.supervoxels, frag.nsupervox, tmp_edges, list_of_borders, count, bool(validate), steps, 
     steps_border  )
     print('border calculation done in %.4f s'% (time.time() - t))
+
 
 # create graph
 
@@ -235,11 +237,11 @@ if validate:
     generated_borders = [np.concatenate((x_g[0:2], x_g[3:x_g[2]])) for x_g in list_of_borders]
     for i in range(0,count[0]):
           if(np.all(generated_borders[i] == reference_borders[i])):
-            pass
+              pass
           else:
-            all_pass = False
-            print(generated_borders[i])
-            print(reference_borders[i])
+              all_pass = False
+              print(generated_borders[i])
+              print(reference_borders[i])
             
     if all_pass:
         print("the borders match for this dataset")
