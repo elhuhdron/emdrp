@@ -306,8 +306,9 @@ class dpFRAG(emLabels):
             # now pad the dilation perimeter with zeros.
             opad = tuple((np.ones((3,2),dtype=np.int32)*self.bperim).tolist())
             self.data_cube = np.lib.pad(self.data_cube, opad, 'constant', constant_values=0)
+        assert((np.iinfo(self.data_cube.dtype).max > self.data_cube).all())
 
-        # optionally remove ECS supervoxels entirely (set to background)            
+        # optionally remove ECS supervoxels entirely (set to background) 
         if self.remove_ECS and self.has_ECS:
             self.data_cube[self.data_cube > self.data_attrs['types_nlabels'][0]] = 0
         relabel, sizes, mapping = emLabels.relabel_sequential(self.data_cube, return_mapping=True)
@@ -1074,14 +1075,14 @@ class dpFRAG(emLabels):
 
         # sanity checks
         assert( ncomps == self.FRAG.number_of_nodes() )
-        assert( self.prev_max_node+ncomps == max(self.FRAG.nodes()) )  # commented for speed, HIASSERT
+        #assert( self.prev_max_node+ncomps == max(self.FRAG.nodes()) )  # commented for speed, HIASSERT
         # relabel the FRAG starting at supervoxel 1
         self.FRAG = nx.relabel_nodes(self.FRAG, {x+self.prev_max_node:x for x in range(1,ncomps+1)}, copy=False)
 
         # same steps for outRAG as for FRAG
         if self.outRAG is not None:
             assert( ncomps == self.outRAG.number_of_nodes() )
-            assert( self.prev_max_node+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
+            #assert( self.prev_max_node+ncomps == max(self.outRAG.nodes()) )  # commented for speed, HIASSERT
             self.outRAG = nx.relabel_nodes(self.outRAG, {x+self.prev_max_node:x for x in range(1,ncomps+1)}, copy=False)
 
         # xxx - this block is identical in threshold_agglomerate()
