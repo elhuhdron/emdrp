@@ -13,7 +13,7 @@ import _FRAG_extension as FRAG_extension
 
 #read the input arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('--size_of_edges',nargs =1, type= np.uint32, default = 300000, help = 'Enter the size of maximum edges in a dataset')
+parser.add_argument('--size_of_edges',nargs =1, type= np.uint32, default = 30000, help = 'Enter the size of maximum edges in a dataset')
 parser.add_argument('--size_of_borders', nargs=1,type=np.uint32, default=30000, help = 'Enter size of maximum borders for a label-edge pair in a dataset')
 parser.add_argument('--do_cpu_rag', nargs =1, type = bool , default = False , help = 'Turn the python-serial creation of rag on/off')
 parser.add_argument('--validate', nargs=1, type=bool , default = False , help = 'Perform Valiation')
@@ -23,6 +23,8 @@ parser.add_argument('--blockdim', nargs=1, type=np.int32, default=8, help= 'Bloc
 parser.add_argument('--batch_edges', nargs=1, type=np.uint32, default=30000, help= 'Batch size of label-edges to be processed at a time')
 parser.add_argument('--tmp_edge_size', nargs=1, type=np.int, default=100, help='Temporary memory size for edgelist for each label on gpu')
 parser.add_argument('--no_dilation', nargs =1, type=bool , default=True, help= 'Use the dilation method to calculate the borders or not')
+parser.add_argument('--batch_borders', nargs=1, type=np.uint32, default=100000, help='Batch size of borders to be processed at a time on gpu')
+parser.add_argument('--label_jump_borders', nargs=1, type=np.uint, default=1000, help='Number of labels to process at a time for border calculation')
 
 args = parser.parse_args()
 size_of_edges = args.size_of_edges
@@ -35,11 +37,13 @@ batch_size = np.uint32(args.batch_edges)
 tmp_edge_size = args.tmp_edge_size
 size_of_borders = np.uint32(args.size_of_borders)
 no_dilation = args.no_dilation
+label_jump_borders = np.uint(args.label_jump_borders)
 
+batch_borders = np.uint32(args.batch_borders)
 # labeled chunks
 chunk = [16,17,0]
-#size = [1024,1024,480]
-size = [128, 128, 128]
+size = [1024,1024,480]
+#size = [512, 512, 480]
 offset = [0,0,32]
 has_ECS = True
 
@@ -92,6 +96,7 @@ frag = dpFRAG.makeTestingFRAG(labelfile, chunk, size, offset,
     [probfile, probaugfile], [rawfile, rawaugfile],
     raw_dataset, outfile, label_subgroups, ['testing','thr'],
     progressBar=progressBar, feature_set=feature_set, has_ECS=has_ECS,
+    neighbor_only=True, pad_prob_svox_perim=True,
     verbose=verbose)
 
 # hack to save raveled indices of overlap in context of whole volume (including boundary)
@@ -165,12 +170,13 @@ for i in range(0, count[0]):
 if no_dilation:
     print('Cpp serial generation of borders for rag using nearest neigh');
     t=time.time()
-    FRAG_extension.build_frag_borders_nearest_neigh(frag.supervoxels, frag.nsupervox, list_of_borders, count, bool(validate), steps, np.int(tmp_edge_size))
+    FRAG_extension.build_frag_borders_nearest_neigh(frag.supervoxels, frag.nsupervox, tmp_lab_edges, list_of_borders, count, bool(validate), steps, np.int(tmp_edge_size), block_size, watershed_shape.astype('int32'), np.uint32(batch_borders), np.uint(label_jump_borders))
     print('border calculation done in %.4f s'% (time.time() - t))
 else:
     print('Cpp serial generation of borders for rag'); t=time.time()
     FRAG_extension.build_frag_borders(frag.supervoxels, np.uint64(frag.nsupervox), tmp_lab_edges, list_of_borders, count, bool(validate), neigh_sel_indices, compliment_index, steps_edges, steps_border, block_size, watershed_shape.astype('int32'), np.int(tmp_edge_size))
     print('border calculation done in %.4f s'% (time.time() - t))
+
 
 # create graph
 if do_cpu_rag:
@@ -238,11 +244,12 @@ if validate:
         ref.append(np.uint32(re.findall('\d+', line)))
 
     reference_borders = [x_r for x_r in ref]
-    generated_borders = [np.concatenate((x_g[0:3], x_g[3:3+x_g[2]])) for x_g in list_of_borders]
-    for i in range(0,4):
+    generated_borders = [np.concatenate((x_g[0:2], x_g[3:x_g[2]])) for x_g in list_of_borders]
+    for i in range(0,count[0]):
           if(np.all(generated_borders[i] == reference_borders[i])):
             #print("label-edge", list_of_borders[i][0], list_of_borders[i][1])
             pass
           else:
             print(generated_borders[i])
+            print(reference_borders[i])
  

@@ -15,13 +15,6 @@
 #include <thrust/unique.h>
 
 #include "kernel_createFrag.h"
-typedef thrust::device_ptr<int> intlabelptr;
-typedef thrust::device_vector<int> IntVector;
-typedef IntVector::iterator IntIterator;
-typedef thrust::tuple< IntIterator, IntIterator >  IntIteratorTuple;
-typedef thrust::zip_iterator< IntIteratorTuple >  ZipIterator;
-
-
 extern void wrapper_createRag(const int* const gpu_watershed, const npy_intp* const gpu_steps, const int n_pixels,
                               const int n_labels, const int n_steps, int* gpu_edges, int* gpu_labels, 
                               const int blockdim, int* d_count, int* gpu_edge_test);
@@ -46,3 +39,10 @@ extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int
                                  const npy_uint64 n_labels, const npy_uint32 label_jump);
 
 extern void wrapper_sort(const int n_pixlels, int* gpu_list, int size, int* final_order);
+
+extern void wrapper_get_borders_nearest_neigh(const unsigned int* const d_watershed, const npy_intp* const d_steps_edges, 
+                                              npy_uint32 *d_borders, const npy_uint32* const d_edges, npy_int blockdim,
+                                              const int* const d_grid, const int* const grid, const npy_uint32 n_voxels, 
+                                              const npy_int n_steps, const npy_int tmp_edge_size, const npy_uint32 border_size,
+                                              const npy_uint32 n_supervox, const npy_uint jump);
+
