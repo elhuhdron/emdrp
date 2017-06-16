@@ -61,6 +61,22 @@ extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int
 
 }
 
+extern void wrapper_get_borders_nearest_neigh(const unsigned int* const d_watershed, const npy_intp* const d_steps_edges, 
+                                              npy_uint32 *d_borders, const npy_uint32* const d_edges, npy_int blockdim,
+                                              const int* const d_grid, const int* const grid, const npy_uint32 n_voxels, 
+                                              const npy_int n_steps, const npy_int tmp_edge_size, const npy_uint32 border_size,
+                                              const npy_uint32 n_supervox, const npy_uint jump){
+
+     dim3 dim_grid((grid[0]/blockdim) + 1 , (grid[1]/blockdim) + 1, (grid[2]/blockdim) +1 ), dim_block(blockdim, blockdim, blockdim);
+     get_nearest_neigh<<<dim_grid, dim_block>>>(d_watershed, d_steps_edges, d_borders, d_edges, 
+                                                d_grid, n_voxels, n_steps, tmp_edge_size, border_size, n_supervox, jump);
+     cudaDeviceSynchronize();
+
+     // check for error
+     CALL_CUDA(cudaGetLastError());
+    
+}
+
 // attempts at performing post processing on gpu side- but slower than host side
 
 /*extern void wrapper_post_process(const int n_pixels, const int* edges, const int* labels,const int count, int* gpu_uniquelabels, const int blockdim){
@@ -88,23 +104,4 @@ extern void wrapper_sort(const int n_pixels, int* gpu_list, int size, int* final
      // get the error
      CALL_CUDA(cudaGetLastError());
 }*/
-
-//thrust method to sort tuples -- very slow 
-    /*intlabelptr dev_dataptr = thrust::device_pointer_cast(labels);
-    intlabelptr dev_edgeptr = thrust::device_pointer_cast(edges);
-    thrust::device_vector<int> d_vec(dev_dataptr, dev_dataptr + count[0]);
-    thrust::device_vector<int> d_vec2(dev_edgeptr, dev_edgeptr + count[0]);
-    thrust::sort_by_key(d_vec.begin(), d_vec.end(), d_vec2.begin());
-    //thrust::sort(thrust::make_zip_iterator( thrust::make_tuple( d_vec.begin(), d_vec2.begin() ) ),
-      //                                   thrust::make_zip_iterator( thrust::make_tuple( d_vec.end(), d_vec2.end() ) ) );
-
-    ZipIterator newEnd = thrust::unique( thrust::make_zip_iterator( thrust::make_tuple( d_vec.begin(), d_vec2.begin() ) ),
-                                         thrust::make_zip_iterator( thrust::make_tuple( d_vec.end(), d_vec2.end() ) ) );
-
-    IntIteratorTuple endTuple = newEnd.get_iterator_tuple();
-
-
-    d_vec.erase( thrust::get<0>( endTuple ), d_vec.end() );
-    d_vec2.erase( thrust::get<1>( endTuple ), d_vec2.end() );
-    printf("%d" , d_vec.size());;*/
 
