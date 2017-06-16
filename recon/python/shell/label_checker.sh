@@ -11,6 +11,8 @@
 #outraw=/home/watkinspv/Downloads/ITKcube_raw_x0016_y0017_z0004
 #chunk='16 17 4'
 #offset='0 0 0'
+##contour_level = 0.25
+##smooth_size = [3, 3, 3]
 
 fnraw=/Data/datasets/raw/K0057_D31_dsx3y3z1.h5
 dataset=data_mag_x3y3z1
@@ -20,10 +22,12 @@ ctx_size='384 384 64'
 ctx_chunk='0 0 0'
 ctx_offset='64 64 16'
 minsize=9
-fn=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x13_y18_z15o64_labels
-outraw=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x13_y18_z15o64_crop
-chunk='13 18 15'
-offset='0 0 64'
+fn=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x4o96_y35o96_z3o64_labels
+outraw=/home/watkinspv/Downloads/K0057_tracing/K0057_D31_dsx3y3z1_x4o96_y35o96_z3o64_crop
+chunk='4 35 3'
+offset='96 96 64'
+contour_level='0.3'
+smooth_size='5 5 5'
 
 # load raw data and write out nrrd
 dpLoadh5.py --srcfile $fnraw --dataset $dataset --outraw $outraw.nrrd --chunk $chunk --size $size --offset $offset
@@ -36,7 +40,7 @@ dpLoadh5.py --srcfile $tmp.h5 --dataset labels --outraw ${fn}_crop.nrrd --chunk 
 # main label cleaning steps, all steps are done in 3d (NOT per 2d zslice)
 
 # (1) smoothing, done per label
-dpCleanLabels.py --srcfile $tmp.h5 --chunk $ctx_chunk --offset $ctx_offset --size $size --smooth --dpC
+dpCleanLabels.py --srcfile $tmp.h5 --chunk $ctx_chunk --offset $ctx_offset --size $size --smooth --smooth-size $smooth_size --contour-lvl $contour_level --dpC
 
 # (2) remove adjacencies
 dpCleanLabels.py --srcfile $tmp.h5 --chunk $ctx_chunk --offset $ctx_offset --size $size --remove_adjacencies --fg-connectivity 3 --dpC

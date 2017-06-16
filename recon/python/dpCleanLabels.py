@@ -61,7 +61,7 @@ class dpCleanLabels(emLabels):
             if self.dpCleanLabels_verbose:
                 print('\tdone in %.4f s' % (time.time() - t))
 
-        # minpath overlay creation is intended to improve proofreading speed by highlighting connected path
+        # minpath overlay creation is intended to improve proofreading speed by highlighting connected paths
         if self.minpath > 0:
             import skfmm
             if self.minpath_skel:
@@ -92,7 +92,6 @@ class dpCleanLabels(emLabels):
                               return_distances=True, sampling=self.data_attrs['scale']), selbg))
 
                     # xxx - need something like imregionalmin in 3d, could not quickly find an easy solution
-                    #   parameterize the min select percentage?
                     d = d1+d2; bwlabels = ((d.data < self.minpath_perc*d.min()) & ~d.mask); bwlabels[s1 | s2] = 1
                     if self.minpath_skel:
                         # optionally skeletonize keeping original minpath points as anchors
@@ -117,20 +116,12 @@ class dpCleanLabels(emLabels):
             # threshold sizes to remove empty labels
             self.data_cube, sizes = emLabels.thresholdSizes(self.data_cube, minSize=1)
 
-            # xxx - fix old comments from matlab meshing code, fix this
-
-            # xxx - local parameters, expose if find any need to change these
-            #rad = 5;                # amount to pad (need greater than one for method 3 because of smoothing
-            #contour_level = 0.25;   # binary threshold for calculating surface mesh
-            #smooth_size = [3, 3, 3];
-            #rad = 7;                # amount to pad (need greater than one for method 3 because of smoothing
-            #contour_level = 0.45;    # binary threshold for calculating surface mesh
-            #smooth_size = [5, 5, 5];
+            # exposed smoothing kernel size and contour level as parameters
             smooth_size = self.smooth_size
-            contour_level = self.smooth_contour
+            contour_level = self.contour_lvl
+            # calculate padding based on smoothing kernel size
             rad = int(1.5*smooth_size.max())
 
-            #emptyLabel = 65535; % should define this in attribs?
             sizes = np.array(self.data_cube.shape); sz = sizes + 2*rad;
             image_with_zeros = np.zeros(sz, dtype=self.data_cube.dtype); # create zeros 3 dimensional array
             image_with_zeros[rad:-rad,rad:-rad,rad:-rad] = self.data_cube  # embed label array into zeros array

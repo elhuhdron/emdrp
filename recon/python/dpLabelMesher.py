@@ -57,7 +57,7 @@ class dpLabelMesher(emLabels):
     RAD = 5  # for padding
 
     #print_every = 500 # modulo for print update
-    dataset_root = 'meshes'
+    #dataset_root = 'meshes'
 
     VERTEX_DTYPE = np.uint16    # decided to use fixed precision to represent vertices, sets max vertex value
     VERTEX_BPLACES = 0          # binary place to fix vertices to (precision depends on if set_voxel_scale)
@@ -1014,6 +1014,7 @@ class dpLabelMesher(emLabels):
                        help='Show merged meshes from the annotation file from knossos')
         p.add_argument('--write_hdf5', action='store_true',
                        help='Write separate mesh file for annotated meshes')
+        p.add_argument('--dataset-root', nargs=1, type=str, default='meshes', help='Top level for hdf5 outfile')
         p.add_argument('--write_ply', action='store_true',
                        help='Write separate ply file for annoatated meshes')
         p.add_argument('--reduce-frac', nargs=1, type=float, default=[0.2], metavar=('PERC'),
