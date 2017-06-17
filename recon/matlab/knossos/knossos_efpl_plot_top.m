@@ -136,16 +136,18 @@ load_files = {
 %   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper.mat'
 %   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper_ctx.mat'
 %   '/home/watkinspv/Data/efpl/efpl_crop_interp_wtsh_mfergus32_ECS_paper_ctx.mat'
-%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper.mat'
-%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper.mat'
 %   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_ctx.mat'
 %   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_ctx.mat'
-  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper.mat'
-  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper.mat'
-  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_ctx.mat'
-  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_ctx.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper.mat'
+%   '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper.mat'
+  %'/home/watkinspv/Data/efpl/efpl_nocrop_interp_agglo_none_mfergus32_ECS_paper_ctx.mat'
+  %'/home/watkinspv/Data/efpl/efpl_nocrop_interp_agglo_none_mfergus32_ECS_paper_ctx.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_noECS.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_noECS.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_noECS.mat'
+  '/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_noECS.mat'
 };
-load_indices = [3 4 3 4];
+load_indices = [2 4 2 4];
 
 % load_files = {
 %   '/home/watkinspv/Downloads/soma_run2.mat'

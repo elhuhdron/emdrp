@@ -92,8 +92,14 @@ end
 % if use_thresholds, o.thresholds = o.thresholds(ismember(round(1e6*o.thresholds),round(1e6*p.use_thresholds))); end
 
 % other calculated values based on params
-o.loadsize = p.nchunks.*o.chunksize - p.offset;
-o.loadcorner = pdata.chunk.*o.chunksize + p.offset;
+if isfield(p, 'size')
+  o.loadsize = p.size;
+  o.loadcorner = pdata.chunk.*o.chunksize + p.offset;
+else
+  % xxx - messy, support legacy version which only had nchunks, no size and offset interpreted as "skip"
+  o.loadsize = p.nchunks.*o.chunksize - p.offset;
+  o.loadcorner = pdata.chunk.*o.chunksize + p.offset;
+end
 o.nthresholds = length(o.thresholds);
 o.nparams = o.nthresholds;
 assert( o.nparams > 1 );
