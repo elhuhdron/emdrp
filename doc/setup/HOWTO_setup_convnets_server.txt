@@ -6,9 +6,9 @@ New notes have been added for initialization with CentOS7.1.
 NOTE: commands that can be directly pasted to terminal are prepended with >
 
   Name    Previous Name   Machine              Tag        GPUs                 Cores / CPU                     Mem
-  red     matra           Dell Poweredge R720  ---        2 780Ti              8 Xeon CPU E5-2670 v2 @ 2.50GHz 128G
-  orang   cdcu-dev2       Dell Precision T7610 01942074   1-980TiSC 1-780TI    4 Xeon CPU E5-2603 v2 @ 1.80GHz 32G
-  blue    ---             Phantek Gigabyte     02051609   1-980TiSC 1-980TiFTW 4 Core i7-6700K CPU @ 4.00GHz   32G
+  red     matra           Dell Poweredge R720  ---        ---                  8 Xeon CPU E5-2670 v2 @ 2.50GHz 128G
+  orang   ---             Phantek Gigabyte     01942074   1-1080TiFd 1-980TiSC 4 Core i7-6700K CPU @ 4.00GHz   32G
+  blue    ---             Phantek Gigabyte     02077347   1-1080TiFd 1-980TiSC 4 Core i7-6700K CPU @ 4.00GHz   32G
   green   ---             Phantek ASUS         02021553   1-780Ti              4 Core i7-6700K CPU @ 4.00GHz   48G
   xgreen  ---             X99P-SLI (5 clones)  02021565   4 980Ti              6 Core i7-5930K @ 3.5Ghz        16G
   xgreen  ---             Synology DS1515      ---        ---                  xxx                             2G
@@ -40,6 +40,8 @@ Local interface is 10.42.55.xxx/255.255.255.192, using 4 subnets:
   clone ($g5)                  3       193
 Had to switch to different subnet approach in order to fully take advantage of synology interfaces.
   Had tried many configurations with link aggregation to no avail.
+ADD static routes for each interface, otherwise find that sometimes traffic would always be routed out
+  the default gateway on the switch (not sure how that even works).
 
 OLD:
 Local interface is 10.42.55.1/255.255.255.0: 
@@ -56,7 +58,15 @@ Local interface is 10.42.55.1/255.255.255.0:
 Retired Machines:
   Name    Retired      Previous Name   Machine              Tag        Cores / CPU                     Mem
   yello   2017 Feb 10  cdcu-dev1       Dell Precision T5600 01903086   6 Xeon CPU E5-2620 0 @ 2.00GHz  32G
+  orang   2017 Jun 5   cdcu-dev2       Dell Precision T7610 01942074   4 Xeon CPU E5-2603 v2 @ 1.80GHz 32G
 
+Phantek Machines:
+  gskill -> orang
+  EVGA -> blue
+  intel -> green
+  UD -> student
+  blank -> imaging
+  
 Absolutely need sudoers or root access to perform the setup / install required modules. 
 All machines currently setup with a local administrator account called nindsadmin during CentOS install.
 Give user login sudo access to log most install steps (note: steps as su not logged in sudoers history)
@@ -523,6 +533,9 @@ Need google snappy for writing Knossos segmentation cubes:
     > sudo yum install snappy snappy-devel
     > sudo pip install python-snappy
 
+For local anaconda on biowulf needed (then DO NOT load snappy module):
+    > conda install -c conda-forge python-snappy=0.5.1
+
 For aleks-watershed, need C++11 compatible compiler, not installed by default on CentOS 6.5
 Install devtoolset from Scientific Linux (CERN):
     > wget http://ftp.mirrorservice.org/sites/ftp.scientificlinux.org/linux/scientific/51/i386/RPM-GPG-KEYs/RPM-GPG-KEY-cern
@@ -660,7 +673,7 @@ create the machine with install, i.e.:
 virt-install --network bridge=br0 --network bridge=br1 --name infra --ram 16384 --vcpus=2 --disk path=/Data/vm-images/infra.img,size=200,sparse=false --graphics none --location /home/watkinspv/Downloads/CentOS-7-x86_64-Minimal-1611-custom.iso --os-type linux --os-variant centos7.0 --extra-args "console=tty0 console=ttyS0,115200"
 
 extra packages installed:
-  > sudo yum install net-tools bind-utils nfs-utils
+  > sudo yum install net-tools bind-utils nfs-utils rsync
 
 disable network manage, verify ifcfg scripts, disable ipv6 for local interface
 
@@ -1075,6 +1088,14 @@ OR
 Enabled jumbo frames on all local interfaces (MTU=9000), can test with:
   > ping -M do -c 4 -s 8972 $syn
 MUST enable jumbo frame support on the switch also, then reboot switch
+
+Even with subnet solution ran into issues getting all 4 interfaces to stream on synology.
+  Added static routes to force traffic over particular interface depending on gateway IP. This helped.
+  MUST be certain that gateway interface is open, as somehow cisco switch can figure out how to route the traffic
+    over another interface using a gateway on a different subnet.
+  xxx - maybe adding separate VLANs on cisco switch could totally alleviate issue? would prefer a "no route to host"
+    error if the correct subnet gateway interface is not open.
+
 
 
 
