@@ -369,33 +369,35 @@ ylabel('combined eftpl (%PL)');
 xlabel('merged nodes'); set(gca,'xlim',[0 0.5]);
 [m,mi] = max(combined_eftpl,[],2);
 set(gca,'ylim',[-0.025 0.8],'xlim',[-0.025 0.5]); box off
-title(sprintf('maxd=%g\n%g %g\n@split edges=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+title(sprintf('maxd=%g\n%g %g\n@merged nodes=%g %g',abs(m(2)-m(1)),m(1),m(2),...
   merge_fracnodes(1,mi(1)),merge_fracnodes(2,mi(2))));
 
-subplot(2,2,3);
-sumSM = split_fracnodes+merge_fracnodes;
-[m,mi] = min(sumSM,[],2);
-minSM = [[split_fracnodes(1,mi(1)); merge_fracnodes(1,mi(1))] ...
-  [split_fracnodes(2,mi(2)); merge_fracnodes(2,mi(2))]];
-plot(split_fracnodes', merge_fracnodes', '-o', 'markersize', 2);
-hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(minSM(1,1),minSM(2,1),'x');
-hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(minSM(1,2),minSM(2,2),'x');
-hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(squeeze(split_er_CI(1,:,1)),squeeze(merge_fracnodes_CI(1,:,1)),'--');
-hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(squeeze(split_er_CI(2,:,1)),squeeze(merge_fracnodes_CI(2,:,1)),'--');
-hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(squeeze(split_er_CI(1,:,2)),squeeze(merge_fracnodes_CI(1,:,2)),'--');
-hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-plot(squeeze(split_er_CI(2,:,2)),squeeze(merge_fracnodes_CI(2,:,2)),'--');
-set(gca,'plotboxaspectratio',[1 1 1]);
-%set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
-xlabel('splits per node'); ylabel('merged nodes');
-title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g\nnode radius=%d',abs(m(2)-m(1)),m(1),...
-  minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2)),p.node_radius));
-%legend(names)
+if p.node_radius > -1
+  subplot(2,2,3);
+  sumSM = split_fracnodes+merge_fracnodes;
+  [m,mi] = min(sumSM,[],2);
+  minSM = [[split_fracnodes(1,mi(1)); merge_fracnodes(1,mi(1))] ...
+    [split_fracnodes(2,mi(2)); merge_fracnodes(2,mi(2))]];
+  plot(split_fracnodes', merge_fracnodes', '-o', 'markersize', 2);
+  hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  plot(minSM(1,1),minSM(2,1),'x');
+  hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  plot(minSM(1,2),minSM(2,2),'x');
+  hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  plot(squeeze(split_er_CI(1,:,1)),squeeze(merge_fracnodes_CI(1,:,1)),'--');
+  hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  plot(squeeze(split_er_CI(2,:,1)),squeeze(merge_fracnodes_CI(2,:,1)),'--');
+  hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  plot(squeeze(split_er_CI(1,:,2)),squeeze(merge_fracnodes_CI(1,:,2)),'--');
+  hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  plot(squeeze(split_er_CI(2,:,2)),squeeze(merge_fracnodes_CI(2,:,2)),'--');
+  set(gca,'plotboxaspectratio',[1 1 1]);
+  %set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
+  xlabel('splits per node'); ylabel('merged nodes');
+  title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g\nnode radius=%d',abs(m(2)-m(1)),m(1),...
+    minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2)),p.node_radius));
+  %legend(names)
+end
 
 
 
