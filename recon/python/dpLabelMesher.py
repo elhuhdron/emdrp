@@ -245,91 +245,91 @@ class dpLabelMesher(emLabels):
         if self.set_voxel_scale:
             # Have to set the voxel anisotropy here, as there does not seem an easy way once the poly is created.
             dataImporter.SetDataSpacing(self.data_attrs['scale'])
-            # Data extent is the extent of the actual buffer, whole extent is ???
-            # Use extents that are relative to non-padded cube
-            if(self.meshes):
-                beg = min_coord - self.dataset_index
-                end = beg + min_range - 1
 
+        # Data extent is the extent of the actual buffer, whole extent is ???
+        # Use extents that are relative to non-padded cube
+        if(self.meshes):
+            beg = min_coord - self.dataset_index
+            end = beg + min_range - 1
+        else:
+            beg = min_coord ;  end = min_range + min_coord - 1;
+            #print(beg,end)
+
+        dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+        dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+
+        # use vtk for isosurface contours and surface mesh reduction
+        iso = vtk.vtkContourFilter()
+        iso.SetInputConnection(dataImporter.GetOutputPort())
+        iso.SetComputeNormals(0)
+        iso.SetValue(0, self.contour_lvl)
+
+        if self.decimatePro:
+            deci = vtk.vtkDecimatePro()
+            rf = 1-self.reduce_frac; deci.SetTargetReduction(rf); df = 0.01
+            deci.SplittingOn(); deci.PreserveTopologyOff(); deci.BoundaryVertexDeletionOn()
+            if self.min_faces > 0: updates = range(100)
+            else: updates = ['deci.BoundaryVertexDeletionOff()','deci.PreserveTopologyOn()','0']
+        else:
+            deci = vtk.vtkQuadricClustering()
+            #deci.SetDivisionOrigin(0.0,0.0,0.0); deci.SetDivisionSpacing(self.reduce_spacing)
+            nb = self.reduce_nbins; deci.SetNumberOfDivisions(nb,nb,nb); deci.AutoAdjustNumberOfDivisionsOff()
+            updates = ['deci.AutoAdjustNumberOfDivisionsOn()','0']
+
+         # thought of adding checking for closed surfaces, http://comments.gmane.org/gmane.comp.lib.vtk.user/47957
+         # this did not work, for low reduce_frac, many open edges remain even for large objects
+
+         # not clear that triangle filter does anything, contour filter already makes triangulated meshes?
+         # send polygonal mesh from isosurface to triangle filter to convert to triangular mesh
+         #tri = vtk.vtkTriangleFilter(); tri.SetInputConnection(iso.GetOutputPort());
+         #deci.SetInputConnection(tri.GetOutputPort())
+
+        deci.SetInputConnection(iso.GetOutputPort())
+        # xxx - this is kindof a cheap trick, if we reduce down "too much", then rerun to preserve more
+        for update in updates:
+            deci.Update()
+
+            # http://forrestbao.blogspot.com/2012/06/vtk-polygons-and-other-cells-as.html
+            # http://stackoverflow.com/questions/6684306/how-can-i-read-a-vtk-file-into-a-python-datastructure
+            dOut = deci.GetOutput()
+            # xxx - points seem to be single instead of inputted type, probably depends on vtk version:
+            #   http://public.kitware.com/pipermail/vtkusers/2010-April/059413.html
+            vertices = nps.vtk_to_numpy(dOut.GetPoints().GetData())
+            faces = nps.vtk_to_numpy(dOut.GetPolys().GetData()).reshape((-1,4))[:,1:]
+            nVertices = vertices.shape[0]
+            nFaces = faces.shape[0]
+            #if self.dpLabelMesher_verbose :
+            #    print('\t%d vertices, %d faces' % (nVertices, nFaces))
+            if self.min_faces > 0:
+                if nFaces >= self.min_faces: break
+                rf -= df; deci.SetTargetReduction(rf)
             else:
-                beg = min_coord ;  end = min_range + min_coord - 1;
-                #print(beg,end)
+                if nVertices > 2 and nFaces > 0: break
+                eval(update)
+        assert( nVertices > 2 and nFaces > 0 )  # there has to be at least one face
 
-            dataImporter.SetDataExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
-            dataImporter.SetWholeExtent(beg[0], end[0], beg[1], end[1], beg[2], end[2])
+        if self.doplots:
+            mapper = vtk.vtkPolyDataMapper()
+            mapper.SetInputConnection(deci.GetOutputPort())
+            dpLabelMesher.vtkShow(mapper=mapper)
 
-            # use vtk for isosurface contours and surface mesh reduction
-            iso = vtk.vtkContourFilter()
-            iso.SetInputConnection(dataImporter.GetOutputPort())
-            iso.SetComputeNormals(0)
-            iso.SetValue(0, self.contour_lvl)
+        # append the current surface to vtk object with all the surfaces
+        if self.doplots or self.mesh_outfile_stl:
+            self.allPolyData.AddInputConnection(deci.GetOutputPort())
 
-            if self.decimatePro:
-                deci = vtk.vtkDecimatePro()
-                rf = 1-self.reduce_frac; deci.SetTargetReduction(rf); df = 0.01
-                deci.SplittingOn(); deci.PreserveTopologyOff(); deci.BoundaryVertexDeletionOn()
-                if self.min_faces > 0: updates = range(100)
-                else: updates = ['deci.BoundaryVertexDeletionOff()','deci.PreserveTopologyOn()','0']
-            else:
-                deci = vtk.vtkQuadricClustering()
-                #deci.SetDivisionOrigin(0.0,0.0,0.0); deci.SetDivisionSpacing(self.reduce_spacing)
-                nb = self.reduce_nbins; deci.SetNumberOfDivisions(nb,nb,nb); deci.AutoAdjustNumberOfDivisionsOff()
-                updates = ['deci.AutoAdjustNumberOfDivisionsOn()','0']
+        if self.doplots:
+            connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
+            connectivityFilter.SetInputConnection(self.allPolyData.GetOutputPort())
+            connectivityFilter.SetExtractionModeToAllRegions()
+            connectivityFilter.ColorRegionsOn()
+            connectivityFilter.Update()
+            mapper = vtk.vtkPolyDataMapper()
+            mapper.SetInputConnection(connectivityFilter.GetOutputPort())
+            mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
+            mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
+            dpLabelMesher.vtkShow(mapper=mapper)
 
-             # thought of adding checking for closed surfaces, http://comments.gmane.org/gmane.comp.lib.vtk.user/47957
-             # this did not work, for low reduce_frac, many open edges remain even for large objects
-
-             # not clear that triangle filter does anything, contour filter already makes triangulated meshes?
-             # send polygonal mesh from isosurface to triangle filter to convert to triangular mesh
-             #tri = vtk.vtkTriangleFilter(); tri.SetInputConnection(iso.GetOutputPort());
-             #deci.SetInputConnection(tri.GetOutputPort())
-
-            deci.SetInputConnection(iso.GetOutputPort())
-            # xxx - this is kindof a cheap trick, if we reduce down "too much", then rerun to preserve more
-            for update in updates:
-                deci.Update()
-
-                # http://forrestbao.blogspot.com/2012/06/vtk-polygons-and-other-cells-as.html
-                # http://stackoverflow.com/questions/6684306/how-can-i-read-a-vtk-file-into-a-python-datastructure
-                dOut = deci.GetOutput()
-                # xxx - points seem to be single instead of inputted type, probably depends on vtk version:
-                #   http://public.kitware.com/pipermail/vtkusers/2010-April/059413.html
-                vertices = nps.vtk_to_numpy(dOut.GetPoints().GetData())
-                faces = nps.vtk_to_numpy(dOut.GetPolys().GetData()).reshape((-1,4))[:,1:]
-                nVertices = vertices.shape[0]
-                nFaces = faces.shape[0]
-                #if self.dpLabelMesher_verbose :
-                #    print('\t%d vertices, %d faces' % (nVertices, nFaces))
-                if self.min_faces > 0:
-                    if nFaces >= self.min_faces: break
-                    rf -= df; deci.SetTargetReduction(rf)
-                else:
-                    if nVertices > 2 and nFaces > 0: break
-                    eval(update)
-            assert( nVertices > 2 and nFaces > 0 )  # there has to be at least one face
-
-            if self.doplots:
-                mapper = vtk.vtkPolyDataMapper()
-                mapper.SetInputConnection(deci.GetOutputPort())
-                dpLabelMesher.vtkShow(mapper=mapper)
-
-            # append the current surface to vtk object with all the surfaces
-            if self.doplots or self.mesh_outfile_stl:
-                self.allPolyData.AddInputConnection(deci.GetOutputPort())
-
-            if self.doplots:
-                connectivityFilter = vtk.vtkPolyDataConnectivityFilter()
-                connectivityFilter.SetInputConnection(self.allPolyData.GetOutputPort())
-                connectivityFilter.SetExtractionModeToAllRegions()
-                connectivityFilter.ColorRegionsOn()
-                connectivityFilter.Update()
-                mapper = vtk.vtkPolyDataMapper()
-                mapper.SetInputConnection(connectivityFilter.GetOutputPort())
-                mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
-                mapper.SetScalarRange(connectivityFilter.GetOutput().GetPointData().GetArray("RegionId").GetRange())
-                dpLabelMesher.vtkShow(mapper=mapper)
-
-            return vertices,faces
+        return vertices,faces
 
     def writeMeshOutfile(self):
         if not self.mesh_outfile: return
@@ -899,7 +899,7 @@ class dpLabelMesher(emLabels):
               self.faces[i][j] = face
 
               nfaces = face.shape[0]
-              nvertices = verts.shape[0]
+              #nvertices = verts.shape[0]
 
 
               #self.nFaces[i] += nfaces
