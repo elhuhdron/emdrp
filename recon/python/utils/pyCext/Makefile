@@ -1,16 +1,16 @@
 
 # Python include directory. This should contain the file Python.h, among others.
 #PYTHON_INCLUDE_PATH = /usr/local/Anaconda/envs/anaconda_2.4.1_py35/include/python3.5m
-PYTHON_INCLUDE_PATH = $(HOME)/anaconda3/include/python3.5m
+PYTHON_INCLUDE_PATH = $(HOME)/anaconda3/include/python3.6m
 
 # Numpy include directory. This should contain the file arrayobject.h, among others.
 #NUMPY_INCLUDE_PATH = /usr/local/Anaconda/envs/anaconda_2.4.1_py35/lib/python3.5/site-packages/numpy/core/include/numpy
-NUMPY_INCLUDE_PATH = $(HOME)/anaconda3/lib/python3.5/site-packages/numpy/core/include/numpy
+NUMPY_INCLUDE_PATH = $(HOME)/anaconda3/lib/python3.6/site-packages/numpy/core/include/numpy
 
 # Python library directory and link version. This should contain libpythonx.x, among others.
 #PYTHON_LIBRARY_PATH = /usr/local/Anaconda/envs/anaconda_2.4.1_py35/lib
 PYTHON_LIBRARY_PATH = $(HOME)/anaconda3/lib
-PYTHON_VERSION = 3.5m
+PYTHON_VERSION = 3.6m
 
 # ---- Link --------------------------- 
 _pyCext.so:  pyCext.o 
