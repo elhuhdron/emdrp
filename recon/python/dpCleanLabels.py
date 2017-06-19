@@ -26,6 +26,14 @@
 
 # see label_checker.sh for usage for cleaning single annotator GT labels from itksnap
 
+# "Cleaning" is used both for:
+#       (1) cleaning up manually annotated ground truth (GT) labels (typically from single labeler)
+#       (2) cleaning up automated labels (supervoxels) as a last step before meshing.
+#       (3) cleaning up and calculating paths for "proof-reading" or "boot-strapping" 
+#             xxx - this method did not work super well, so has been abandoned for now
+# xxx - better quantification of the value of these steps, (2) has been difficult to measure but (1) could be measured
+#   cleaned supervoxels are at least aesthetically much more pleasing than before cleaning
+
 #import h5py
 import numpy as np
 import argparse
@@ -187,47 +195,11 @@ class dpCleanLabels(emLabels):
             self.data_attrs['types_nlabels'] = [nlabels]
 
         # NOTE: cavity_fill not intended to work with ECS labeled with single value (ECS components are fine)
-        if self.cavity_fill or self.cavity_fill_minsize > 1:
-            if self.dpCleanLabels_verbose:
-                print('Removing cavities using conn %d' % (self.bg_connectivity,)); t = time.time()
+        if self.cavity_fill:
+            self.data_cube, selbg, msk = self.cavity_fill(self.data_cube)
 
-            if self.cavity_fill_minsize > 1:
-                if self.dpCleanLabels_verbose:
-                    print('\tAlso removing labels < %d in cavities' % (self.cavity_fill_minsize,))
-                labels_orig = self.data_cube
-                data, nlabels = self.minsize_scrub(labels_orig, self.cavity_fill_minsize, False)
-            else:
-                data = self.data_cube
-
-            selbg = (data == 0)
-            if self.dpCleanLabels_verbose:
-                print('\tnumber bg vox before = %d' % (selbg.sum(dtype=np.int64),))
-            labels = np.ones([x + 2 for x in self.data_cube.shape], dtype=np.bool)
-            labels[1:-1,1:-1,1:-1] = selbg
-            # don't connect the top and bottom xy planes
-            labels[1:-1,1:-1,0] = 0; labels[1:-1,1:-1,-1] = 0
-            labels, nlabels = nd.measurements.label(labels, self.bgbwconn)
-            msk = np.logical_and((labels[1:-1,1:-1,1:-1] != labels[0,0,0]), selbg); del labels
-            #data[msk] = 0; # xxx - had this originally, seems redundant, delete this after verified
-            selbg[msk] = 0
-            self.data_cube = emLabels.nearest_neighbor_fill(data, mask=selbg, sampling=self.data_attrs['scale'])
-
-            if self.dpCleanLabels_verbose:
-                print('\tnumber bg vox after = %d' % ((self.data_cube==0).sum(dtype=np.int64),))
-                print('\tdone in %.4f s' % (time.time() - t))
-
-            if self.cavity_fill_minsize > 1:
-                if self.dpCleanLabels_verbose:
-                    print('\tReplacing non-cavity labels')
-                labels = self.data_cube
-                sel_not_fill = np.logical_and(labels_orig > 0, labels == 0)
-                labels[sel_not_fill] = labels_orig[sel_not_fill]; selbg[sel_not_fill] = 0
-                del labels_orig, sel_not_fill
-                # remove any zero labels (that were removed as cavities)
-                self.data_cube, nlabels = self.minsize_scrub(labels, 1, False); del labels
-                # allow this to work before self.get_svox_type or self.write_voxel_type
-                self.data_attrs['types_nlabels'] = [nlabels]
-
+            # this prevents any supervoxels as being classified as "membrane".
+            # many scripts assume that membrane is labeled as background (label 0).
             if self.get_svox_type or self.write_voxel_type:
                 if self.dpCleanLabels_verbose:
                     print('\tRemoving cavities from voxel type'); t = time.time()
@@ -238,6 +210,29 @@ class dpCleanLabels(emLabels):
                     voxel_type[msk] = 1
                 print('\t\tdone in %.4f s' % (time.time() - t))
             del msk, selbg
+
+        # NOTE: cavity_fill not intended to work with ECS labeled with single value (ECS components are fine)
+        # This method is not foolproof, in one shot it removes all labels below a specified size and then reruns
+        #   cavity fill. If a label was not filled then it puts it back. This will not remove any labels that are
+        #   in a cavity but connected to background via a bunch of other labels smaller than specified size.
+        if self.cavity_fill_minsize > 1:
+            if self.dpCleanLabels_verbose:
+                print('Removing labels < %d in cavities' % (self.cavity_fill_minsize,))
+            labels_orig = self.data_cube
+            data, nlabels = self.minsize_scrub(labels_orig, self.cavity_fill_minsize, False, tab=True)
+
+            # do a normal cavity fill after labels smaller than cavity_fill_minsize are removed
+            labels, selbg, msk = self.cavity_fill(data, tab=True); del msk, selbg
+                
+            if self.dpCleanLabels_verbose:
+                print('\tReplacing non-cavity labels')
+            sel_not_fill = np.logical_and(labels_orig > 0, labels == 0)
+            labels[sel_not_fill] = labels_orig[sel_not_fill]
+            del labels_orig, sel_not_fill
+            # remove any zero labels (that were removed as cavities)
+            self.data_cube, nlabels = self.minsize_scrub(labels, 1, False, tab=True); del labels
+            # allow this to work before self.get_svox_type or self.write_voxel_type
+            self.data_attrs['types_nlabels'] = [nlabels]
 
         if self.relabel:
             labels = self.data_cube
@@ -315,30 +310,55 @@ class dpCleanLabels(emLabels):
             # xxx - probably shouldn't be using this anyways?
             self.data_attrs['types_nlabels'] = self.data_attrs['types_nlabels'][0]
 
-    def minsize_scrub(self, labels, minsize, minsize_fill):
+    def minsize_scrub(self, labels, minsize, minsize_fill, tab=False):
+        tabc = '\t' if tab else ''
         sel_ECS, ECS_label = self.getECS(labels); labels[sel_ECS] = 0
 
         if self.dpCleanLabels_verbose:
-            print('Scrubbing labels with minsize %d%s' % (minsize,
+            print('%sScrubbing labels with minsize %d%s' % (tabc, minsize,
                 ', ignoring ECS label %d' % (ECS_label,) if ECS_label else ''))
-            print('\tnlabels = %d, before re-label' % (labels.max(),))
+            print('%s\tnlabels = %d, before re-label' % (tabc, labels.max(),))
             t = time.time()
 
         selbg = np.logical_and((labels == 0), np.logical_not(sel_ECS))
         labels, sizes = emLabels.thresholdSizes(labels, minSize=minsize)
         if minsize_fill:
             if self.dpCleanLabels_verbose:
-                print('Nearest neighbor fill scrubbed labels')
+                print('%s\tNearest neighbor fill scrubbed labels' % (tabc,))
             labels = emLabels.nearest_neighbor_fill(labels, mask=selbg, sampling=self.data_attrs['scale'])
 
         nlabels = sizes.size
         labels, nlabels = self.setECS(labels, sel_ECS, ECS_label, nlabels)
 
         if self.dpCleanLabels_verbose:
-            print('\tnlabels = %d after re-label' % (nlabels,))
-            print('\tdone in %.4f s' % (time.time() - t))
+            print('%s\tnlabels = %d after re-label' % (tabc, nlabels,))
+            print('%s\tdone in %.4f s' % (tabc, time.time() - t))
 
         return labels, nlabels
+
+    def cavity_fill(self, data, tab=False):
+        tabc = '\t' if tab else ''
+        if self.dpCleanLabels_verbose:
+            print('%sRemoving cavities using conn %d' % (tabc, self.bg_connectivity,)); t = time.time()
+            
+        selbg = (data == 0)
+        if self.dpCleanLabels_verbose:
+            print('%s\tnumber bg vox before = %d' % (tabc, selbg.sum(dtype=np.int64),))
+        labels = np.ones([x + 2 for x in data.shape], dtype=np.bool)
+        labels[1:-1,1:-1,1:-1] = selbg
+        # don't connect the top and bottom xy planes
+        labels[1:-1,1:-1,0] = 0; labels[1:-1,1:-1,-1] = 0
+        labels, nlabels = nd.measurements.label(labels, self.bgbwconn)
+        msk = np.logical_and((labels[1:-1,1:-1,1:-1] != labels[0,0,0]), selbg); del labels
+        #data[msk] = 0; # xxx - had this originally, seems redundant, delete this after verified
+        selbg[msk] = 0
+        filled = emLabels.nearest_neighbor_fill(data, mask=selbg, sampling=self.data_attrs['scale'])
+
+        if self.dpCleanLabels_verbose:
+            print('%s\tnumber bg vox after = %d' % (tabc, (filled==0).sum(dtype=np.int64),))
+            print('%s\tdone in %.4f s' % (tabc, time.time() - t))
+        
+        return filled, selbg, msk
 
     def getECS(self, labels):
         if self.ECS_label > 0:
