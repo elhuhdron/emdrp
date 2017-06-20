@@ -18,3 +18,16 @@ do
 
     count=`expr $count + 1`
 done
+
+# only for validation
+#outpath=/home/watkinspv/Downloads/K0057_tracing/tmp
+#count=0
+#for chunk in "${chunks[@]}";
+#do
+#    echo processing $chunk
+#    dpLoadh5.py --srcfile $fnraw --chunk $chunk --size $size --offset ${offsets[$count]} --dataset $dataset --outraw $outpath/${inraws[$count]}.nrrd --dpL
+#    dpLoadh5.py --srcfile $outlabels --chunk $chunk --size $size --offset ${offsets[$count]} --dataset labels --outraw $outpath/${inraws[$count]}_labels.nrrd --dpL
+#
+#    count=`expr $count + 1`
+#done
+
