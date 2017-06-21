@@ -329,7 +329,6 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
                                   const npy_uint32 n_vox, const npy_int n_steps, const npy_int tmp_edge_size, 
                                   const npy_uint32 brder_size, const npy_uint32 n_labels, const npy_uint jmp){
     
-    //extern __shared__ npy_uint32 edge_store[];
 
     unsigned int idx_x = blockIdx.z*blockDim.z + threadIdx.z;
     unsigned int idx_y = blockIdx.y*blockDim.y + threadIdx.y;
@@ -346,18 +345,10 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
     unsigned int cnt = 0;
     unsigned int k = 0;
 
-   /* if(threadIdx.x ==0 && threadIdx.y == 0 && threadIdx.z==0){
 
-        for(int n_lab = 0; n_lab < n_labels; n_lab++){
-            for(int edge_size = 0; edge_size < tmp_edge_size; edge_size++){
-                edge_store[n_lab*tmp_edge_size + edge_size] = edges[n_lab*tmp_edge_size + edge_size];
-            }
-        } 
-    }
+   //if(label != 0 && label >= n_labels && label < (n_labels + jmp) && watershed_idx < n_vox){
+   if(label != 0 && label >= n_labels && label <= jmp && watershed_idx < n_vox){
 
-    __syncthreads();*/
-
-    if(label != 0 && label >= n_labels && label < (n_labels + jmp) && watershed_idx < n_vox){
         // calculate the index of the edge in the datastructure
         for(int cnt_id = n_labels-1;cnt_id < label-1;cnt_id++){
 
@@ -370,8 +361,8 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
          
             edge_value = watershed[steps[step]+ watershed_idx];
             store_index = 0;
-            do_add_border = true;
-            do_add_vox = true;
+            //do_add_border = true;
+            //do_add_vox = true;
             if(edge_value > label){
                 
                 for(int index = 0;index < tmp_edge_size-2;index++){
@@ -383,7 +374,7 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
                       break;
                     }
                 }
-                
+   
                 border_ind = steps[step]+ watershed_idx;
                 border_vox = watershed_idx;
                 cnt = borders[store_index*brder_size + 2];
@@ -407,21 +398,102 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
                    }
                 }*/
 
-                if(do_add_border){
+                //if(do_add_border){
                     k = atomicAdd(&borders[store_index*brder_size + 2], 1);
                     borders[store_index*brder_size + k] = border_ind;
                     
-                }
-                if(do_add_vox){
+                //}
+                //if(do_add_vox){
                     k = atomicAdd(&borders[store_index*brder_size + 2], 1);
                     borders[store_index*brder_size + k] = border_vox;
-                }
+               // }
             }
                        
         }
     }
 
 }
+
+
+
+/*__global__ void get_nearest_neigh(const unsigned int* const watershed, const npy_intp* const steps,
+                                  npy_uint32* borders, const npy_uint32* const edges, const int* const grid,
+                                  const npy_uint32 n_vox, const npy_int n_steps, const npy_int tmp_edge_size,
+                                  const npy_uint32 brder_size, const npy_uint32 frst_lbl, const npy_uint32 last_lbl, const npy_uint jmp){
+
+
+    unsigned int idx_x = blockIdx.z*blockDim.z + threadIdx.z;
+    unsigned int idx_y = blockIdx.y*blockDim.y + threadIdx.y;
+    unsigned int idx_z = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int watershed_idx = idx_x*grid[1]*grid[2] + idx_y*grid[2] + idx_z;
+    unsigned int label = watershed[watershed_idx];
+    unsigned int edge_value;
+    unsigned int border_ind;
+    unsigned int border_vox;
+    unsigned int start_index = 0;
+    unsigned int store_index = 0;
+    unsigned int cnt = 0;
+    unsigned int k = 0;
+    unsigned int id = 0;
+
+    if(label != 0 && watershed_idx < n_vox && label >= frst_lbl && label <= last_lbl){
+
+         for(int cnt_id = 0;cnt_id < (label-1);cnt_id++){
+
+            id += edges[cnt_id*tmp_edge_size];
+
+         }
+         id =  id - (2*(label-1));
+         start_index = id%jmp; 
+
+         for(int step = 0; step < n_steps; step++){
+         
+            edge_value = watershed[steps[step]+ watershed_idx];
+            store_index = 0;
+
+            if(edge_value > label){
+
+                for(int index = 0;index < tmp_edge_size-2;index++){
+                    // the edge list is stored with the first two columns dedicated to coulmn[0] - count of number of edges for a
+                    // label and column[1] - label 
+                    if(edges[(label-1)*tmp_edge_size + index + 2] == edge_value){
+                        store_index = index;
+                        break;
+                    }
+                }
+
+                if(label == frst_lbl && (start_index + store_index) < jmp){
+                    if(start_index > store_index)
+                        store_index = start_index - store_index;
+                    else
+                        store_index = store_index - start_index;   
+                }else if(label == frst_lbl && (start_index + store_index) >= jmp){
+                        
+                    store_index = (start_index + store_index) - jmp;                 
+ 
+                }else{
+                 
+                    store_index = (store_index + start_index);
+
+                }
+                if(store_index < jmp){   
+                    border_ind = steps[step]+ watershed_idx;
+                    border_vox = watershed_idx;
+                    cnt = borders[store_index*brder_size + 2];
+                    if(cnt > brder_size){
+                                printf("%d ", cnt);
+                    }
+                    k = atomicAdd(&borders[store_index*brder_size + 2], 1);
+                    borders[store_index*brder_size + k] = border_ind;
+                    k = atomicAdd(&borders[store_index*brder_size + 2], 1);
+                    borders[store_index*brder_size + k] = border_vox;
+                }
+            }
+         }      
+    } 
+}*/
+
+
 // kernel attempts to do post processing on gpu - is slower than host post processing
 /*__global__ void sort(const int n_pixels, const int* const gpu_list, const int size, int* final_order){
 

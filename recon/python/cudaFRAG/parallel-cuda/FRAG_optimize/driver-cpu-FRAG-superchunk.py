@@ -38,12 +38,12 @@ tmp_edge_size = args.tmp_edge_size
 size_of_borders = np.uint32(args.size_of_borders)
 no_dilation = args.no_dilation
 label_jump_borders = np.uint(args.label_jump_borders)
-
 batch_borders = np.uint32(args.batch_borders)
+
 # labeled chunks
 chunk = [16,17,0]
-size = [1024,1024,480]
-#size = [512, 512, 480]
+#size = [1024,1024,480]
+size = [256, 256, 256]
 offset = [0,0,32]
 has_ECS = True
 
@@ -248,6 +248,7 @@ if validate:
     for i in range(0,count[0]):
           if(np.all(generated_borders[i] == reference_borders[i])):
             #print("label-edge", list_of_borders[i][0], list_of_borders[i][1])
+            #print(reference_borders[i])
             pass
           else:
             print(generated_borders[i])
