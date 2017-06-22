@@ -3,6 +3,10 @@
 # outprefix taken from ini if not specified, counts done per outprefix and dimordering (taken from ini)
 #
 # Script for renaming convnet job outputs with more appropriate names.
+# 
+# Sample invocations (from directory containing convnet outputs, aka ~/Data/convnet_out)
+#   ./mega_mover.py 2017-05-1 1
+#
 
 import re
 import sys
@@ -12,8 +16,10 @@ import shutil
 
 # non-command line parameters
 doMove = False
-# need to define this if outprefix not given as second command line argument
-alloutprefixes = ['none', 'huge']
+# need to define this if outprefix not given as second command line argument.
+# NOTE: these prefixes have to match exactly to the string just before .ini in the parser ini name from data/config
+#alloutprefixes = ['none', 'huge']
+alloutprefixes = ['K0057-dsx3y3z1']
 
 inprefix = sys.argv[1:][0]
 initcnt = int(sys.argv[1:][1])
@@ -36,7 +42,8 @@ for name in glob.glob(inprefix + '*.txt'):
         if m is not None: skip = m.group('skip')
         m = re.search(r'dim_ordering=\'(?P<order>\w+)\'', line)
         if m is not None: order = m.group('order')
-        m = re.search(r'EMDataParser: config file .*-(?P<outprefix>\w+).ini', line)
+        # stackoverflow.com how-to-match-any-string-from-a-list-of-strings-in-regular-expressions-in-python
+        m = re.search(r'EMDataParser: config file .*-(?P<outprefix>('+'|'.join(alloutprefixes)+r')).ini', line)
         if m is not None and getoutprefix: outprefix = m.group('outprefix')
     shakes.close()
     iskip = int(skip)

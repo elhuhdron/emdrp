@@ -20,6 +20,8 @@ import subprocess
 import re
 import binascii
 import time
+import socket
+import sys
 
 NUM_GPUS, GPU_JOB_SUBDIR, GPU_PREFIX = 10, 'gpu_jobs', 'gpu' # init NUM_GPUS as max gpus, set in get_paths
 GPU_STATUS, GPU_STARTED = 'gpu%d_status.log', 'gpu%d_last_started.log'
@@ -224,6 +226,20 @@ def create_pid_lck(pid, gpu):
         cmd_to_start = 'touch ' + os.path.join(cur_gpu_path, str(pid) + '.lck')
         os.system(cmd_to_start)
 
+def get_lock(process_name):
+    job_path, convnet_out_path, convnet_paths = get_paths()
+
+    # Without holding a reference to our socket somewhere it gets garbage
+    # collected when the function exits
+    get_lock._lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+
+    try:
+        get_lock._lock_socket.bind('\0' + process_name)
+        #print('I got the lock')
+    except socket.error:
+        #print('lock exists')
+        sys.exit()
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Schedule or exceute jobs on local GPUs, nohup and redirects appended')
     #parser.add_argument('imagesrc', nargs=1, type=str, help='Input image EM data (multilayer tiff)')
@@ -237,6 +253,10 @@ if __name__ == '__main__':
         help='Use along with --submit (-s) to specify Data paths to be relinked [LINK] [RELINK-TO-PATH]')
     parser.add_argument('-f', '--force', dest='force', action='store_true', help='Force next job to start')
     args = parser.parse_args()
+
+    # this is to prevent multiple instances running at once so that a job can't be started twice.
+    # this is mostly so that manually starting jobs (or via script) does not interfere with the cron job.
+    get_lock('gpu_job')
 
     if args.pid_lck[0] >= 0: create_pid_lck(args.pid_lck[1], args.pid_lck[0])
     elif args.clear: clear_jobs()
