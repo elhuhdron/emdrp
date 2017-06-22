@@ -77,31 +77,4 @@ extern void wrapper_get_borders_nearest_neigh(const unsigned int* const d_waters
     
 }
 
-// attempts at performing post processing on gpu side- but slower than host side
-
-/*extern void wrapper_post_process(const int n_pixels, const int* edges, const int* labels,const int count, int* gpu_uniquelabels, const int blockdim){
-
-     dim3 dim_grid((count/blockdim)+1), dim_block(blockdim);
- 
-    // launch the kernel 
-     create_unique<<<dim_grid,dim_block>>>(edges, labels, count, gpu_uniquelabels);
-     cudaDeviceSynchronize();
-
-     // get the error
-     CALL_CUDA(cudaGetLastError());
- 
-}
-
-
-extern void wrapper_sort(const int n_pixels, int* gpu_list, int size, int* final_order)
-{
-
-     dim3 dim_grid((size/128)+1), dim_block(128);
-     // launch the kernel 
-     sort<<<dim_grid,dim_block>>>(n_pixels, gpu_list,size, final_order);
-     cudaDeviceSynchronize();
-
-     // get the error
-     CALL_CUDA(cudaGetLastError());
-}*/
 

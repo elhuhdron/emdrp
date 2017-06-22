@@ -38,6 +38,14 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
                                   const npy_uint32 brder_size, const npy_uint32 n_labels, const npy_uint jmp);
 
 
+
+/*__global__ void get_nearest_neigh(const unsigned int* const watershed, const npy_intp* const steps,           
+                                  npy_uint32* borders, const npy_uint32* const edges, const int* const grid,
+                                  const npy_uint32 n_vox, const npy_int n_steps, const npy_int tmp_edge_size,        
+                                  const npy_uint32 brder_size, const npy_uint32 frst_lbl, const npy_uint32 last_lbl, const npy_uint jmp);
+*/
+
+
 //__global__ void sort(const int n_pixels, const int* const gpu_list, const int size, int* final_order);
 
 //__global__ void create_unique(const int* const edges,const int* const labels,const int count, int* gpu_uniquelabels);

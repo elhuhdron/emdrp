@@ -474,6 +474,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint32 border_index_1 = 0;
     npy_uint32 border_index_2 = 0;
     std::vector<std::tuple<npy_uint32,npy_uint32,npy_uint32>>borders;
+    timer1.Start();
     for(unsigned int vox = 0; vox < n_voxels; vox++){
         label = h_watershed[vox]; 
         if(label!=0){
@@ -493,6 +494,8 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
             }
         }
     }
+    timer1.Stop();
+    time_processing = timer1.Elapsed()/1000;
     //postprocessing
     npy_uint64 edge_index = 0;
     npy_uint64 begin = 0;
