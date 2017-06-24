@@ -168,9 +168,9 @@ class dpCubeIter(object):
                 cur_chunk = cur_volume * self.cube_size + self.volume_range_beg
                 cur_chunk[is_left_remainder] -= self.cube_size[is_left_remainder]
     
-                left_offset = self.overlap.copy(); left_offset[is_left_border] = 0
-                right_offset = self.overlap.copy();
-                if not self.leave_edge: right_offset[is_right_border] = 0
+                left_offset = self.overlap.copy(); right_offset = self.overlap.copy();
+                if not self.leave_edge: 
+                    right_offset[is_right_border] = 0; left_offset[is_left_border] = 0
     
                 # default size is adding left and right offsets
                 size = self.cube_size_voxels + left_offset + right_offset
@@ -299,7 +299,7 @@ class dpCubeIter(object):
             help='Size in voxels of "right" remainder volumes')
         p.add_argument('--use-chunksize', nargs=3, type=int, default=[128,128,128], metavar=('X', 'Y', 'Z'),
                        help='Size of chunks in voxels')
-        p.add_argument('--leave_edge', action='store_true', help='Whether to leave right-most overlap or not')
+        p.add_argument('--leave_edge', action='store_true', help='Specify to leave overlap at edges of volume range')
         p.add_argument('--no_volume_flags', action='store_true',
                        help='Do not include chunk, size and offset flags in output')
 
