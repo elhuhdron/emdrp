@@ -244,8 +244,11 @@ class dpCubeIter(object):
             str_inputs = self.flagsToString(self.fileflags, self.filepaths, self.fileprefixes, self.filepostfixes,
                                             [x if y else '' for x,y in zip(suffixes, self.filenames_suffixes)],
                                             [x if y else '' for x,y in zip(affixes, self.filepaths_affixes)])
-            print(ccmd + (''if self.no_volume_flags else str_volume) + str_inputs)
+            str_cmd = ccmd + (''if self.no_volume_flags else str_volume) + str_inputs
+            if self.pre_cmd: str_cmd = self.pre_cmd + ';' + str_cmd
+            if self.post_cmd: str_cmd = str_cmd + ';' + self.post_cmd
 
+            print(str_cmd)
             cnt += 1
 
     @classmethod
@@ -271,6 +274,10 @@ class dpCubeIter(object):
         p.add_argument('--cmdfile', nargs=1, type=str, default='',
                        help='Full name and path of text file containing command')
         p.add_argument('--cmd', nargs=1, type=str, default='', help='Specify command on command line as string')
+        p.add_argument('--pre-cmd', nargs=1, type=str, default='', 
+                       help='Semi-colon delimited command to print before generated command')
+        p.add_argument('--post-cmd', nargs=1, type=str, default='', 
+                       help='Semi-colon delimited command to print after generated command')
         # arguments that modulate each parameter that is being iterated by cubeiter
         p.add_argument('--fileflags', nargs='*', type=str, default=[],
                        help='in/out files command line switches (0 for none)')
