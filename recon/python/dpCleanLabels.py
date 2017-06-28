@@ -196,7 +196,7 @@ class dpCleanLabels(emLabels):
 
         # NOTE: cavity_fill not intended to work with ECS labeled with single value (ECS components are fine)
         if self.cavity_fill:
-            self.data_cube, selbg, msk = self.cavity_fill(self.data_cube)
+            self.data_cube, selbg, msk = self.cavity_fill_voxels(self.data_cube)
 
             # this prevents any supervoxels as being classified as "membrane".
             # many scripts assume that membrane is labeled as background (label 0).
@@ -219,10 +219,10 @@ class dpCleanLabels(emLabels):
             if self.dpCleanLabels_verbose:
                 print('Removing labels < %d in cavities' % (self.cavity_fill_minsize,))
             labels_orig = self.data_cube
-            data, nlabels = self.minsize_scrub(labels_orig, self.cavity_fill_minsize, False, tab=True)
+            data, nlabels = self.minsize_scrub(labels_orig, self.cavity_fill_minsize, False, tab=True, no_remap=True)
 
             # do a normal cavity fill after labels smaller than cavity_fill_minsize are removed
-            labels, selbg, msk = self.cavity_fill(data, tab=True); del msk, selbg
+            labels, selbg, msk = self.cavity_fill_voxels(data, tab=True); del msk, selbg
                 
             if self.dpCleanLabels_verbose:
                 print('\tReplacing non-cavity labels')
@@ -310,7 +310,7 @@ class dpCleanLabels(emLabels):
             # xxx - probably shouldn't be using this anyways?
             self.data_attrs['types_nlabels'] = self.data_attrs['types_nlabels'][0]
 
-    def minsize_scrub(self, labels, minsize, minsize_fill, tab=False):
+    def minsize_scrub(self, labels, minsize, minsize_fill, tab=False, no_remap=False):
         tabc = '\t' if tab else ''
         sel_ECS, ECS_label = self.getECS(labels); labels[sel_ECS] = 0
 
@@ -321,7 +321,7 @@ class dpCleanLabels(emLabels):
             t = time.time()
 
         selbg = np.logical_and((labels == 0), np.logical_not(sel_ECS))
-        labels, sizes = emLabels.thresholdSizes(labels, minSize=minsize)
+        labels, sizes = emLabels.thresholdSizes(labels, minSize=minsize, no_remap=no_remap)
         if minsize_fill:
             if self.dpCleanLabels_verbose:
                 print('%s\tNearest neighbor fill scrubbed labels' % (tabc,))
@@ -336,7 +336,7 @@ class dpCleanLabels(emLabels):
 
         return labels, nlabels
 
-    def cavity_fill(self, data, tab=False):
+    def cavity_fill_voxels(self, data, tab=False):
         tabc = '\t' if tab else ''
         if self.dpCleanLabels_verbose:
             print('%sRemoving cavities using conn %d' % (tabc, self.bg_connectivity,)); t = time.time()

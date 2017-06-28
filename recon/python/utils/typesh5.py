@@ -175,16 +175,20 @@ class emLabels(dpWriteh5):
 
     # calculate sizes for a label volume and remove labels below specified threshold, returns sizes for labels only
     @staticmethod
-    def thresholdSizes(lbls, minSize=1, return_mapping=False):
+    def thresholdSizes(lbls, minSize=1, return_mapping=False, no_remap=False):
         # xxx - all these methods should do something like this, would be better to move to normal class member methods
         assert( lbls.dtype.kind in 'ui' )
 
         sizes = emLabels.getSizes(lbls); sizes = sizes[1:];
         # negative minSize means only keep labels < minSize, positive means only keep labels >= minSize
-        if minSize < 0: bgsel = (sizes >= -minSize)
-        else: bgsel = (sizes < minSize)
-        fgsel = np.logical_not(bgsel); sizes = sizes[fgsel]; fgcomps = np.cumsum(fgsel,dtype=emLabels.LBLS_DTYPE);
-        fgcomps[bgsel] = 0; fgcomps = np.insert(fgcomps,0,0); L = fgcomps[lbls.flatten()].reshape(lbls.shape)
+        bgsel = (sizes >= -minSize) if minSize < 0 else (sizes < minSize); fgsel = np.logical_not(bgsel)
+        if no_remap:
+            # this removes the components selected labels by setting them to zero
+            #   but does not remap the labels (i.e. that label value now just has size zero).
+            sizes[bgsel] = 0; fgcomps = np.arange(1,sizes.size+1,dtype=emLabels.LBLS_DTYPE); fgcomps[bgsel] = 0
+        else:
+            sizes = sizes[fgsel]; fgcomps = np.cumsum(fgsel,dtype=emLabels.LBLS_DTYPE)
+        fgcomps[bgsel] = 0; fgcomps = np.insert(fgcomps,0,0); L = fgcomps[lbls]
         if return_mapping:
             # return mapping from new supervoxels to old ones
             mapping = np.transpose(np.nonzero(fgsel)).reshape((-1,))
