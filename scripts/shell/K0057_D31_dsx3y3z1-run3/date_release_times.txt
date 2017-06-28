@@ -1,0 +1,17 @@
+
+emdrp last release for this run
+commit a4ed6a57ffcce0a4bf1e2aadd1d4e9a850e6b6f1
+Author: Paul Watkins <pwatkins@gmail.com>
+Date:   Thu Jun 22 18:07:47 2017 -0400
+
+dates for full pipeline run (up to cleaning): June 20 2017 - 
+
+run times
+----------------------
+top half volume export: 3:30
+bottom half volume export: 
+top half volume prob aggregate: 2 streams 2:50, 4 streams 1:50
+bottom half volume export: 
+
+probs copy from syns to biowulf: 4 machines, each at ~63 MB/s overall rate == 252 MB/s
+
