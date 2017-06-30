@@ -4,11 +4,11 @@
 # NOTE: DO NOT use lscratch, as we want all the subgroups in the same hdf5 file.
 
 OUTD=out_batches/20170624_K0057_run3/clean
-no_fill_iter=24
+no_fill_iter=0
 
 count=0
 iter=0
-while [ $iter -le 48 ]
+while [ $iter -le 24 ]
 do
     agglo_iter=`printf '%.8f' $iter`
     echo processing $agglo_iter
@@ -35,6 +35,6 @@ do
     cd ../../..
 
     count=`expr $count + 1`
-    iter=`expr $iter + 4`
+    iter=`expr $iter + 2`
 done
 
