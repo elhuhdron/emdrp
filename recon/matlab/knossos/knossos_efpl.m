@@ -331,7 +331,7 @@ else % if p.skeleton_mode
   % centered meshgrid and select for iterating points around radius of each node
   soma_info = struct; r = p.node_radius;
   [x,y,z] = ndgrid(-r:r,-r:r,-r:r);
-  soma_info.sel = (x.*x + y.*y + z.*z < r*r);
+  soma_info.sel = (x.*x + y.*y + z.*z <= r*r);
   soma_info.size = [2*r+1,2*r+1,2*r+1];
   %soma_info.pts = [x(soma_info.sel) y(soma_info.sel) z(soma_info.sel)];
   %soma_info.inds = find(soma_info.sel); soma_info.cnt = length(soma_info.inds);

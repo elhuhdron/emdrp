@@ -190,7 +190,7 @@ pdata = struct;  % input parameters depending on dataset
 
 
 
-
+% % START COMPARING agglo settings runs
 % % with ~20% ECS
 % i = 1;
 % pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
@@ -267,53 +267,53 @@ pdata = struct;  % input parameters depending on dataset
 % pdata(i).segparams = 0:2:100;
 % pdata(i).nlabels_attr = 'types_nlabels';
 
-% with ~20% ECS, agglomeration
-i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_wbg_ovlp_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
-pdata(i).name = 'huge_wbg_ovlp_noECS_agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 0:2:100;
-pdata(i).nlabels_attr = 'types_nlabels';
-
-% with ~20% ECS, agglomeration
-i = 2;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_wbg_nbhd_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
-pdata(i).name = 'huge_wbg_nbhd_noECS_agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 0:2:100;
-pdata(i).nlabels_attr = 'types_nlabels';
-
-% with ~20% ECS, agglomeration
-i = 3;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_zbg_ovlp_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
-pdata(i).name = 'huge_zbg_ovlp_noECS_agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 0:2:100;
-pdata(i).nlabels_attr = 'types_nlabels';
-
-% with ~20% ECS, agglomeration
-i = 4;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-pdata(i).chunk = [16 17 0];
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_zbg_nbhd_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
-pdata(i).name = 'huge_zbg_nbhd_noECS_agglo';
-pdata(i).subgroups = {'agglomeration'};
-pdata(i).segparam_attr = '';
-pdata(i).segparams = 0:2:100;
-pdata(i).nlabels_attr = 'types_nlabels';
+% % with ~20% ECS, agglomeration
+% i = 1;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_wbg_ovlp_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
+% pdata(i).name = 'huge_wbg_ovlp_noECS_agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 0:2:100;
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS, agglomeration
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_wbg_nbhd_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
+% pdata(i).name = 'huge_wbg_nbhd_noECS_agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 0:2:100;
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS, agglomeration
+% i = 3;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_zbg_ovlp_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
+% pdata(i).name = 'huge_zbg_ovlp_noECS_agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 0:2:100;
+% pdata(i).nlabels_attr = 'types_nlabels';
+% 
+% % with ~20% ECS, agglomeration
+% i = 4;
+% pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+% pdata(i).chunk = [16 17 0];
+% pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
+% pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/mfergus32_ECSpaper_noECS/huge_zbg_nbhd_noECS_mfergus32_rf_100iter2p_medium_clean_supervoxels.h5';
+% pdata(i).name = 'huge_zbg_nbhd_noECS_agglo';
+% pdata(i).subgroups = {'agglomeration'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = 0:2:100;
+% pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -374,6 +374,8 @@ pdata(i).nlabels_attr = 'types_nlabels';
 % pdata(i).subgroups = {'with_background'};
 % pdata(i).segparam_attr = 'thresholds';
 % pdata(i).nlabels_attr = 'types_nlabels';
+
+% % END COMPARING agglo settings runs
 
 
 
@@ -440,30 +442,31 @@ pdata(i).nlabels_attr = 'types_nlabels';
 %   end
 % end
 
-% % K0057 agglomeration somas clean
-% i = 1;
-% pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
-% pdata(i).chunk = [2 8 1];
-% %pdata(i).chunk = [20 20 7];
-% pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-% pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/clean';
-% pdata(i).name = 'K0057 clean';
-% pdata(i).subgroups = {'agglomeration'};
-% pdata(i).segparam_attr = '';
-% pdata(i).segparams = 39:48;
-% pdata(i).nlabels_attr = 'types_nlabels';
+% K0057 agglomeration somas clean
+i = 1;
+pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+pdata(i).chunk = [2 8 1];
+%pdata(i).chunk = [20 20 7];
+pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run3/clean';
+pdata(i).name = 'K0057 agglo';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = 0:2:24;
+pdata(i).nlabels_attr = 'types_nlabels';
 
-% % K0057 agglomeration somas agglo
-% i = 1;
-% pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
-% pdata(i).chunk = [2 8 1];
-% pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-% pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32all_K0057_ds3_run2/agglo';
-% pdata(i).name = 'K0057 agglo';
-% pdata(i).subgroups = {'agglomeration'};
-% pdata(i).segparam_attr = '';
-% pdata(i).segparams = 1:5:48;
-% pdata(i).nlabels_attr = 'types_nlabels';
+% K0057 watershed somas clean
+i = 2;
+pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+pdata(i).chunk = [2 8 1];
+%pdata(i).chunk = [20 20 7];
+pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run3/clean_wtsh';
+pdata(i).name = 'K0057 wtsh';
+pdata(i).subgroups = {'with_background'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = [0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999];
+pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -514,9 +517,9 @@ p.remove_MEM_merged_nodes = true;
 
 % xxx - this should have been written to the downsampled hdf5 as an attribute, fix this when fixed in hdf5
 %p.ds_ratio = [3 3 1];
-p.ds_ratio = [1 1 1];
+%p.ds_ratio = [1 1 1];
 
-p.skeleton_mode = true;
+p.skeleton_mode = false;
 if p.skeleton_mode
   % legacy mode size in chunks and offset as "skip"
   p.nchunks = [8 8 4];
@@ -538,7 +541,7 @@ else
   p.supernchunks = [6 6 6];
   p.offset = [0 0 0];
   p.max_nodes = 1;  % only count somas that have this number of nodes or less (always 1???)
-  p.node_radius = 100;
+  p.node_radius = 100;  % zero means only the label that is directly under the knossos node (only checks mergers)
   p.superchunk_labels_unique = false;
   p.nalloc = 1e7; % soma mode requires bigger stacks
   p.remove_MEM_merged_nodes = true; % absolutely need this on for this to make sense
@@ -546,8 +549,8 @@ end
 
 % these could be defined per pdata blocks, but did not see a good reason for this.
 % have to do separate runs if the dataset names are different.
-p.dataset_data = 'data_mag1';
-%p.dataset_data = 'data_mag_x3y3z1';
+%p.dataset_data = 'data_mag1';
+p.dataset_data = 'data_mag_x3y3z1';
 p.dataset_lbls = 'labels';
 
 % optional outputs for debug / validation
@@ -571,7 +574,8 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_noECS','p','pdata','o');
+save('/home/watkinspv/Data/efpl/soma_rad100_mfergus32_K0057_ds3_run3','p','pdata','o');
+%save('/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_noECS','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_ctx','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_paper_crop_diameters.mat','p','pdata','o');
