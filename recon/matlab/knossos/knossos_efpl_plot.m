@@ -19,6 +19,7 @@ nBGnodes = cell(1,ndatasets); nECSnodes = cell(1,ndatasets);
 nnodes = zeros(1,ndatasets);
 nnodes_skel = cell(1,ndatasets);
 names = cell(1,ndatasets);
+soma_mode = false;
 
 split_mergers_CI = cell(1,ndatasets);
 split_mergers_segEM_CI = cell(1,ndatasets);
@@ -51,6 +52,10 @@ for i = 1:ndatasets
   
   params{i} = o{i}.thresholds;
   names{i} = pdata{i}.name;
+  if pdata{i}.node_radius > -1
+    names{i} = [names{i} sprintf(' r=%d',pdata{i}.node_radius)];
+    soma_mode = true;
+  end
 end
 
 % for single matrices over parameter dimension, use max length and fill shorter rows with NaN
@@ -289,7 +294,6 @@ title(sprintf('none: %d skels, median %.2f (%.4f)\nhuge: %d skels, median %.2f (
 
 
 
-
 figure(baseno+figno); figno = figno+1; clf
 subplot(2,2,1);
 sumSM = split_er+merge_fracnodes;
@@ -316,27 +320,27 @@ title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g',abs(m(2)-m(1)),m(1),...
   minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2))));
 legend(names)
 
-% %figure(baseno+figno); figno = figno+1; clf
-% subplot(2,2,3);
-% plot(norm_params',combined_eftpl');
-% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-% % plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
-% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-% plot(norm_params',squeeze(combined_eftpl_CI(:,:,1))','--');
-% hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
-% plot(norm_params',squeeze(combined_eftpl_CI(:,:,2))','--');
-% set(gca,'plotboxaspectratio',[1 1 1]);
-% ylabel('combined eftpl (%PL)');
-% if p.param_name
-%   set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
-%   xlabel(p.param_name)
-% else
-%   xlabel('norm parameter')
-% end
-% [m,mi] = max(combined_eftpl,[],2);
-% set(gca,'ylim',[-0.025 0.8]); box off
-% title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
-%   params{1}(mi(1)),params{2}(mi(2))));
+%figure(baseno+figno); figno = figno+1; clf
+subplot(2,2,3);
+plot(norm_params',combined_eftpl');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+% plot([ithr_minmergers ithr_minmergers]',repmat([-0.05;0.55],[1 ndatasets]),'--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(norm_params',squeeze(combined_eftpl_CI(:,:,1))','--');
+hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+plot(norm_params',squeeze(combined_eftpl_CI(:,:,2))','--');
+set(gca,'plotboxaspectratio',[1 1 1]);
+ylabel('combined eftpl (%PL)');
+if p.param_name
+  set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
+  xlabel(p.param_name)
+else
+  xlabel('norm parameter')
+end
+[m,mi] = max(combined_eftpl,[],2);
+set(gca,'ylim',[-0.025 0.8]); box off
+title(sprintf('maxd=%g\n%g %g\n@thr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+  params{1}(mi(1)),params{2}(mi(2))));
 
 %figure(baseno+figno); figno = figno+1; clf
 subplot(2,2,2);
@@ -372,9 +376,15 @@ set(gca,'ylim',[-0.025 0.8],'xlim',[-0.025 0.5]); box off
 title(sprintf('maxd=%g\n%g %g\n@merged nodes=%g %g',abs(m(2)-m(1)),m(1),m(2),...
   merge_fracnodes(1,mi(1)),merge_fracnodes(2,mi(2))));
 
-if p.node_radius > -1
-  subplot(2,2,3);
-  sumSM = split_fracnodes+merge_fracnodes;
+
+
+
+if soma_mode
+  figure(baseno+figno); figno = figno+1; clf
+
+  subplot(1,2,2);
+  % xxx - how to scale splits for soma mode???
+  sumSM = log10(split_fracnodes)+merge_fracnodes;
   [m,mi] = min(sumSM,[],2);
   minSM = [[split_fracnodes(1,mi(1)); merge_fracnodes(1,mi(1))] ...
     [split_fracnodes(2,mi(2)); merge_fracnodes(2,mi(2))]];
@@ -391,13 +401,39 @@ if p.node_radius > -1
   plot(squeeze(split_er_CI(1,:,2)),squeeze(merge_fracnodes_CI(1,:,2)),'--');
   hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
   plot(squeeze(split_er_CI(2,:,2)),squeeze(merge_fracnodes_CI(2,:,2)),'--');
-  set(gca,'plotboxaspectratio',[1 1 1]);
+  set(gca,'plotboxaspectratio',[1 1 1], 'xscale','log');
   %set(gca,'ylim',[-0.05 1.05],'xlim',[-0.05 1.05]);
   xlabel('splits per node'); ylabel('merged nodes');
-  title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g\nnode radius=%d',abs(m(2)-m(1)),m(1),...
-    minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2)),p.node_radius));
+  title(sprintf('maxd=%g\n%g=%g+%g %g=%g+%g\n@thr=%g %g',abs(m(2)-m(1)),m(1),...
+    minSM(1,1),minSM(2,1),m(2),minSM(1,2),minSM(2,2),params{1}(mi(1)),params{2}(mi(2))));
   %legend(names)
-end
+    
+  subplot(1,2,1);
+  plot(norm_params',merge_fracnodes','-o', 'markersize', 2);
+  %   hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  %   plot(norm_params',squeeze(are_CI(:,:,1))','--');
+  %   hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  %   plot(norm_params',squeeze(are_CI(:,:,2))','--');
+  %   hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  % if exist('ithr_minmergers_all','var')
+  %   hold on; if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
+  %   plot([ithr_minmergers_all(:,i) ithr_minmergers_all(:,i)]',repmat([0.5;1.05],[1 ndatasets]),'--');
+  % end
+  set(gca,'plotboxaspectratio',[1 1 1]); box off
+  %   [m,mi] = min(are,[],2);
+  %   title(sprintf('maxd=%g\n%g %g\nthr=%g %g',abs(m(2)-m(1)),m(1),m(2),...
+  %     params{1}(mi(1)),params{2}(mi(2))));
+  if p.param_name
+    set(gca,'xtick',ticksel,'xticklabel',params{1}(ticksel)); xlim([0.5 nparams+0.5])
+    xlabel(p.param_name)
+  else
+    xlabel('norm parameter')
+  end
+  %title(sprintf('node radius=%d',p.node_radius))
+  title('soma-mode analysis')
+  ylabel('merged nodes')
+  legend(names)
+end  
 
 
 
