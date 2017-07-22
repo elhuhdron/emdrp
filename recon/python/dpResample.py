@@ -139,10 +139,11 @@ class dpResample(dpWriteh5):
 
         f = self.factor
         if self.upsample:
-            # update the scale and compute new chunk/size/offset
-            new_attrs['scale'][self.resample_dims] /= f
-            new_attrs['boundary'][self.resample_dims] *= f
-            new_attrs['nchunks'][self.resample_dims] *= f
+            if 'boundary' in new_attrs: # proxy for whether attrs is there at all
+                # update the scale and compute new chunk/size/offset
+                new_attrs['scale'][self.resample_dims] /= f
+                new_attrs['boundary'][self.resample_dims] *= f
+                new_attrs['nchunks'][self.resample_dims] *= f
             # this attribute is saved as downsample factor
             new_attrs['factor'][self.resample_dims] /= f
             new_chunk[self.resample_dims] *= f
@@ -154,11 +155,12 @@ class dpResample(dpWriteh5):
             for i in range(self.nslices):
                 new_data[self.slices[i]] = self.data_cube
         else:
-            # update the scale and compute new chunk/size/offset
-            new_attrs['scale'][self.resample_dims] *= f
-            new_attrs['boundary'][self.resample_dims] //= f
-            new_attrs['nchunks'][self.resample_dims] = \
-                np.ceil(new_attrs['nchunks'][self.resample_dims] / f).astype(np.int32)
+            if 'boundary' in new_attrs: # proxy for whether attrs is there at all
+                # update the scale and compute new chunk/size/offset
+                new_attrs['scale'][self.resample_dims] *= f
+                new_attrs['boundary'][self.resample_dims] //= f
+                new_attrs['nchunks'][self.resample_dims] = \
+                    np.ceil(new_attrs['nchunks'][self.resample_dims] / f).astype(np.int32)
             # this attribute is saved as downsample factor
             new_attrs['factor'][self.resample_dims] *= f
             new_chunk[self.resample_dims] //= f

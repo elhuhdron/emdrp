@@ -279,7 +279,8 @@ class dpLoadh5(object):
             data[:z[0],-z[1]:,-z[2]:] = 0; data[-z[0]:,-z[1]:,-z[2]:] = 0
         if bool(self.dtypeGray):
             dtypeGray = eval('np.' + self.dtypeGray) if isinstance(self.dtypeGray, str) else self.dtypeGray
-            #data -= data.min(); data /= data.max() # xxx - scale as option? typically for probs, so commented
+            # this is for converting uint grayscale data types
+            data = data.astype(np.double) / self.dtypeGrayScale
             data = (data*np.iinfo(dtypeGray).max).astype(dtypeGray)
         if self.nColorsLUTraw and islabels:
             data = data % self.nColorsLUTraw
@@ -489,6 +490,8 @@ class dpLoadh5(object):
             help='Specify non-zero number of colors for uint data (apply modulo, raw output)')
         p.add_argument('--dtypeGray', nargs=1, type=str, default=[0], metavar=('DTYPE'),
             help='Specify data type for converting to grayscale (raw output)')
+        p.add_argument('--dtypeGrayScale', nargs=1, type=float, default=[1.0], metavar='S',
+            help='Specify scaling before converting to grayscale (for use diwht dtypeGray)')
         p.add_argument('--zeropadraw', nargs=6, type=int, default=[0,0,0,0,0,0],
             metavar=('Xb', 'Xa', 'Yb', 'Ya', 'Zb', 'Za'),
             help='Size in voxels to zero pad (b=before, a=after) (raw output)')
