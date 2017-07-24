@@ -49,6 +49,7 @@ from typesh5 import emLabels, emVoxelType
 class dpCleanLabels(emLabels):
 
     def __init__(self, args):
+        self.LIST_ARGS += ['contour_lvl']
         emLabels.__init__(self,args)
 
         self.fgbwconn = nd.morphology.generate_binary_structure(dpLoadh5.ND, self.fg_connectivity)
@@ -126,7 +127,7 @@ class dpCleanLabels(emLabels):
 
             # exposed smoothing kernel size and contour level as parameters
             smooth_size = self.smooth_size
-            contour_level = self.contour_lvl
+            #contour_level = self.contour_lvl
             # calculate padding based on smoothing kernel size
             rad = int(1.5*smooth_size.max())
 
@@ -155,14 +156,31 @@ class dpCleanLabels(emLabels):
                 #    print('Smoothing label %d / %d' % (j+1,nSeeds)); t = time.time()
 
                 pbnd = tuple([slice(x.start-rad,x.stop+rad) for x in svox_bnd[j]])
-                Lcrp = (image_with_brd[pbnd] == j+1).astype(np.double)
-
+                Lcrpsel = (image_with_brd[pbnd] == j+1); Lcrp = Lcrpsel.astype(np.double)
+                # smoothing operation just box filter on cropped binarized label
                 Lfilt = nd.filters.uniform_filter(Lcrp, size=smooth_size, mode='constant')
-                # incase smoothing below contour level, use without smoothing
-                if not (Lfilt > contour_level).any(): Lfilt = Lcrp
+                
+                # this feature allows for variable contour level depending on if object splits apart
+                if len(self.contour_lvl) > 1:
+                    # get the original number of components for the object
+                    nlabels_orig = nd.measurements.label(Lcrpsel, self.fgbwconn)[1]
+                    for c in np.arange(self.contour_lvl[1], self.contour_lvl[0]-self.contour_lvl[2]/10, 
+                                       -self.contour_lvl[2]):
+                        # incase smoothing below contour level, use without smoothing
+                        if not (Lfilt > c).any(): Lfilt = Lcrp
 
+                        # check new number of labels, stop if it same (or less?) than original number of components
+                        csel = (Lfilt > c)
+                        nlabels = nd.measurements.label(csel, self.fgbwconn)[1]
+                        if nlabels <= nlabels_orig: break
+                else:
+                    contour_level = self.contour_lvl[0]
+                    # incase smoothing below contour level, use without smoothing
+                    if not (Lfilt > contour_level).any(): Lfilt = Lcrp
+                    csel = (Lfilt > contour_level)
+                    
                 # assign smoothed output for current label
-                lbls[pbnd][Lfilt > contour_level] = j+1
+                lbls[pbnd][csel] = j+1
 
             # put ECS labels back
             if ECS_label: lbls[sel_ECS] = ECS_label
@@ -173,15 +191,16 @@ class dpCleanLabels(emLabels):
             self.data_cube = lbls[rad:-rad,rad:-rad,rad:-rad]
 
         if self.remove_adjacencies:
+            r = self.remove_adjacencies; assert( r > 1 and r % 2 == 1 ) # bad nbhd size
             labels = self.data_cube.astype(np.uint32, copy=True, order='C')
             sel_ECS, ECS_label = self.getECS(labels); labels[sel_ECS] = 0
 
             if self.dpCleanLabels_verbose:
-                print('Removing adjacencies with conn %d%s' % (self.fg_connectivity,
+                print('Removing adjacencies with nbhd %d%s' % (r,
                     ', ignoring ECS label %d' % (ECS_label,) if ECS_label else ''))
                 t = time.time()
 
-            self.data_cube = emLabels.remove_adjacencies_nconn(labels, bwconn=self.fgbwconn)
+            self.data_cube = emLabels.remove_adjacencies_nconn(labels, bwconn=np.ones((r,r,r),dtype=np.bool))
             if ECS_label: self.data_cube[sel_ECS] = ECS_label
 
             if self.dpCleanLabels_verbose:
@@ -393,20 +412,20 @@ class dpCleanLabels(emLabels):
         p.add_argument('--smooth', action='store_true', help='Perform 3d smoothing on labels')
         p.add_argument('--smooth-size', nargs=3, type=int, default=[3,3,3], metavar=('X', 'Y', 'Z'),
             help='Size of smoothing kernel')
-        p.add_argument('--contour-lvl', nargs=1, type=float, default=[0.25], metavar=('LVL'),
-            help='Level [0,1] to use to create mesh isocontours')
+        p.add_argument('--contour-lvl', nargs='*', type=float, default=[0.25], metavar=('LVL'),
+            help='Level [0,1] to use to create mesh isocontours, specify range for "auto" mode')
         # remove components smaller than size (using voxel counts only)
         p.add_argument('--minsize', nargs=1, type=int, default=[-1], metavar=('size'),
             help='Minimum label size in voxels to keep')
         p.add_argument('--minsize_fill', action='store_true',
                        help='Whether to nearest neighbor fill labels scrubbed with minsize')
         # remove adjacencies
-        p.add_argument('--remove_adjacencies', action='store_true',
-                       help='Perform 3d adjacency removal using fg-connectivity')
+        p.add_argument('--remove_adjacencies', nargs=1, type=int, default=[0], metavar=('NBHD'),
+                       help='Perform 3d adjacency removal using specified neighborhood size')
         # remove cavities
         p.add_argument('--cavity-fill', action='store_true', help='Remove all BG not connected to cube faces')
         # remove any labels less than specified size that are within cavities
-        p.add_argument('--cavity-fill-minsize', nargs=1, type=int, default=[1], metavar=('size'),
+        p.add_argument('--cavity-fill-minsize', nargs=1, type=int, default=[1], metavar=('SIZE'),
             help='Minimum label size to replace labels in cavities (force cavity fill)')
         # rerun labeling (connected components)
         p.add_argument('--relabel', action='store_true', help='Re-label components (run connected components)')

@@ -243,11 +243,17 @@ def remove_adjacencies(labels, bwconn):
         raise Exception( 'In remove_adjacencies, bwconn not C-order contiguous')
     if bwconn.dtype != testB.dtype:
         raise Exception( 'In remove_adjacencies, bwconn not correct data type')
+    if not all([x%2 for x in bwconn.shape]):
+        raise Exception( 'In remove_adjacencies, bwconn shape contains even size(s)')
+        
+    c = [x//2 for x in bwconn.shape]; bwconn[c[0],c[1],c[2]] = 0; bwconn = np.tril(bwconn) # optimization
 
-    sz =  [x+2 for x in labels.shape]   # need border for neighborhoods around the edge voxels
-    lbls = np.zeros(sz, dtype=labels.dtype); lbls[1:-1,1:-1,1:-1] = labels
-    _pyCext.remove_adjacencies(lbls, bwconn)
-    return lbls[1:-1,1:-1,1:-1]
+    sz =  [x+y-1 for x,y in zip(labels.shape, bwconn.shape)]   # need border for neighborhoods around the edges
+    slc = np.s_[c[0]:-c[0],c[1]:-c[1],c[2]:-c[2]]
+    lbls = np.zeros(sz, dtype=labels.dtype); lbls[slc] = labels
+    lblsout = np.zeros(sz, dtype=labels.dtype); lblsout[slc] = labels
+    _pyCext.remove_adjacencies(lbls, lblsout, bwconn)
+    return lblsout[slc]
 
 # assign type for each supervoxel using majority vote of contained voxels, output to supervoxel_type
 def type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_types=2):

@@ -404,43 +404,48 @@ static PyObject *type_components(PyObject *self, PyObject *args)
 static PyObject *remove_adjacencies(PyObject *self, PyObject *args)
 {
     PyArrayObject *labels, *labels_out, *bwconnectivity;
-    npy_uint32 *lbls, *lout;
+    npy_uint32 *lbls, *lblsout;
     npy_bool *bwconn;
 
-    npy_int m,n,nz, x,y,z, xp,yp,zp, ip;
+    npy_int m,n,nz, bwm,bwn,bwnz, x,y,z, xp,yp,zp, ip;
     npy_intp pt, ind;
-    npy_intp *dims, size;
-    npy_bool adj;
+    npy_intp *dims, *bwdims, size, bwsize, sz[LBLS_ND];
 
-    if (!PyArg_ParseTuple(args, "O!O!", &PyArray_Type, &labels, &PyArray_Type, &bwconnectivity))
+    int i;
+
+    if (!PyArg_ParseTuple(args, "O!O!O!", &PyArray_Type, &labels, &PyArray_Type, &labels_out, 
+                          &PyArray_Type, &bwconnectivity))
         return NULL;
 
     /* Get the dimensions of the labels and the c pointer to the labels and components */
     dims = PyArray_DIMS(labels); m = dims[0]; n = dims[1]; nz = dims[2]; size = m*n*nz;
     lbls = (npy_uint32 *) PyArray_DATA(labels);
+    lblsout = (npy_uint32 *) PyArray_DATA(labels_out);
+    bwdims = PyArray_DIMS(bwconnectivity); bwm = bwdims[0]; bwn = bwdims[1]; bwnz = bwdims[2]; bwsize = bwm*bwn*bwnz;
     bwconn = (npy_bool *) PyArray_DATA(bwconnectivity);
+
+    // get the "center point" of bwconn (structuring element)
+    for( i=0; i<LBLS_ND; i++ ) sz[i] = bwdims[i] / 2;
 
     // get neighbors based on adjacency for all non-zero label voxels
     for( pt = 0; pt < size; pt++ ) {
         if( lbls[pt] ) {
+            z = pt % nz; y = (pt / nz) % n; x = pt / n / nz; // ind2sub in volume for 3d, C-order
             // iterate neighborhood for this voxel and clear any voxels that are not the same label
-            adj = 0;
-            for( ip = 0; ip < 27; ip++ ) {
+            for( ip = 0; ip < bwsize; ip++ ) {
                 // if current voxel in 3d neighborhood (skip center) is adjacent based on supplied connectivity
-                if( bwconn[ip] && ip != 13 ) {
-                    zp = ip % 3; yp = (ip / 3) % 3; xp = ip / 9; // ind2sub in patch for 3d, C-order
-                    z = pt % nz; y = (pt / nz) % n; x = pt / n / nz; // ind2sub in volume for 3d, C-order
+                //if( bwconn[ip] && ip != 13 ) { // have caller control optimizing bwconn
+                if( bwconn[ip] ) {
+                    zp = ip % bwnz; yp = (ip / bwnz) % bwn; xp = ip / bwn / bwnz; // ind2sub in patch for 3d, C-order
                     // get patch location relative to center and sub2ind in volume for 3d, C-order
-                    ind = (npy_intp)(x+xp-1)*n*nz + (npy_intp)(y+yp-1)*nz + (npy_intp)(z+zp-1);
+                    ind = (npy_intp)(x+xp-sz[0])*n*nz + (npy_intp)(y+yp-sz[1])*nz + (npy_intp)(z+zp-sz[2]);
 
                     // if adjacent label is not the same as center label, found adjacency, clear adjacent voxel
                     if( lbls[ind] && lbls[pt] != lbls[ind] ) {
-                        lbls[ind] = 0; adj = 1;
+                        lblsout[ind] = 0; 
                     }
                 }
             } // for each point in 3d neighborhood (3x3x3)
-            // if adjacency was found, also clear current voxel so that adjacency is removed symmetrically
-            if( adj ) lbls[pt] = 0;
         } // if current voxel is non-zero
     } // for each voxel in volume
 

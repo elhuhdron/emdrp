@@ -139,7 +139,7 @@ class dpWriteh5(dpLoadh5):
 
     def writeFromRaw(self):
         self.loadFromRaw()
-        if self.dpWriteh5_verbose: print(self.data_cube.min(), self.data_cube.max(), self.data_cube.shape)
+        #if self.dpWriteh5_verbose: print(self.data_cube.min(), self.data_cube.max(), self.data_cube.shape)
         # xxx - total hacks, keep commented
         #self.data_attrs['dimOrdering'] = [1,2,3]
         self.writeCube()
