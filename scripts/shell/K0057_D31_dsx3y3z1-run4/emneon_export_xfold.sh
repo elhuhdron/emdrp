@@ -17,15 +17,14 @@ do
     #while [ $count -lt `expr $icount + 1` ]
     while [ $count -lt 4 ]
     do
-        #echo "python -u ./emneon.py --data_config data/tmp_config/EMdata-3class-32x32out-rand-K0057-dsx3y3z1.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz_test${itestc}_${count}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz_test${itestc}_${count}.h5 --image_in_size 128 --test_range 200001 20000$ntestc --nbebuf 1 -i ${card[$totalc]} --chunk_skip_list $testc" > run_tmp.sh
-        echo "python -u ./emneon.py --data_config data/tmp_config/EMdata-3class-32x32out-rand-K0057-dsx3y3z1.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz_test${itestc}_${count}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz_${count}.h5 --image_in_size 128 --test_range 200001 20000$ntestc --nbebuf 1 -i ${card[$totalc]} --chunk_skip_list $testc" > run_tmp.sh
-        cat run_tmp.sh
-        #./run_gpu_job.py -s run_tmp.sh
+        echo "python -u ./emneon.py --data_config ~/gits/emdrp/scripts/shell/K0057_D31_dsx3y3z1-run4/EMdata-3class-32x32out-rand-ctx-K0057-dsx3y3z1.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz_test${itestc}_${count}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz_${count}.h5 --image_in_size 128 --test_range 200001 20000$ntestc --nbebuf 1 -i ${card[$totalc]} --chunk_skip_list $testc" > run_tmp.sh
+        #cat run_tmp.sh
+        ./run_gpu_job.py -s run_tmp.sh
        
         count=`expr $count + 1`
         totalc=`expr $totalc + 1`
     done
     iter=`expr $iter + 1`
 done
-#./run_gpu_job.py 
+./run_gpu_job.py 
 

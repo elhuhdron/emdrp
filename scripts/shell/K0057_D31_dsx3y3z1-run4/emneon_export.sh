@@ -40,9 +40,9 @@ do
     sed -i -- "s/chunk_range_beg.*/chunk_range_beg = ${chunk_range_beg[$machine]}/g" $fn
     sed -i -- "s/chunk_range_end.*/chunk_range_end = ${chunk_range_end[$machine]}/g" $fn
 
-    #./run_gpu_job.py -s run_tmp.sh
-    cat run_tmp.sh
+    ./run_gpu_job.py -s run_tmp.sh
+    #cat run_tmp.sh
     iter=`expr $iter + 1`
 done
-#./run_gpu_job.py
+./run_gpu_job.py
 
