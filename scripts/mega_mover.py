@@ -23,6 +23,9 @@ import shutil
 #alloutprefixes = ['none', 'huge']
 #alloutprefixes = ['K0057-dsx3y3z1']
 
+# xxx - got lazy and didn't start with argparse, migrate to argparse
+assert( len(sys.argv[1:]) >= 4 ) # need 4 arguments
+
 inprefix = sys.argv[1:][0]
 initcnt = int(sys.argv[1:][1])
 # xxx - old, for reference
@@ -42,17 +45,24 @@ for name in glob.glob(inprefix + '*.txt'):
     fp, fn = os.path.split(name); fh, ext = os.path.splitext(fn)
     m = re.search(r'(?P<name>.*)\-out', fh); fh = m.group('name')
 
-    shakes = open(name, "r"); skip = -1
+    shakes = open(name, "r"); skip = ''; found=0
     for line in shakes:
-        m = re.search(r'chunk_skip_list\: \[(?P<skip>\d+)\]', line)
-        if m is not None: skip = m.group('skip')
+        #m = re.search(r'chunk_skip_list\: \[(?P<skip>\d+)\]', line)
+        m = re.search(r'chunk_skip_list\: \[(?P<skip>\d+(, \d+)*)\]', line)
+        if m is not None: skip = m.group('skip'); found += 1
         m = re.search(r'dim_ordering=\'(?P<order>\w+)\'', line)
-        if m is not None: order = m.group('order')
+        if m is not None: order = m.group('order'); found += 1
         # stackoverflow.com how-to-match-any-string-from-a-list-of-strings-in-regular-expressions-in-python
         m = re.search(r'EMDataParser: config file .*-(?P<outprefix>('+'|'.join(alloutprefixes)+r')).ini', line)
-        if m is not None and getoutprefix: outprefix = m.group('outprefix')
+        if m is not None and getoutprefix: outprefix = m.group('outprefix'); found += 1
+        if found >= 3: break
     shakes.close()
-    iskip = int(skip)
+    if len(skip) > 0:
+        # for multiple test chunks, use the index of the first test chunk only in the filename
+        iskip = [int(x) for x in skip.split(',')][0]
+    else:
+        iskip = -1 
+    #iskip = int(skip)
  
     if iskip < 0: 
         # no crossfold (trained on all)
@@ -74,15 +84,15 @@ for name in glob.glob(inprefix + '*.txt'):
         cnt[outprefix][order][iskip] += 1
         cntstr = str(cnt[outprefix][order][iskip])
 
-        src = os.path.join(fp,fh+'-out.txt'); dst = os.path.join(fp,outprefix + '_' + order + '_test' + skip \
+        src = os.path.join(fp,fh+'-out.txt'); dst = os.path.join(fp,outprefix + '_' + order + '_test' + str(iskip) \
             + '_' + cntstr + '.txt')
         print(src,dst)
         if doMove: shutil.move(src,dst)
-        src = os.path.join(fp,fh+'-model.prm'); dst = os.path.join(fp,outprefix + '_' + order + '_test' + skip \
+        src = os.path.join(fp,fh+'-model.prm'); dst = os.path.join(fp,outprefix + '_' + order + '_test' + str(iskip) \
             + '_' + cntstr + '.prm')
         print(src,dst)
         if doMove: shutil.move(src,dst)
-        src = os.path.join(fp,fh+'-output.h5'); dst = os.path.join(fp,outprefix + '_' + order + '_test' + skip \
+        src = os.path.join(fp,fh+'-output.h5'); dst = os.path.join(fp,outprefix + '_' + order + '_test' + str(iskip) \
             + '_' + cntstr + '.h5')
         print(src,dst)
         if doMove: shutil.move(src,dst)
