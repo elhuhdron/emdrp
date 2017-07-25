@@ -1,0 +1,10 @@
+
+emdrp last release for this run
+
+xxx - fix this
+commit a4ed6a57ffcce0a4bf1e2aadd1d4e9a850e6b6f1
+Author: Paul Watkins <pwatkins@gmail.com>
+Date:   Thu Jun 22 18:07:47 2017 -0400
+
+dates for full pipeline run (up to cleaning): June 24 2017 - xxx add end date
+
