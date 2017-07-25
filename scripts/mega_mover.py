@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-# mega_mover.py [inprefix_without_wildcard] [initcnt] [optional_outprefix]
-# outprefix taken from ini if not specified, counts done per outprefix and dimordering (taken from ini)
+# mega_mover.py [inprefix_without_wildcard] [initcnt] [doMove] [* alloutprefixes]
+# outprefix taken from ini but must be in alloutprefixes, counts done per outprefix and dimordering (taken from ini)
 #
 # Script for renaming convnet job outputs with more appropriate names.
+# NOTE: outprefixes have to match exactly to the string just before .ini in the parser ini name from data/config
 # 
 # Sample invocations (from directory containing convnet outputs, aka ~/Data/convnet_out)
-#   ./mega_mover.py 2017-05-1 1
+#   ./mega_mover.py 2017-05-1 1 0 K0057-dsx3y3z1
 #
 
 import re
@@ -14,21 +15,26 @@ import glob
 import os
 import shutil
 
+# xxx - old, for reference
 # non-command line parameters
-doMove = False
+#doMove = False
 # need to define this if outprefix not given as second command line argument.
 # NOTE: these prefixes have to match exactly to the string just before .ini in the parser ini name from data/config
 #alloutprefixes = ['none', 'huge']
-alloutprefixes = ['K0057-dsx3y3z1']
+#alloutprefixes = ['K0057-dsx3y3z1']
 
 inprefix = sys.argv[1:][0]
 initcnt = int(sys.argv[1:][1])
-getoutprefix = False
-if len(sys.argv[1:]) > 2:
-    outprefix = sys.argv[1:][2]
-    alloutprefixes = [outprefix]
-else:
-    getoutprefix = True
+# xxx - old, for reference
+#getoutprefix = False
+#if len(sys.argv[1:]) > 2:
+#    outprefix = sys.argv[1:][2]
+#    alloutprefixes = [outprefix]
+#else:
+#    getoutprefix = True
+doMove = (sys.argv[1:][2].lower() in ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh'])
+getoutprefix = True
+alloutprefixes = sys.argv[1:][3:]
 cnt = {y:{x:[initcnt-1]*20 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
 cntall = {y:{x:initcnt-1 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
 
