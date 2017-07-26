@@ -23,7 +23,6 @@ for i in ${!lips[@]}; do
        machine=${i}
    fi
 done
-machine=0
 
 #rm -rf $outdir # bad idea's coming
 mkdir -p $outdir
