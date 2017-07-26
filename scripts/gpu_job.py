@@ -22,6 +22,7 @@ import binascii
 import time
 import socket
 import sys
+import random
 
 NUM_GPUS, GPU_JOB_SUBDIR, GPU_PREFIX = 10, 'gpu_jobs', 'gpu' # init NUM_GPUS as max gpus, set in get_paths
 GPU_STATUS, GPU_STARTED = 'gpu%d_status.log', 'gpu%d_last_started.log'
@@ -112,8 +113,8 @@ def run_next_jobs(force=False):
         outfile2.write(time.strftime('%Y-%m-%d %H:%M:%S') + '\t\t' + cmd_to_start + '\n\n'); outfile2.close()
         # xxx - found that at least for neon jobs two jobs starting one right after another results in intermittent
         #   errors, possibly regarding the neon cache? either way it helps to pause for a short bit before submitting
-        #   the next job.
-        if started_job: time.sleep(18)
+        #   the next job. hang problem was persistent to moved to a randomized pause time.
+        if started_job: time.sleep(random.randrange(21,60,3))
         else: started_job = True
         os.system(cmd_to_start)
         os.remove(job_script)
