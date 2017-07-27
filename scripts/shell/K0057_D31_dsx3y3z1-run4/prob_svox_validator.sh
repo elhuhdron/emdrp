@@ -2,9 +2,10 @@
 # run on red or machine with mounted synology
 
 outpath=/home/watkinspv/Downloads/tmp_probs
-inprobs=/mnt/syn2/watkinspv/full_datasets/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1_xyz
+inprobs=/mnt/syn2/watkinspv/full_datasets/neon_xfold/mfergus32_K0057_ds3_run4/K0057-dsx3y3z1
 dataset=data_mag_x3y3z1
 ctx_offset=32
+export_svox=1
 
 declare -a sizes=('256 256 128' '256 256 128' '256 256 128' '128 256 128')
 declare -a chunks=("6 23 2" "16 19 15" "4 35 2" "4 11 14")
@@ -33,11 +34,16 @@ do
     while [ $cnt -lt 4 ]
     do
         echo processing $chunk count $cnt
-        dpLoadh5.py --srcfile ${inprobs}_$cnt.h5 --chunk $chunk --size $sz --offset $ofst --dataset MEM --outraw $outpath/${fn}_MEM_$cnt.nrrd --dpL
-        #dpLoadh5.py --srcfile ${inprobs}_$cnt.h5 --chunk $chunk --size $sz --offset $ofst --dataset ICS --outraw $outpath/${fn}_ICS_$cnt.nrrd --dpL
-        #dpLoadh5.py --srcfile ${inprobs}_$cnt.h5 --chunk $chunk --size $sz --offset $ofst --dataset ECS --outraw $outpath/${fn}_ECS_$cnt.nrrd --dpL
+        #dpLoadh5.py --srcfile ${inprobs}_xyz_$cnt.h5 --chunk $chunk --size $sz --offset $ofst --dataset MEM --outraw $outpath/${fn}_MEM_$cnt.nrrd --dpL
+        #dpLoadh5.py --srcfile ${inprobs}_xyz_$cnt.h5 --chunk $chunk --size $sz --offset $ofst --dataset ICS --outraw $outpath/${fn}_ICS_$cnt.nrrd --dpL
+        #dpLoadh5.py --srcfile ${inprobs}_xyz_$cnt.h5 --chunk $chunk --size $sz --offset $ofst --dataset ECS --outraw $outpath/${fn}_ECS_$cnt.nrrd --dpL
         cnt=`expr $cnt + 1`
     done
+
+    if [ $export_svox -eq 1 ]; then
+        dpLoadh5.py --srcfile ${inprobs}_supervoxels.h5 --chunk $chunk --size $sz --offset $ofst --dataset labels --subgroups with_background 0.99999000 --outraw $outpath/${fn}_supervoxels.nrrd --dpL
+        #dpLoadh5.py --srcfile ${inprobs}_probs.h5 --chunk $chunk --size $sz --offset $ofst --dataset MEM --outraw $outpath/${fn}_MEM.nrrd --dpL
+    fi
 
     count=`expr $count + 1`
 done

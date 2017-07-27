@@ -114,7 +114,7 @@ def run_next_jobs(force=False):
         # xxx - found that at least for neon jobs two jobs starting one right after another results in intermittent
         #   errors, possibly regarding the neon cache? either way it helps to pause for a short bit before submitting
         #   the next job. hang problem was persistent to moved to a randomized pause time.
-        if started_job: time.sleep(random.randrange(21,60,3))
+        if started_job: time.sleep(random.randrange(17,31))
         else: started_job = True
         os.system(cmd_to_start)
         os.remove(job_script)

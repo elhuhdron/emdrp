@@ -4,7 +4,7 @@
 # for this run, "prob pushes" were divided on two synolgies.
 # 4 streams of gpu-clones 0-4 split half to syn and half to syn2.
 # run3 did 2 streams per synology ethernet interface, but clones split into 2 streams were much slower.
-#   try this instead to see about speed.
+#   this worked, in fact maybe try going to 6 or 8 streams per clone.
 
 # this is just here for reference, should match emneon_export.sh
 # "top" half 
