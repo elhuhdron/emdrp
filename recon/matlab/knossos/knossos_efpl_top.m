@@ -448,25 +448,40 @@ pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
 pdata(i).chunk = [2 8 1];
 %pdata(i).chunk = [20 20 7];
 pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run3/clean';
+pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run4/clean';
 pdata(i).name = 'K0057 agglo';
 pdata(i).subgroups = {'agglomeration'};
 pdata(i).segparam_attr = '';
 pdata(i).segparams = 0:2:24;
 pdata(i).nlabels_attr = 'types_nlabels';
+pdata(i).node_radius = 0;
 
-% K0057 watershed somas clean
+% K0057 agglomeration somas clean
 i = 2;
 pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
 pdata(i).chunk = [2 8 1];
 %pdata(i).chunk = [20 20 7];
 pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
-pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run3/clean_wtsh';
-pdata(i).name = 'K0057 wtsh';
-pdata(i).subgroups = {'with_background'};
+pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run4/clean';
+pdata(i).name = 'K0057 agglo';
+pdata(i).subgroups = {'agglomeration'};
 pdata(i).segparam_attr = '';
-pdata(i).segparams = [0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999];
+pdata(i).segparams = 0:2:24;
 pdata(i).nlabels_attr = 'types_nlabels';
+pdata(i).node_radius = 20;
+
+% % K0057 watershed somas clean
+% i = 2;
+% pdata(i).datah5 = '/Data/datasets/raw/K0057_D31_dsx3y3z1.h5';
+% pdata(i).chunk = [2 8 1];
+% %pdata(i).chunk = [20 20 7];
+% pdata(i).skelin = '/Data/datasets/skeletons/K0057-D31-somas.365.xml';
+% pdata(i).lblsh5 = '/Data_yello/watkinspv/full_datasets/neon/mfergus32_K0057_ds3_run4/clean_wtsh';
+% pdata(i).name = 'K0057 wtsh';
+% pdata(i).subgroups = {'with_background'};
+% pdata(i).segparam_attr = '';
+% pdata(i).segparams = [0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999];
+% pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
@@ -541,7 +556,7 @@ else
   p.supernchunks = [6 6 6];
   p.offset = [0 0 0];
   p.max_nodes = 1;  % only count somas that have this number of nodes or less (always 1???)
-  p.node_radius = 100;  % zero means only the label that is directly under the knossos node (only checks mergers)
+  %p.node_radius = 0;  % zero means only the label that is directly under the knossos node (only checks mergers)
   p.superchunk_labels_unique = false;
   p.nalloc = 1e7; % soma mode requires bigger stacks
   p.remove_MEM_merged_nodes = true; % absolutely need this on for this to make sense
@@ -574,7 +589,7 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('/home/watkinspv/Data/efpl/soma_rad100_mfergus32_K0057_ds3_run3','p','pdata','o');
+save('/home/watkinspv/Data/efpl/soma_newagglo_mfergus32_K0057_ds3_run4','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_huge_mfergus32_ECS_paper_noECS','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_crop_interp_agglo_none_mfergus32_ECS_paper_ctx','p','pdata','o');
 %save('/home/watkinspv/Data/efpl/efpl_huge_sensitivity_crop_big_sample0p2.mat','p','pdata','o');

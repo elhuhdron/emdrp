@@ -200,6 +200,7 @@ else
     end
   end
   o.superchunk_size = p.supernchunks.*o.chunksize;
+  o.node_radius = pdata.node_radius;
 end
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
@@ -309,8 +310,8 @@ else % if p.skeleton_mode
       % skip if node plus radius is out of bounds of the supervoxel area
       n1subs = n1pt-o.loadcorner+p.matlab_base;
       if any(n1subs < 1) || any(n1subs > o.loadsize), continue; end
-      if any(n1subs - p.node_radius < 1), continue; end
-      if any(n1subs + p.node_radius > o.loadsize), continue; end
+      if any(n1subs - o.node_radius < 1), continue; end
+      if any(n1subs + o.node_radius > o.loadsize), continue; end
       
       % this edge and these nodes are within the supervoxel labeled volume so include it
       o.nodes_use{n}(n1) = true;
@@ -329,13 +330,15 @@ else % if p.skeleton_mode
   assert( nskels == nnodes ); % xxx - did not see a point to multiple nodes per soma in "soma-mode"
 
   % centered meshgrid and select for iterating points around radius of each node
-  soma_info = struct; r = p.node_radius;
+  soma_info = struct; r = o.node_radius;
   [x,y,z] = ndgrid(-r:r,-r:r,-r:r);
   soma_info.sel = (x.*x + y.*y + z.*z <= r*r);
   soma_info.size = [2*r+1,2*r+1,2*r+1];
   %soma_info.pts = [x(soma_info.sel) y(soma_info.sel) z(soma_info.sel)];
   %soma_info.inds = find(soma_info.sel); soma_info.cnt = length(soma_info.inds);
   
+  %allsomas=vertcat(o.info(~o.omit_things_use).nodes); allsomas=allsomas(:,1:3);
+  %save('~/Downloads/allsomas.mat','allsomas');
 end % if p.skeleton_mode
 
 % optionally output the skeletons
@@ -847,7 +850,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
       %superchunks(n,:) = fix((n1pt - o.loadcorner) ./ o.superchunk_size).*p.supernchunks + pdata.chunk;
       
       % the bounding box for the node sphere
-      begi(n,:) = n1pt - p.node_radius; endi(n,:) = n1pt + p.node_radius;
+      begi(n,:) = n1pt - o.node_radius; endi(n,:) = n1pt + o.node_radius;
       
     end % for each node
   end % for each thing
@@ -893,7 +896,7 @@ function [edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, nlabels] = lab
           Vlbls(begsubs(1):endsubs(1),begsubs(2):endsubs(2),begsubs(3):endsubs(3));
         
         % assign label mapping for the label that is directly under the node
-        center_pt = cVlbls(p.node_radius+1, p.node_radius+1, p.node_radius+1);
+        center_pt = cVlbls(o.node_radius+1, o.node_radius+1, o.node_radius+1);
         if center_pt ~= p.empty_label
           nodes_to_labels{n}(n1,:) = [center_pt sci];
         end
