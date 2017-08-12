@@ -112,6 +112,7 @@ parser.add_argument('--plot_combine_chans', action="store_true",
                     help='With plotting weights, make plot that combines first three channels into colors')
 parser.add_argument('--plot_log', action="store_true", help='Plot weights on log scale')
 parser.add_argument('--plot_save_path', type=str, default='', help='Path to save weight plots instead of displaying')
+parser.add_argument('--plot_filters_per_row', type=int, default=None, help='With plotting weights, filters per row')
 
 # parse the command line arguments (generates the backend)
 args = parser.parse_args(gen_be=False)
@@ -365,7 +366,8 @@ try:
                 filters -= filters.min()
                 filters /= filters.max()
         filter_start = 0; num_filters = filters.shape[2]
-        make_filter_fig(filters, filter_start, figno, 'Layer %s' % layer.name, num_filters, args.plot_combine_chans)
+        make_filter_fig(filters, filter_start, figno, 'Layer %s' % layer.name, num_filters, args.plot_combine_chans,
+                        FILTERS_PER_ROW=args.plot_filters_per_row)
         figno += 1
 
         if args.plot_save_path:
