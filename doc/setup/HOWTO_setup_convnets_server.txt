@@ -547,6 +547,14 @@ Install devtoolset from Scientific Linux (CERN):
 Install boost:
     > sudo yum install boost boost-devel
 
+Above instructions for C++11 or C++14 compatible compiler has been superseded by software collections:
+https://wiki.centos.org/AdditionalResources/Repositories/SCL
+https://www.softwarecollections.org/en/scls/rhscl/devtoolset-6/
+    > sudo yum install centos-release-scl
+    > sudo yum install devtoolset-6
+    > source scl_source enable devtoolset-6
+
+
 Follow instructions for additional modules need with gala: https://github.com/janelia-flyem/gala
 Update steps (xxx - change this to the full set of steps):
    > sudo easy_install -U distribute
@@ -575,6 +583,8 @@ Copy repo to local to install gala and run example (see README):
 
 
 For knossos build:
+See instructions below for C++14 compatible compiler (not default on Centos 7 or below).
+    NOTE: use devtoolset-6, devtoolset-4 had some serious problems with it's own libraries.
 DO NOT do this, not functional:
     > sudo yum install qt5-qtbase qt5-qtbase-devel qt-creator
 This resulted in crashes using qtcreator, so downloaded and ran installer instead, install everything
@@ -589,7 +599,13 @@ Deployed to local directory (like install_dir within build dirs) and then used r
     > sudo rsync -avRh . /usr/local/
 xxx - could not figure out how to get qtcreator to find libs installed in home directory, copied qt files to /usr/local
     >  sudo rsync -avRh ~/Qt5.7.0/5.7/gcc_64/lib /usr/local
+NOTE: this causes issues with matplotlib plotting against Qt5, which is easily resolved with
+    > unset LD_LIBRARY_PATH
+or to just remove /usr/local/lib, for example:
+    > export LD_LIBRARY_PATH=`echo $LD_LIBRARY_PATH | sed -e 's/:\/usr\/local\/lib//g'`
+xxx - collisions with other apps? in that case can remove /usr/local/lib using a manifest from the above location
 
+This is old:
 diff -r knossos/CMakeLists.txt ../gits/knossos/CMakeLists.txt
 38c38,39
 < find_package(TurboJPEG REQUIRED)
@@ -601,6 +617,10 @@ diff -r knossos/CMakeLists.txt ../gits/knossos/CMakeLists.txt
 ---
 >     #TurboJPEG::TurboJPEG#turbojpeg is partly included in QtGui, multiple definition if you try to link it afterwards
 >     ${JPEG_LIBRARIES}
+
+For rutuja's knossos:
+building szip:
+cmake3 -DCMAKE_INSTALL_PREFIX=/usr/local -DCMAKE_BUILD_TYPE=RELEASE -DBUILD_SHARED_LIBS=ON ..
 
 
 
