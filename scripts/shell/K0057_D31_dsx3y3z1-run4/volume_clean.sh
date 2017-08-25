@@ -15,6 +15,7 @@ do
 
     if [[ ${iter} -ge ${no_fill_iter} ]]; then
         # K0057 large agglo cleaning
+        # NOTE: on next runs change minsize to 64 and change cavity-fill-minsize to 8192
         python -u dpCubeIter.py --volume_range_beg 2 8 1 --volume_range_end 50 38 19 --overlap 8 8 8 --cube_size 6 6 6 --cmd "python -u $HOME/gits/emdrp/recon/python/dpCleanLabels.py --dataset labels --subgroups agglomeration $agglo_iter --get-svox-type --cavity-fill --minsize 27 --minsize_fill --cavity-fill-minsize 4096 --ECS-label 0 --dpWriteh5-verbose --dpCleanLabels-verbose" --fileflags srcfile outfile --filepaths /data/CDCU/full_datasets/neon/mfergus32_K0057_ds3_run4/agglo /data/CDCU/full_datasets/neon/mfergus32_K0057_ds3_run4/clean --fileprefixes K0057_D31_dsx3y3z1_supervoxels_agglo K0057_D31_dsx3y3z1_supervoxels_agglo_clean --filepostfixes .h5 .h5 > $OUTD/20170727_K0057_run4_cnt${count}.swarm
     else 
         # K0057 large agglo cleaning no minsize

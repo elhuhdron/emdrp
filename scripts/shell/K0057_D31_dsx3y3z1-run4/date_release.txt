@@ -1,10 +1,9 @@
 
 emdrp last release for this run
 
-xxx - fix this
-commit a4ed6a57ffcce0a4bf1e2aadd1d4e9a850e6b6f1
+commit f28ae149143a6d89762172d735e3eb352fab19f5
 Author: Paul Watkins <pwatkins@gmail.com>
-Date:   Thu Jun 22 18:07:47 2017 -0400
+Date:   Sat Aug 12 17:45:18 2017 -0400
 
-dates for full pipeline run (up to cleaning): June 24 2017 - xxx add end date
+dates for full pipeline run (up to cleaning): July 24 2017 - August 7 2017
 

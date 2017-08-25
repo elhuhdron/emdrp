@@ -11,6 +11,7 @@ do
     echo processing ${thrs[$level]}
 
     # K0057 large mesh
+    # NOTE: on next run change smoothing to isotropic (5 5 5) and turn reduce frac down (maybe 0.02)
     python -u dpCubeIter.py --volume_range_beg 2 8 1 --volume_range_end 50 38 19 --overlap 0 0 0 --cube_size 6 6 6 --cmd "python -u $HOME/gits/emdrp/recon/python/dpLabelMesher.py --dataset labels --subgroups with_background ${thrs[$level]}  --dpLabelMesher-verbose --set-voxel-scale --dataset-root $level --reduce-frac 0.01 --smooth 7 7 5" --fileflags mesh-outfile srcfile --filepaths '/lscratch/$SLURM_JOBID' '/lscratch/$SLURM_JOBID' --fileprefixes K0057_D31_mag1 K0057_D31_dsx3y3z1_supervoxels_clean --filepostfixes .clean_wtshA.$level.mesh.h5 .h5 > $OUTD/20170727_K0057_run4_level${level}_1.swarm
 
     # copy watershed to lscratch
