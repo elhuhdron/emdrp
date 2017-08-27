@@ -20,14 +20,13 @@ for i in ${!lips[@]}; do
        machine=${i}
    fi
 done
-machine=0
 cmachine_skip_inds=(${machine_skip_inds[$machine]})
 
 echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/scripts/shell/K0057_D31_dsx3y3z1-run5/EMdata-3class-32x32out-rand-K0057-dsx3y3z1.ini --serialize 100 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch mfergus --train_range 100001 103900 --epoch_dstep 1700 1200 700 200 -i ${card[$cnt]} >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
 # just run on all 5 machines
 #if [ ${#cmachine_skip_inds[@]} -lt 5 ]; then
-    #./run_gpu_job.py -s run_tmp.sh
-    cat run_tmp.sh
+    ./run_gpu_job.py -s run_tmp.sh
+    #cat run_tmp.sh
     cnt=`expr $cnt + 1`
 #fi
 
@@ -36,11 +35,11 @@ while [ $iter -lt ${#cmachine_skip_inds[@]} ]
 do
 
     echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/scripts/shell/K0057_D31_dsx3y3z1-run5/EMdata-3class-32x32out-rand-K0057-dsx3y3z1.ini --eval 100 --serialize 100 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch mfergus --train_range 100001 103900 --epoch_dstep 1700 1200 700 200 --test_range 200001 200001 --chunk_skip_list ${skip_lists[${cmachine_skip_inds[$iter]}]} -i ${card[$cnt]} >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
-    #./run_gpu_job.py -s run_tmp.sh
-    cat run_tmp.sh
+    ./run_gpu_job.py -s run_tmp.sh
+    #cat run_tmp.sh
 
     iter=`expr $iter + 1`
     cnt=`expr $cnt + 1`
 done
-#./run_gpu_job.py
+./run_gpu_job.py
 
