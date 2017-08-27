@@ -41,3 +41,9 @@ git filter-branch --tree-filter 'rm -rf vendor/gems' HEAD
 git push origin master --force
 xxx - afterwards, DO NOT merge another branch that had this file in the commit history
 
+for working on head of another branch (for example):
+git push -u origin 3D_meshes
+git stash; git pull origin 3D_meshes; git stash pop
+git fetch origin; git reset --hard origin/3D_meshes
+
+
