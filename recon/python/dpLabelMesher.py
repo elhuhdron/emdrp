@@ -248,7 +248,7 @@ class dpLabelMesher(emLabels):
 
         # Data extent is the extent of the actual buffer, whole extent is ???
         # Use extents that are relative to non-padded cube
-        if(self.meshes):
+        if(self.annotation_file_mesh):
             beg = min_coord - self.dataset_index
             end = beg + min_range - 1
         else:
@@ -1010,8 +1010,8 @@ class dpLabelMesher(emLabels):
                        help='Input path for mesh files to be merged')
         p.add_argument('--annotation-file', nargs=1, type=str, default='',
                        help='Input annotation file from knossos (show merged meshes)')
-        p.add_argument('--meshes', action='store_true',
-                       help='Show merged meshes from the annotation file from knossos')
+        p.add_argument('--annotation-file-mesh', action='store_true',
+                       help='Mesh only supervoxels from the knossos annotation file')
         p.add_argument('--write_hdf5', action='store_true',
                        help='Write separate mesh file for annotated meshes')
         p.add_argument('--dataset-root', nargs=1, type=str, default='meshes', help='Top level for hdf5 outfile')
@@ -1056,18 +1056,21 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    if seg2mesh.meshes and seg2mesh.annotation_file:
-        seg2mesh.mergeMesh()
-
-    elif seg2mesh.annotation_file:
-        seg2mesh.showMergeMesh()
+    if seg2mesh.annotation_file:
+        if seg2mesh.annotation_file_mesh:
+            # create or recreate meshes but only for supervoxels in merge list from knossos annotation file
+            seg2mesh.mergeMesh()
+        else:
+            # visualize meshes from knossos annotation file
+            seg2mesh.showMergeMesh()
     elif seg2mesh.merge_mesh_path:
+        # merge meshes from multiple mesh files (necessary if superchunks have been stitched)
         seg2mesh.mergeMeshInfiles()
-
     elif len(seg2mesh.mesh_infiles) > 0:
+        # print out combined stats for mesh files over multiple superchunks      
         seg2mesh.readMeshInfiles()
-
     else:
+        # standard mode, mesh all supervoxels in a single labeled volume (superchunk in one hdf5 label file)
         seg2mesh.readCubeToBuffers()
         seg2mesh.procData()
         seg2mesh.writeMeshOutfile()
