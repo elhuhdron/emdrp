@@ -217,7 +217,10 @@ class dpWriteh5(dpLoadh5):
             if 'scale' not in self.data_attrs:
                 self.data_attrs['scale'] = hdr['scales'][:3]
         else:
-            data = np.fromfile(self.inraw,dtype=self.data_type_out)
+            if self.inraw_bigendian:
+                data = np.fromfile(self.inraw,dtype=self.data_type_out).byteswap(True)
+            else:
+                data = np.fromfile(self.inraw,dtype=self.data_type_out)
 
         # xxx - hacky command line over-ride for scale
         if all([x > 0 for x in self.scale]): self.data_attrs['scale'] = self.scale
@@ -304,6 +307,7 @@ class dpWriteh5(dpLoadh5):
         p.add_argument('--fillvalue', nargs=1, type=str, default=[''], metavar=('FILL'),
             help='Fill value for empty (default 0)')
         p.add_argument('--inraw', nargs=1, type=str, default='', metavar='FILE', help='Raw input file')
+        p.add_argument('--inraw-bigendian', action='store_true', help='Raw input is big endian format')
         p.add_argument('--scale', nargs=3, type=float, default=[0.0,0.0,0.0], metavar=('X', 'Y', 'Z'),
             help='Override scale (use only with inraw and without srcfile')
         p.add_argument('--inroi', nargs=1, type=str, default='',
