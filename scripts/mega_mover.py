@@ -14,6 +14,7 @@ import sys
 import glob
 import os
 import shutil
+from random import shuffle
 
 # xxx - old, for reference
 # non-command line parameters
@@ -41,7 +42,7 @@ alloutprefixes = sys.argv[1:][3:]
 cnt = {y:{x:[initcnt-1]*20 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
 cntall = {y:{x:initcnt-1 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
 
-for name in glob.glob(inprefix + '*.txt'):
+for name in shuffle(glob.glob(inprefix + '*.txt')):
     fp, fn = os.path.split(name); fh, ext = os.path.splitext(fn)
     m = re.search(r'(?P<name>.*)\-out', fh); fh = m.group('name')
 
