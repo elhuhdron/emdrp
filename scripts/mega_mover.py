@@ -39,10 +39,11 @@ initcnt = int(sys.argv[1:][1])
 doMove = (sys.argv[1:][2].lower() in ['true', '1', 't', 'y', 'yes', 'yeah', 'yup', 'certainly', 'uh-huh'])
 getoutprefix = True
 alloutprefixes = sys.argv[1:][3:]
-cnt = {y:{x:[initcnt-1]*20 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
+cnt = {y:{x:[initcnt-1]*1000 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
 cntall = {y:{x:initcnt-1 for x in ['xyz', 'xzy', 'zyx']} for y in alloutprefixes}
 
-for name in shuffle(glob.glob(inprefix + '*.txt')):
+files=list(glob.glob(inprefix + '*.txt')); shuffle(files)
+for name in files:
     fp, fn = os.path.split(name); fh, ext = os.path.splitext(fn)
     m = re.search(r'(?P<name>.*)\-out', fh); fh = m.group('name')
 
