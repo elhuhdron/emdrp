@@ -7,12 +7,11 @@
 
 extern void wrapper_createLabelRag(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_uint32 n_pixels,
                                    const npy_uint64 n_labels, const npy_uint32 label_jump, const unsigned int start_label, 
-                                   const npy_int n_steps, unsigned int* gpu_edges, unsigned int* gpu_labels, const npy_int blockdim, 
-                                   npy_uint32* d_count, npy_uint8* gpu_edge_test, const int* const  watershed_grid_shape, 
-                                   const int* const gpu_grid){
+                                   const npy_int n_steps, unsigned int* gpu_edges, unsigned int* gpu_labels, 
+                                   const npy_int blockdim, npy_uint32* d_count, npy_uint8* gpu_edge_test, 
+                                   const int* const  watershed_grid_shape, const int* const gpu_grid){
 
      dim3 dim_grid((watershed_grid_shape[2]/blockdim)+1, (watershed_grid_shape[1]/blockdim) +1, (watershed_grid_shape[0]/blockdim) + 1), dim_block(blockdim,blockdim,blockdim);
-     //printf("%d %d %d", dim_grid.x, dim_grid.y, dim_grid.z);
      // launch the kernel 
      create_Labelrag<<<dim_grid,dim_block>>>(gpu_watershed, gpu_steps, n_steps, n_labels, label_jump, start_label,
                                              n_pixels, gpu_edges, gpu_labels, d_count, gpu_edge_test, gpu_grid);
@@ -23,6 +22,22 @@ extern void wrapper_createLabelRag(const unsigned int* const gpu_watershed, cons
 
 }
 
+extern void wrapper_createBorder(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_uint32 n_pixels,
+                                 const npy_uint64 n_labels, const npy_int n_steps, unsigned int* gpu_edges, unsigned int* gpu_labels,
+                                 unsigned int* gpu_borders, const npy_int blockdim, npy_uint32* d_count, 
+                                 const int* const  watershed_grid_shape, const int* const gpu_grid){
+
+    dim3 dim_grid((watershed_grid_shape[2]/blockdim)+1, (watershed_grid_shape[1]/blockdim) +1, (watershed_grid_shape[0]/blockdim) + 1), dim_block(blockdim,blockdim,blockdim);
+
+    create_borders<<<dim_grid, dim_block>>>(gpu_watershed, gpu_steps, n_steps, n_labels, n_pixels, gpu_edges, gpu_labels,
+                                            d_count, gpu_grid, gpu_borders);
+
+    cudaDeviceSynchronize();
+
+    // get the error
+    CALL_CUDA(cudaGetLastError());
+
+}
 
 extern void wrapper_get_borders(const unsigned int* gpu_watershed, const npy_intp* const gpu_steps_edges, 
                                 const npy_intp* const gpu_steps_borders, const unsigned int* const gpu_edges, 
@@ -63,9 +78,9 @@ extern void wrapper_initialize_edge_test(npy_uint8* gpu_edge_test, const npy_int
 
 extern void wrapper_get_borders_nearest_neigh(const unsigned int* const d_watershed, const npy_intp* const d_steps_edges, 
                                               npy_uint32 *d_borders, const npy_uint32* const d_edges, npy_int blockdim,
-                                              const int* const d_grid, const int* const grid, const npy_uint32 n_voxels, 
-                                              const npy_int n_steps, const npy_int tmp_edge_size, const npy_uint32 border_size,
-                                              const npy_uint32 n_supervox, const npy_uint jump){
+                                              const int* const d_grid, const int* const grid, 
+                                              const npy_uint32 n_voxels, const npy_int n_steps, const npy_int tmp_edge_size, 
+                                              const npy_uint32 border_size, const npy_uint32 n_supervox, const npy_uint jump){
 
      dim3 dim_grid((grid[0]/blockdim) + 1 , (grid[1]/blockdim) + 1, (grid[2]/blockdim) +1 ), dim_block(blockdim, blockdim, blockdim);
      get_nearest_neigh<<<dim_grid, dim_block>>>(d_watershed, d_steps_edges, d_borders, d_edges, 
@@ -77,4 +92,26 @@ extern void wrapper_get_borders_nearest_neigh(const unsigned int* const d_waters
     
 }
 
+extern void wrapper_reinit_brdrcnt(npy_uint32* d_borders, npy_uint32 batchsize, npy_int blockdim, npy_uint jump, npy_uint32 batch_brdrs){
 
+    dim3 dim_grid((batch_brdrs/blockdim)+1, (jump/blockdim) +1), dim_block(blockdim,blockdim);
+
+    reinit_brdrcnt<<<dim_grid, dim_block>>>(d_borders, batchsize, batch_brdrs);
+
+    cudaDeviceSynchronize();
+
+    // check for error
+    CALL_CUDA(cudaGetLastError());
+
+}
+
+/*extern void wrapper_sort(npy_uint32* d_borders, const npy_uint32 begin, const npy_uint32 part, const npy_uint32 edge_index){
+
+    int num_blocks = (part - begin)/128;
+    int *d_in = (int*)malloc(sizeof(int)*(part-begin));
+    d_in = NULL;;
+    int *d_out = (int*)malloc(sizeof(int)*(part-begin));
+    d_out = NULL;
+    BlockSortKernel<128, 16><<<num_blocks, 128>>>(d_in, d_out);
+    
+}*/

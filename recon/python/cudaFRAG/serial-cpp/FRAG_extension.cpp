@@ -432,8 +432,6 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint64 n_borders;
     npy_int n_steps;
    
-
-   
 //parse arguments
     if (!PyArg_ParseTuple(args,"OiOOiO", &input_watershed, &n_supervoxels, &input_borders, &input_count, &verbose, &input_steps))
         return NULL;

@@ -21,8 +21,10 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
+#include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
-#include <thrust/tuple.h>
+
+//#include <thrust/tuple.h>
 //#include <thrust/zip_iterator.h>
 
 //local include
@@ -58,6 +60,7 @@ static struct PyModuleDef moduledef = {
         NULL,                /* m_clear */
         NULL                 /* m_free */
 };
+
 PyMODINIT_FUNC
 PyInit__FRAG_extension(void)
 #else
@@ -100,16 +103,17 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     PyArrayObject *input_edges;
     PyArrayObject *input_edge_test;
     PyArrayObject *input_count;
-    PyArrayObject *gridsize; 
+    PyArrayObject *gridsize;
+    PyArrayObject *input_borders; 
     int edgelist_size, n_grid;
     npy_intp *dims;
     npy_int32 n_steps, blockdim, n_size;
-    npy_uint32 num_pixels, batch_edge_size, label_jump;
+    npy_uint32 num_pixels, batch_edge_size, label_jump, batch_borders;
     npy_uint64 n_supervoxels;
     bool verbose;
     
     // parse arguments
-    if (!PyArg_ParseTuple(args, "OliOiOiOiOOi", &input_watershed, &n_supervoxels, &edgelist_size, &input_edges, &verbose, &input_steps, &blockdim, &gridsize, &label_jump, &input_count, &input_edge_test, &batch_edge_size)) 
+    if (!PyArg_ParseTuple(args, "OliOOiOiOiOOii", &input_watershed, &n_supervoxels, &edgelist_size, &input_edges, &input_borders, &verbose, &input_steps, &blockdim, &gridsize, &label_jump, &input_count, &input_edge_test, &batch_edge_size, &batch_borders)) 
        return NULL;
 
     // get arguments in PythonArrayObject to access data through C data structures
@@ -132,6 +136,10 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     //allocate edges
     npy_int32* edges;
     edges = (npy_int32*)PyArray_DATA(input_edges);
+
+    //allocate borders 
+    npy_uint32* borders;
+    borders = (npy_uint32*)PyArray_DATA(input_borders);
   
      //check if there is an overflow for space allocated to hybrid adjacency matrix
     unsigned long int max_int = std::pow(2,64);
@@ -155,12 +163,15 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     //using pinned host memory. But this gives no improvement in memiry transfer as per test.
     unsigned int* h_labels; //= (unsigned int*)malloc(edgelist_size*sizeof(unsigned int));
     unsigned int* h_edges; //= (unsigned int*)malloc(edgelist_size*sizeof(unsigned int));
+    unsigned int* h_borders;
     //CALL_CUDA(cudaMallocHost((void**)&h_labels, edgelist_size*sizeof(unsigned int)));
     //CALL_CUDA(cudaMallocHost((void**)&h_edges, edgelist_size*sizeof(unsigned int)));
     CALL_CUDA(cudaHostAlloc((void**)&h_labels, batch_edge_size*sizeof(unsigned int), cudaHostAllocMapped));
     CALL_CUDA(cudaHostAlloc((void**)&h_edges, batch_edge_size*sizeof(unsigned int),  cudaHostAllocMapped));
+    //CALL_CUDA(cudaHostAlloc((void**)&h_borders, batch_edge_size*sizeof(unsigned int), cudaHostAllocMapped));
     h_labels[0] = 0;
     h_edges[0] = 0;
+    //h_borders[0] = 0;
   
     //get the shape of the grid (used only in case of launching 3D kernel, usefulness not explored)
     int *grid; 
@@ -202,6 +213,7 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     unsigned int* gpu_labels;
     npy_uint8* gpu_edge_test;
     int* gpu_grid;
+    unsigned int* gpu_borders;
  
     timer1.Start();
     CALL_CUDA(cudaMalloc((void**)&gpu_watershed,num_pixels*sizeof(unsigned int)));
@@ -211,11 +223,11 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     CALL_CUDA(cudaMalloc((void**)&gpu_count_edges,sizeof(npy_uint32)));         
     CALL_CUDA(cudaMalloc((void**)&gpu_edges, (batch_edge_size)*sizeof(unsigned int)));
     CALL_CUDA(cudaMalloc((void**)&gpu_labels, (batch_edge_size)*sizeof(unsigned int)));
+    //CALL_CUDA(cudaMalloc((void**)&gpu_borders, (batch_edge_size)*sizeof(unsigned int)));
     CALL_CUDA(cudaMalloc((void**)&gpu_edge_test, (edge_test_size)*sizeof(npy_uint8)));
     CALL_CUDA(cudaMemcpy(gpu_edge_test, edge_test, (edge_test_size)*sizeof(npy_uint8), cudaMemcpyHostToDevice));  
     CALL_CUDA(cudaMalloc((void**)&gpu_grid, (n_grid)*sizeof(int)));
     CALL_CUDA(cudaMemcpy(gpu_grid, grid, (n_grid)*sizeof(int), cudaMemcpyHostToDevice));
-
     timer1.Stop();
     time_memtransfer = timer1.Elapsed()/1000;
     std::cout << " only the one time transfer: "  << time_memtransfer << std::endl; 
@@ -244,6 +256,8 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
                       label_jump, start_label, n_steps, gpu_edges,
                       gpu_labels, blockdim, gpu_count_edges, gpu_edge_test, grid, gpu_grid);
         wrapper_initialize_edge_test(gpu_edge_test, blockdim, edge_test_size, n_supervoxels, label_jump);
+        //wrapper_createBorder(gpu_watershed, gpu_steps, num_pixels, n_supervoxels, n_steps, gpu_edges, gpu_labels,
+                             //gpu_borders, blockdim, gpu_count_edges, grid, gpu_grid);
         timer2.Stop();
         time_kernelProcessing += timer2.Elapsed()/1000;
         
@@ -254,41 +268,66 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
         timer1.Stop();
         time_memtransfer += timer1.Elapsed()/1000;
         // serial post processing on cpu -- to remove all the duplicates that might be added due to asynchronous functioning 
-        //std::cout << "batch wise: " << count_edges[0] << std::endl;
         assert(batch_edge_size > count_edges[0]);
+        count_edges[1] = count_edges[0];
+        timer3.Start();
         for(unsigned int i = 0 ;i < count_edges[0];i++){
             list_of_edges.push_back(std::make_tuple(h_labels[i], h_edges[i]));
         }
-
+        timer3.Stop();
+        time_postprocessing += timer3.Elapsed()/1000;
     }
+
     timer3.Start();
     std::sort(list_of_edges.begin(), list_of_edges.end()); //paircompare to specify order
     auto last =  std::unique(list_of_edges.begin(), list_of_edges.end());
     list_of_edges.erase(last, list_of_edges.end());
-    timer3.Stop();
-    time_postprocessing = timer3.Elapsed()/1000;
-    count_edges[0] = list_of_edges.size();
-    
-    
+    count_edges[0] = list_of_edges.size(); 
+    std::cout << "the edges genertaed are" << count_edges[0] << std::endl;
+    //npy_uint32* borders = (npy_uint32*)malloc((count_edges[0]*batch_borders)*sizeof(npy_uint32));    
+
     unsigned int cnt = 0;
     assert(edgelist_size > count_edges[0]);
     std::vector<std::tuple<unsigned int,unsigned int>>::iterator i = list_of_edges.begin();
     for(i = list_of_edges.begin(); i != list_of_edges.end();i++){
         edges[cnt*2 + 0] = std::get<0>(*i);
         edges[cnt*2 + 1] = std::get<1>(*i);
+        //borders[cnt*batch_borders + 0] = std::get<0>(*i);
+        //borders[cnt*batch_borders + 1] = std::get<1>(*i);
+        //borders[cnt*batch_borders + 2] = 3;
         cnt++;
     }
-    
-    
+    timer3.Stop();
+    time_postprocessing += timer3.Elapsed()/1000;
+ 
+    /*timer3.Start();
+    for(unsigned int j = 0;j < count_edges[1];j++){
+   
+        for(unsigned int k = 0;k < count_edges[0];k++){
+           
+            if(h_labels[j] == borders[k*batch_borders]){
+
+                if(h_edges[j] == borders[k*batch_borders +1]){
+
+                    borders[k*batch_borders + borders[k*batch_borders + 2]] = h_borders[j];    
+                    borders[k*batch_borders + 2]++;                 
+                    break;   
+                }
+            } 
+
+        }
+    }
+    timer3.Stop();
+    time_postprocessing += timer3.Elapsed()/1000;*/    
+
     std::cout << "the edges generated: " << count_edges[0] << std::endl;
     CALL_CUDA(cudaFree(gpu_watershed));
     CALL_CUDA(cudaFree(gpu_steps));
     CALL_CUDA(cudaFree(gpu_edge_test));
 
-    //free(h_labels);
-    //free(h_edges);
     CALL_CUDA(cudaFreeHost(h_labels));
     CALL_CUDA(cudaFreeHost(h_edges));
+    //CALL_CUDA(cudaFreeHost(h_borders));
  
     std::cout << "The memory transfer time is: " << time_memtransfer << " seconds" << std::endl;
     std::cout << "The kernel processing time is: " << time_kernelProcessing << " seconds" << std::endl;
@@ -553,7 +592,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint32 *h_edges = (npy_uint32*)PyArray_DATA(input_edges);
     dims = PyArray_DIMS(input_edges);
     n_edges = dims[0]*dims[1];
-    if (verbose) std::cout << "number of edges " << n_edges << " " << h_edges[0] << " " << h_edges[1] << " " << h_edges[2] << std::endl;
+    if (verbose) std::cout << "number of edges " << n_edges << " " << dims[0] << " " << dims[1] << " " << h_edges[2] << std::endl;
 
     npy_int32 *h_count = (npy_int32*)PyArray_DATA(input_count);
 
@@ -563,6 +602,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     n_borders_dim = dims;
     n_borders = n_borders_dim[0]*n_borders_dim[1];
     if (verbose) std::cout << "number of borders " << n_borders << " " << h_borders[0] << " " << h_borders[1] << " " << h_borders[2] << std::endl;
+
 
 
      //get the shape of the grid (used only in case of launching 3D kernel, usefulness not explored)
@@ -614,6 +654,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     CALL_CUDA(cudaMemcpy(d_edges, h_edges, n_edges*sizeof(npy_uint32), cudaMemcpyHostToDevice));
     CALL_CUDA(cudaMalloc((void**)&d_grid, (n_grid)*sizeof(int)));
     CALL_CUDA(cudaMemcpy(d_grid, grid, (n_grid)*sizeof(int), cudaMemcpyHostToDevice));
+
     timer1.Stop();
     time_memtransfer = timer1.Elapsed()/1000;
     std::cout << " only the one time transfer: "  << time_memtransfer << std::endl;
@@ -621,9 +662,11 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint cnt_edges = 0;
     npy_uint stride = 0;
     npy_uint cnt_index = 0; 
-    npy_uint64 edge_index = 0;
-    npy_uint64 begin = 0;
-    npy_uint64 end = 0;
+    npy_uint32 edge_index = 0;
+    npy_uint32 begin = 0;
+    npy_uint32 begin1 = 0;
+    npy_uint32 end = 0;
+    npy_uint32 end1 = 0;
     npy_uint32 batch_size = 0;
     npy_uint32 first_label = 0;
     npy_uint32 last_label = 0;
@@ -635,6 +678,8 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
     npy_uint32* batch_edge_borders ;//= (npy_uint32*)malloc((batch_size)*sizeof(npy_uint32));
     CALL_CUDA(cudaMalloc((void**)&d_borders, (batch_size)*sizeof(npy_uint32)));
     CALL_CUDA(cudaHostAlloc((void**)&batch_edge_borders, batch_size*sizeof(npy_uint32), cudaHostAllocDefault));//, cudaHostAllocMapped));
+    batch_edge_borders[0] = 0;
+    CALL_CUDA(cudaMemcpy(d_borders, batch_edge_borders, (batch_size)*sizeof(npy_uint32), cudaMemcpyHostToDevice));   
     timer1.Stop();
     time_memtransfer += timer1.Elapsed()/1000;
 
@@ -649,7 +694,6 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
           }
        }
       
-       batch_edge_borders[0] = 0;
        stride = 0;
 
        if(cnt_edges != 0)
@@ -658,56 +702,47 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
            break;
        }  
       
-       for(int b = start_label;b <= nxt_lbl; b++){
-           if(b <= n_supervoxels ){
-             
-               if((h_edges[(b-1)*tmp_edge_size]) > 2){
-                   //std::cout << b << " " << nxt_lbl << std::endl;
-                   for(int j = 0;j < (h_edges[(b-1)*tmp_edge_size]-2);j++){
-                      //std::cout << b << " " << cnt_edges  << " " << stride << std::endl;
-                      batch_edge_borders[(j+stride)*batch_borders] = h_edges[(b-1)*tmp_edge_size + 1];
-                      batch_edge_borders[(j+stride)*batch_borders + 1] = h_edges[(b-1)*tmp_edge_size + j + 2];
-                      batch_edge_borders[(j+stride)*batch_borders + 2] = 3;
-                   }
-                   stride += (h_edges[(b-1)*tmp_edge_size] - 2);
-               }
-           }
-       }
-       timer3.Stop();
-       time_postprocessing += timer3.Elapsed()/1000;
-      
 
        timer1.Start(); 
-       CALL_CUDA(cudaMemcpy(d_borders, batch_edge_borders, (batch_size)*sizeof(npy_uint32), cudaMemcpyHostToDevice));
+       //CALL_CUDA(cudaMemcpy(d_borders, batch_edge_borders, (batch_size)*sizeof(npy_uint32), cudaMemcpyHostToDevice));
        timer1.Stop();
        time_memtransfer += timer1.Elapsed()/1000;
 
       
        timer2.Start();
+       wrapper_reinit_brdrcnt(d_borders, batch_size, blockdim, label_jump_borders, batch_borders);
+
        wrapper_get_borders_nearest_neigh(d_watershed, d_steps_edges, d_borders, d_edges, blockdim, 
                                       d_grid, grid, n_voxels, n_steps, tmp_edge_size, batch_borders, start_label, nxt_lbl);
        timer2.Stop();
        time_kernelProcessing += timer2.Elapsed()/1000;
-       
+
        timer1.Start();
        CALL_CUDA(cudaMemcpy(batch_edge_borders, d_borders, (batch_size)*sizeof(npy_uint32), cudaMemcpyDeviceToHost));
        timer1.Stop();
        time_memtransfer += timer1.Elapsed()/1000;
-      
+
+       //wrapper_bubble_sort(blockdim, cnt_edges, d_borders, batch_borders);
+
+       npy_uint32 part = 0;
        timer3.Start();
+       npy_uint rem = 0;
        for(unsigned int edge_size = 0; edge_size < cnt_edges ; edge_size++){
            edge_index = edge_size * batch_borders;
            if(batch_edge_borders[edge_index + 2] >  batch_borders)
-               std::cout << " overflow" << batch_edge_borders[edge_index + 2] << std::endl;
+               std::cout << " overflow" << batch_edge_borders[edge_index + 2] << std::endl;   
+           part = batch_edge_borders[edge_index+2];
            begin = edge_index + 3;
-           end = edge_index + batch_edge_borders[edge_index + 2];
+           end = edge_index + part;  
+           //int* hin = (int*)malloc();
+           //int* hout = (int*)malloc(); 
+           //wrapper_sort(d_borders, begin, part, edge_index);
            std::vector<npy_uint32> indices(batch_edge_borders + begin, batch_edge_borders + end);
            std::sort(indices.begin() , indices.end());
            auto last = std::unique(indices.begin(), indices.end());
            indices.erase(last, indices.end());
            batch_edge_borders[edge_index + 2] = indices.size() + 3;
-           std::copy(indices.begin(), indices.end(), batch_edge_borders + edge_index + 3);
-
+           std::copy(indices.begin(), indices.end(), batch_edge_borders + edge_index + 3);          
        }
        timer3.Stop();
        time_postprocessing += timer3.Elapsed()/1000;
@@ -735,6 +770,7 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
            
     }
 
+    //CALL_CUDA(cudaMemcpy(h_brdrmap, d_brdrmap, (n_voxels)*sizeof(unsigned int), cudaMemcpyHostToDevice));
     timer1.Start();
     CALL_CUDA(cudaFree(d_borders));
     CALL_CUDA(cudaFreeHost(batch_edge_borders));

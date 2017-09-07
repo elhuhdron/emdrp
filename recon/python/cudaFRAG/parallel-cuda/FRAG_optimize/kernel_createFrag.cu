@@ -3,9 +3,15 @@
 * Date - 03/22/2017
 
 ********************************************************************************/
+//#include <cub/cub.cuh>
+//#include <cub/block/block_load.cuh>
+//#include <cub/block/block_store.cuh>
+//#include <cub/block/block_radix_sort.cuh>
+//using namespace cub
 #include "kernel_createFrag.h"
 
 #define BLOCK 16
+
 
 
 __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_int n_steps, 
@@ -20,16 +26,31 @@ __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const n
      unsigned int label_val = gpu_watershed[watershed_idx];
      unsigned long int index;
      unsigned int factor = start_label/label_jump;
-   
+     unsigned int tmp = 0;
+     bool do_add = false; 
+
      if(watershed_idx < num_pixels && label_val != 0 && label_val < (start_label + label_jump) && label_val >= start_label){
          for(unsigned int step = 0; step < n_steps; step++){
              unsigned int edge_value = gpu_watershed[watershed_idx + gpu_steps[step]];
+            
              if(label_val <= label_jump){
                  index = (label_val-1)*num_labels + edge_value-1;
-             } else{
+             } else {
                  index = (label_val - (factor*label_jump)-1)*num_labels + edge_value-1;
              }
+            
+             /*if(edge_value < label_val && edge_value != 0){    
+               
+                 if(gpu_edge_test[index] == 0){
+                     unsigned int edge_increment = atomicAdd(&d_count[0],1);
+                     gpu_edges[edge_increment] = label_val;
+                     gpu_labels[edge_increment] = edge_value;
+                     gpu_edge_test[index] = 1;
+                 }
+               
+             }*/
              if(edge_value > label_val){
+                
                  // getting the value returned by atomicAdd in a variable and then using
                  // it gives correct values. The atomicAdd of d_count[0] in place gives
                  // wrong resutls.
@@ -45,6 +66,38 @@ __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const n
      }
 
 }
+
+__global__ void create_borders(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_int n_steps,
+                               const npy_uint64 num_labels, const npy_uint32 num_pixels, unsigned int* gpu_edges, unsigned int* gpu_labels,
+                               npy_uint32* d_count, const int* const gpu_grid_shape, unsigned int* gpu_borders){
+
+     unsigned int i = blockIdx.z*blockDim.z + threadIdx.z;
+     unsigned int j = blockIdx.y*blockDim.y + threadIdx.y;
+     unsigned int k = blockIdx.x*blockDim.x + threadIdx.x;
+     unsigned int watershed_idx = i*gpu_grid_shape[1]*gpu_grid_shape[2] + j*gpu_grid_shape[2] + k;
+     unsigned int label_val = gpu_watershed[watershed_idx];
+     unsigned int border_vox;
+     unsigned int edge_value;
+
+     if(watershed_idx < num_pixels && label_val != 0){
+         for(unsigned int step = 0; step < n_steps; step++){
+             edge_value = gpu_watershed[watershed_idx + gpu_steps[step]];
+             border_vox = watershed_idx + gpu_steps[step];
+
+             if(edge_value > label_val){
+                 // getting the value returned by atomicAdd in a variable and then using
+                 // it gives correct values. The atomicAdd of d_count[0] in place gives wrong resutls.
+                 unsigned int edge_increment = atomicAdd(&d_count[0],1);
+                 gpu_edges[edge_increment] = edge_value;
+                 gpu_labels[edge_increment] = label_val;
+                 gpu_borders[edge_increment] = border_vox;
+                 
+             }
+         }
+     }
+
+}
+
 
 __global__ void get_borders(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps_edges,
                             const npy_intp* const gpu_steps_borders, const unsigned int* const gpu_edges,
@@ -338,16 +391,14 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
     unsigned int edge_value;
     unsigned int border_ind;
     unsigned int border_vox;
-    bool do_add_border = true;
-    bool do_add_vox = true;
     unsigned int start_index = 0;
     unsigned int store_index = 0;
     unsigned int cnt = 0;
     unsigned int k = 0;
 
 
-   //if(label != 0 && label >= n_labels && label < (n_labels + jmp) && watershed_idx < n_vox){
-   if(label != 0 && label >= n_labels && label <= jmp && watershed_idx < n_vox){
+    //if(label != 0 && label >= n_labels && label < (n_labels + jmp) && watershed_idx < n_vox){
+    if(label != 0 && label >= n_labels && label <= jmp && watershed_idx < n_vox){
 
         // calculate the index of the edge in the datastructure
         for(int cnt_id = n_labels-1;cnt_id < label-1;cnt_id++){
@@ -361,8 +412,6 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
          
             edge_value = watershed[steps[step]+ watershed_idx];
             store_index = 0;
-            //do_add_border = true;
-            //do_add_vox = true;
             if(edge_value > label){
                 
                 for(int index = 0;index < tmp_edge_size-2;index++){
@@ -383,154 +432,101 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
 
                     printf("%d ", cnt);
                 }
-                                  
-                /*for(unsigned int f = 3;f < cnt;f++){
-                   if(border_ind ==  borders[store_index*brder_size + f]){
-                      do_add_border = false;
-                      break;
-                   }
-                }
 
-                for(unsigned int f = 3;f < cnt;f++){
-                   if(border_vox ==  borders[store_index*brder_size + f]){
-                      do_add_vox = false;
-                      break;
-                   }
-                }*/
-
-                //if(do_add_border){
-                    k = atomicAdd(&borders[store_index*brder_size + 2], 1);
-                    borders[store_index*brder_size + k] = border_ind;
-                    
-                //}
-                //if(do_add_vox){
-                    k = atomicAdd(&borders[store_index*brder_size + 2], 1);
-                    borders[store_index*brder_size + k] = border_vox;
-               // }
-            }
-                       
+                k = atomicAdd(&borders[store_index*brder_size + 2], 1);
+                borders[store_index*brder_size + k] = border_ind;
+                k = atomicAdd(&borders[store_index*brder_size + 2], 1);
+                borders[store_index*brder_size + k] = border_vox;
+            }               
         }
     }
-
 }
 
 
 
-/*__global__ void get_nearest_neigh(const unsigned int* const watershed, const npy_intp* const steps,
-                                  npy_uint32* borders, const npy_uint32* const edges, const int* const grid,
-                                  const npy_uint32 n_vox, const npy_int n_steps, const npy_int tmp_edge_size,
-                                  const npy_uint32 brder_size, const npy_uint32 frst_lbl, const npy_uint32 last_lbl, const npy_uint jmp){
+__global__ void reinit_brdrcnt(npy_uint32* d_borders, const npy_uint32 bchsize, const npy_uint32 btch_brdrs){
 
-
-    unsigned int idx_x = blockIdx.z*blockDim.z + threadIdx.z;
-    unsigned int idx_y = blockIdx.y*blockDim.y + threadIdx.y;
-    unsigned int idx_z = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int watershed_idx = idx_x*grid[1]*grid[2] + idx_y*grid[2] + idx_z;
-    unsigned int label = watershed[watershed_idx];
-    unsigned int edge_value;
-    unsigned int border_ind;
-    unsigned int border_vox;
-    unsigned int start_index = 0;
-    unsigned int store_index = 0;
-    unsigned int cnt = 0;
-    unsigned int k = 0;
-    unsigned int id = 0;
-
-    if(label != 0 && watershed_idx < n_vox && label >= frst_lbl && label <= last_lbl){
-
-         for(int cnt_id = 0;cnt_id < (label-1);cnt_id++){
-
-            id += edges[cnt_id*tmp_edge_size];
-
-         }
-         id =  id - (2*(label-1));
-         start_index = id%jmp; 
-
-         for(int step = 0; step < n_steps; step++){
-         
-            edge_value = watershed[steps[step]+ watershed_idx];
-            store_index = 0;
-
-            if(edge_value > label){
-
-                for(int index = 0;index < tmp_edge_size-2;index++){
-                    // the edge list is stored with the first two columns dedicated to coulmn[0] - count of number of edges for a
-                    // label and column[1] - label 
-                    if(edges[(label-1)*tmp_edge_size + index + 2] == edge_value){
-                        store_index = index;
-                        break;
-                    }
-                }
-
-                if(label == frst_lbl && (start_index + store_index) < jmp){
-                    if(start_index > store_index)
-                        store_index = start_index - store_index;
-                    else
-                        store_index = store_index - start_index;   
-                }else if(label == frst_lbl && (start_index + store_index) >= jmp){
-                        
-                    store_index = (start_index + store_index) - jmp;                 
- 
-                }else{
-                 
-                    store_index = (store_index + start_index);
-
-                }
-                if(store_index < jmp){   
-                    border_ind = steps[step]+ watershed_idx;
-                    border_vox = watershed_idx;
-                    cnt = borders[store_index*brder_size + 2];
-                    if(cnt > brder_size){
-                                printf("%d ", cnt);
-                    }
-                    k = atomicAdd(&borders[store_index*brder_size + 2], 1);
-                    borders[store_index*brder_size + k] = border_ind;
-                    k = atomicAdd(&borders[store_index*brder_size + 2], 1);
-                    borders[store_index*brder_size + k] = border_vox;
-                }
-            }
-         }      
-    } 
-}*/
-
-
-// kernel attempts to do post processing on gpu - is slower than host post processing
-/*__global__ void sort(const int n_pixels, const int* const gpu_list, const int size, int* final_order){
-
-    int cnt = 0;
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;   
-    int val = gpu_list[idx];
-    int same_cnt = 0;
-    if(idx < size)
-    for(int j = 0 ; j< size;j++){
-
-       if(val > gpu_list[j]){
-
-          cnt++;
-       }
-    }
-
-    final_order[cnt] = val;
-
-}
-
-__global__ void create_unique(const int* const edges,const int* const labels, const int count, int* gpu_uniquelabels){
-
-
-    int idx = blockIdx.x*blockDim.x + threadIdx.x;
-    int val_edge = edges[idx];
-    int val_label = labels[idx];;
-    if(idx < count){
-
-        if(idx != 0){
+    unsigned int i = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int j = blockIdx.y*blockDim.y + threadIdx.y;
+    unsigned long int idx = j*btch_brdrs + i;
   
-            if(val_edge == edges[idx-1] && val_label == labels[idx-1]){
-            
-                gpu_uniquelabels[idx] = 1;
-            }
-                    
-        }
+    //printf("%d " , gridDim.x*blockDim.x);
+    if(idx < bchsize && i == 2){
+
+        d_borders[j*btch_brdrs + i] = 3; 
+
     }
 
+}
+
+/*template <int BLOCK_THREADS, int ITEMS_PER_THREAD>
+__global__ void BlockSortKernel(int *d_in, int *d_out)
+{
+    // Specialize BlockLoad, BlockStore, and BlockRadixSort collective types
+    typedef cub::BlockLoad<
+        int*, BLOCK_THREADS, ITEMS_PER_THREAD, BLOCK_LOAD_TRANSPOSE> BlockLoadT;
+    typedef cub::BlockStore<
+        int*, BLOCK_THREADS, ITEMS_PER_THREAD, BLOCK_STORE_TRANSPOSE> BlockStoreT;
+    typedef cub::BlockRadixSort<
+        int, BLOCK_THREADS, ITEMS_PER_THREAD> BlockRadixSortT;
+    // Allocate type-safe, repurposable shared memory for collectives
+    __shared__ union {
+        typename BlockLoadT::TempStorage       load; 
+        typename BlockStoreT::TempStorage      store; 
+        typename BlockRadixSortT::TempStorage  sort;
+    } temp_storage; 
+    // Obtain this block's segment of consecutive keys (blocked across threads)
+    int thread_keys[ITEMS_PER_THREAD];
+    int block_offset = blockIdx.x * (BLOCK_THREADS * ITEMS_PER_THREAD);   
+    BlockLoadT(temp_storage.load).Load(d_in + block_offset, thread_keys);
+    
+    __syncthreads();    // Barrier for smem reuse
+    // Collectively sort the keys
+    BlockRadixSortT(temp_storage.sort).Sort(thread_keys);
+    __syncthreads();    // Barrier for smem reuse
+    // Store the sorted segment 
+    BlockStoreT(temp_storage.store).Store(d_out + block_offset, thread_keys);
 }*/
 
+/*__launch_bounds__ (BLOCK_THREADS);
+
+// Kernels
+//---------------------------------------------------------------------
+__global__ void BlockSortKernel(
+    Key         *d_in,          // Tile of input
+    Key         *d_out,         // Tile of output
+    clock_t     *d_elapsed)     // Elapsed cycle count of block scan
+{
+    enum { TILE_SIZE = BLOCK_THREADS * ITEMS_PER_THREAD };
+    // Specialize BlockLoad type for our thread block (uses warp-striped loads for coalescing, then transposes in shared memory to a blocked arrangement)
+    typedef BlockLoad<Key, BLOCK_THREADS, ITEMS_PER_THREAD, BLOCK_LOAD_WARP_TRANSPOSE> BlockLoadT;
+    // Specialize BlockRadixSort type for our thread block
+    typedef BlockRadixSort<Key, BLOCK_THREADS, ITEMS_PER_THREAD> BlockRadixSortT;
+    // Shared memory
+    __shared__ union
+    {
+        typename BlockLoadT::TempStorage        load;
+        typename BlockRadixSortT::TempStorage   sort;
+    } temp_storage;
+    // Per-thread tile items
+    Key items[ITEMS_PER_THREAD];
+    // Our current block's offset
+    int block_offset = blockIdx.x * TILE_SIZE;
+    // Load items into a blocked arrangement
+    BlockLoadT(temp_storage.load).Load(d_in + block_offset, items);
+    // Barrier for smem reuse
+    __syncthreads();
+    // Start cycle timer
+    clock_t start = clock();
+    // Sort keys
+    BlockRadixSortT(temp_storage.sort).SortBlockedToStriped(items);
+    // Stop cycle timer
+    clock_t stop = clock();
+    // Store output in striped fashion
+    StoreDirectStriped<BLOCK_THREADS>(threadIdx.x, d_out + block_offset, items);
+    // Store elapsed clocks
+    if (threadIdx.x == 0)
+    {
+        d_elapsed[blockIdx.x] = (start > stop) ? start - stop : stop - start;
+    }
+}*/

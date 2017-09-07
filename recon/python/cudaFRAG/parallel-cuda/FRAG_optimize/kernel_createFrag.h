@@ -7,12 +7,18 @@
 #include "Python.h"
 #define NPY_NO_DEPRECATED_API NPY_1_10_API_VERSION
 #include "arrayobject.h"
-
+#include <thrust/host_vector.h>
+#include <thrust/device_vector.h>
 
 __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_int n_steps, 
                                 const npy_uint64 num_labels, const npy_uint32 label_jump, const unsigned int start_label, 
-                                const npy_uint32 num_pixels, unsigned int* gpu_edges, unsigned int* gpu_labels, npy_uint32* d_count, 
-                                npy_uint8* gpu_edge_test, const int* const gpu_grid_shape);
+                                const npy_uint32 num_pixels, unsigned int* gpu_edges, unsigned int* gpu_labels,
+                                npy_uint32* d_count, npy_uint8* gpu_edge_test, const int* const gpu_grid_shape);
+
+__global__ void create_borders(const unsigned int* const gpu_watershed, const npy_intp* const gpu_steps, const npy_int n_steps,
+                               const npy_uint64 num_labels, const npy_uint32 num_pixels, unsigned int* gpu_edges, unsigned int* gpu_labels,
+                               npy_uint32* d_count, const int* const gpu_grid_shape, unsigned int* gpu_borders);
+
 
 __global__ void initialize_edge_test(npy_uint8* gpu_edge_test, const npy_uint64 n_labels, const npy_uint64 size);
 
@@ -37,6 +43,20 @@ __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy
                                   const npy_uint32 n_vox, const npy_int n_steps, const npy_int tmp_edge_size,        
                                   const npy_uint32 brder_size, const npy_uint32 n_labels, const npy_uint jmp);
 
+__global__ void reinit_brdrcnt(npy_uint32* d_borders, const npy_uint32 bchsize, const npy_uint32 btch_brdrs);
+
+template <
+    typename    Key,
+    int         BLOCK_THREADS,
+    int         ITEMS_PER_THREAD>
+
+__global__ void BlockSortKernel(
+    Key         *d_in,          // Tile of input
+    Key         *d_out,         // Tile of output
+    clock_t     *d_elapsed);    
+
+
+//__global__ void BlockSortKernel(int *d_in, int *d_out);
 
 
 /*__global__ void get_nearest_neigh(const unsigned int* const watershed, const npy_intp* const steps,           

@@ -4,7 +4,7 @@ LIB = lib/
 CC=g++
 NVCC=nvcc
 
-NVCCFLAGS=-Xcompiler -fPIC -std=c++11 -DCUCC_ID="nVidia" -DBLD_PROCEDURE -DWITH_GSL -DHAVE_INLINE -DWITH_CUDA -DWITH_MPI -DPARALLEL -DWITH_PARALLEL_IO
+NVCCFLAGS=-Xcompiler -fPIC -std=c++11 -DCUCC_ID="nVidia" -DBLD_PROCEDURE -DWITH_GSL -DHAVE_INLINE -DWITH_CUDA -DWITH_MPI -DPARALLEL -DWITH_PARALLEL_IO 
 #NVCCFLAGS=--compiler-bindir $(CC) -fPIC
 
 CUDA_ARCH= -g -G -gencode=arch=compute_61,code=sm_61 -gencode=arch=compute_52,code=sm_52
@@ -13,6 +13,7 @@ CCFLAGS= -fPIC -g -std=c++11
 CUDA_INSTALL_PATH=/usr/local/cuda-8.0
 CUDA_INC_PATH= $(CUDA_INSTALL_PATH)/include 
 CUDA_LIB_PATH= $(CUDA_INSTALL_PATH)/lib64 
+#CUB_INC_PATH = /home/patilra/cub-1.7.0/
 
 #Python include directory. This should contain the file Python.h, among others.
 PYTHON_INCLUDE_PATH = $(HOME)/anaconda3/include/python3.5m
@@ -28,7 +29,7 @@ CUDA_OBJS= wrapper_createRag kernel_createFrag
 CPP_OBJS= FRAG_Extension
 CUDA_OBJECTS=$(addsuffix .o,$(addprefix $(LIB),$(CUDA_OBJS)))
 CPP_OBJECTS=$(addsuffix .o, $(addprefix $(LIB),$(CPP_OBJS)))
-CUDA_LIB=libCuda.a
+CUDA_LIB=libCuda.a 
 all: $(EXT_LIB)
 
 # ---- C++ compile ------------------
