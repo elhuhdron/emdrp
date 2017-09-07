@@ -6,7 +6,7 @@ OUTD=out_batches/20170902_K0057_run5/mesh_wtsh
 
 declare -a thrs=("0.99900000" "0.99925000" "0.99950000" "0.99975000")
 level=0
-while [ $level -lt 3 ]
+while [ $level -lt 4 ]
 do
     echo processing ${thrs[$level]}
 
