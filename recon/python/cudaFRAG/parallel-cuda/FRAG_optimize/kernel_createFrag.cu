@@ -1,13 +1,15 @@
 /********************************************************************************
 * Author - Rutuja
 * Date - 03/22/2017
-
+* Kernel -  Kernel functions to create RAG and calculate the borders
 ********************************************************************************/
+
 //#include <cub/cub.cuh>
 //#include <cub/block/block_load.cuh>
 //#include <cub/block/block_store.cuh>
 //#include <cub/block/block_radix_sort.cuh>
 //using namespace cub
+
 #include "kernel_createFrag.h"
 
 #define BLOCK 16
@@ -19,29 +21,35 @@ __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const n
                                 const npy_uint32 num_pixels, unsigned int* gpu_edges, unsigned int* gpu_labels, 
                                 npy_uint32* d_count, npy_uint8* gpu_edge_test, const int* const gpu_grid_shape){
 
-     unsigned int i = blockIdx.z*blockDim.z + threadIdx.z;
-     unsigned int j = blockIdx.y*blockDim.y + threadIdx.y;
-     unsigned int k = blockIdx.x*blockDim.x + threadIdx.x;
-     unsigned int watershed_idx = i*gpu_grid_shape[1]*gpu_grid_shape[2] + j*gpu_grid_shape[2] + k; 
-     unsigned int label_val = gpu_watershed[watershed_idx];
-     unsigned long int index;
-     unsigned int factor = start_label/label_jump;
-     unsigned int tmp = 0;
-     bool do_add = false; 
+    unsigned int i = blockIdx.z*blockDim.z + threadIdx.z;
+    unsigned int j = blockIdx.y*blockDim.y + threadIdx.y;
+    unsigned int k = blockIdx.x*blockDim.x + threadIdx.x;
+    unsigned int watershed_idx = i*gpu_grid_shape[1]*gpu_grid_shape[2] + j*gpu_grid_shape[2] + k; 
+    unsigned int label_val = gpu_watershed[watershed_idx];
+    unsigned long int index;
+    unsigned int factor = start_label/label_jump;
+    unsigned int tmp = 0;
+    bool do_add = false; 
 
-     if(watershed_idx < num_pixels && label_val != 0 && label_val < (start_label + label_jump) && label_val >= start_label){
-         for(unsigned int step = 0; step < n_steps; step++){
-             unsigned int edge_value = gpu_watershed[watershed_idx + gpu_steps[step]];
+    if(watershed_idx < num_pixels && label_val != 0 && label_val < (start_label + label_jump) && label_val >= start_label){
+        
+        for(unsigned int step = 0; step < n_steps; step++){
             
-             if(label_val <= label_jump){
-                 index = (label_val-1)*num_labels + edge_value-1;
-             } else {
-                 index = (label_val - (factor*label_jump)-1)*num_labels + edge_value-1;
-             }
+            unsigned int edge_value = gpu_watershed[watershed_idx + gpu_steps[step]];
             
-             /*if(edge_value < label_val && edge_value != 0){    
+            if(label_val <= label_jump){
+            
+                index = (label_val-1)*num_labels + edge_value-1;
+             
+            } else {
+            
+                index = (label_val - (factor*label_jump)-1)*num_labels + edge_value-1;
+
+            }
+            
+            /*if(edge_value < label_val && edge_value != 0){    
                
-                 if(gpu_edge_test[index] == 0){
+                if(gpu_edge_test[index] == 0){
                      unsigned int edge_increment = atomicAdd(&d_count[0],1);
                      gpu_edges[edge_increment] = label_val;
                      gpu_labels[edge_increment] = edge_value;
@@ -49,21 +57,23 @@ __global__ void create_Labelrag(const unsigned int* const gpu_watershed, const n
                  }
                
              }*/
-             if(edge_value > label_val){
+            if(edge_value > label_val){
                 
-                 // getting the value returned by atomicAdd in a variable and then using
-                 // it gives correct values. The atomicAdd of d_count[0] in place gives
-                 // wrong resutls.
-                 if(gpu_edge_test[index] == 0){
+                // getting the value returned by atomicAdd in a variable and then using
+                // it gives correct values. The atomicAdd of d_count[0] in place gives
+                // wrong resutls.
+                if(gpu_edge_test[index] == 0){
+                    
                      unsigned int edge_increment = atomicAdd(&d_count[0],1);
                      gpu_edges[edge_increment] = edge_value;
                      gpu_labels[edge_increment] = label_val;
                      gpu_edge_test[index] = 1;
-                 }
 
-             }
-         }
-     }
+                }
+
+            }
+        }
+    }
 
 }
 
@@ -80,12 +90,15 @@ __global__ void create_borders(const unsigned int* const gpu_watershed, const np
      unsigned int edge_value;
 
      if(watershed_idx < num_pixels && label_val != 0){
+         
          for(unsigned int step = 0; step < n_steps; step++){
+         
              edge_value = gpu_watershed[watershed_idx + gpu_steps[step]];
              border_vox = watershed_idx + gpu_steps[step];
 
              if(edge_value > label_val){
-                 // getting the value returned by atomicAdd in a variable and then using
+             
+                  // getting the value returned by atomicAdd in a variable and then using
                  // it gives correct values. The atomicAdd of d_count[0] in place gives wrong resutls.
                  unsigned int edge_increment = atomicAdd(&d_count[0],1);
                  gpu_edges[edge_increment] = edge_value;
@@ -108,166 +121,185 @@ __global__ void get_borders(const unsigned int* const gpu_watershed, const npy_i
                             const npy_int border_size, unsigned char* gpu_tile_chk)
 {
 
-    npy_uint32 tmp_edges[100];
-    unsigned int edge_val;
-    npy_int dilation_index[3];
-    npy_int curr_index[3];
-    int dilation_cur[81];
-    unsigned int counter = 0;
+     npy_uint32 tmp_edges[100];
+     unsigned int edge_val;
+     npy_int dilation_index[3];
+     npy_int curr_index[3];
+     int dilation_cur[81];
+     unsigned int counter = 0;
 
-    extern __shared__ unsigned int bounding_box[];
+     extern __shared__ unsigned int bounding_box[];
 
-    unsigned int idx_x = blockIdx.z*blockDim.z + threadIdx.z;
-    unsigned int idx_y = blockIdx.y*blockDim.y + threadIdx.y;
-    unsigned int idx_z = blockIdx.x*blockDim.x + threadIdx.x;
-    unsigned int watershed_idx = idx_x*gpu_grid[1]*gpu_grid[2] + idx_y*gpu_grid[2] + idx_z;
-    unsigned int label = gpu_watershed[watershed_idx];
+     unsigned int idx_x = blockIdx.z*blockDim.z + threadIdx.z;
+     unsigned int idx_y = blockIdx.y*blockDim.y + threadIdx.y;
+     unsigned int idx_z = blockIdx.x*blockDim.x + threadIdx.x;
+     unsigned int watershed_idx = idx_x*gpu_grid[1]*gpu_grid[2] + idx_y*gpu_grid[2] + idx_z;
+     unsigned int label = gpu_watershed[watershed_idx];
 
-    unsigned int i;
-    unsigned int j;
-    unsigned int k;
-    int watershed_shared_index; 
-    unsigned int cnt_edges = 0;
-    //tmp_edges[0] = 0;
-    unsigned int start_index = 0;
-    unsigned int store_index = 0;
+     unsigned int i;
+     unsigned int j;
+     unsigned int k;
+     int watershed_shared_index; 
+     unsigned int cnt_edges = 0;
+     //tmp_edges[0] = 0;
+     unsigned int start_index = 0;
+     unsigned int store_index = 0;
 
-    int shared_edge_jump = ((blockDim.z+(blockdim_padded*2))*(blockDim.y+(blockdim_padded*2))
+     int shared_edge_jump = ((blockDim.z+(blockdim_padded*2))*(blockDim.y+(blockdim_padded*2))
                            *(blockDim.x+(blockdim_padded*2)));
 
    
-    //copy watershed global memory into shared memory
-    if(threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0){
-        for(int a = -(blockdim_padded) ;a < (blockdim+blockdim_padded); a++){
-            for(int b = -(blockdim_padded); b < (blockdim+blockdim_padded); b++){
-                for(int c = -(blockdim_padded) ;c < (blockdim+blockdim_padded); c++){
-                    watershed_shared_index = (blockDim.z+(blockdim_padded*2))*(blockDim.z+(blockdim_padded*2))*
+     //copy watershed global memory into shared memory
+     if(threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0){
+
+         for(int a = -(blockdim_padded) ;a < (blockdim+blockdim_padded); a++){
+
+             for(int b = -(blockdim_padded); b < (blockdim+blockdim_padded); b++){
+
+                 for(int c = -(blockdim_padded) ;c < (blockdim+blockdim_padded); c++){
+
+                     watershed_shared_index = (blockDim.z+(blockdim_padded*2))*(blockDim.z+(blockdim_padded*2))*
                                    (threadIdx.z+blockdim_padded+a) + 
                                    (blockDim.y+(blockdim_padded*2))*(threadIdx.y+blockdim_padded+b) + 
                                    threadIdx.x+blockdim_padded+c;  
-                    i = blockIdx.z*blockDim.z + threadIdx.z + a;
-                    j = blockIdx.y*blockDim.y + threadIdx.y + b;
-                    k = blockIdx.x*blockDim.x + threadIdx.x + c;
-                    if(i > 0 && i < (gridDim.z*blockDim.z) && j > 0 && j < (gridDim.y*blockDim.y) 
-                       && k > 0 && k < (gridDim.x*blockDim.x)){ 
-                       watershed_idx = i*gpu_grid[1]*gpu_grid[2] + j*gpu_grid[2] + k; 
-                       bounding_box[watershed_shared_index] = gpu_watershed[watershed_idx];
-                    }
-                    else{
-                       bounding_box[watershed_shared_index] = 0;
-                    }
-                }
-            }
-        }
+                     i = blockIdx.z*blockDim.z + threadIdx.z + a;
+                     j = blockIdx.y*blockDim.y + threadIdx.y + b;
+                     k = blockIdx.x*blockDim.x + threadIdx.x + c;
+                     if(i > 0 && i < (gridDim.z*blockDim.z) && j > 0 && j < (gridDim.y*blockDim.y) 
+                      && k > 0 && k < (gridDim.x*blockDim.x)){ 
+                     
+                        watershed_idx = i*gpu_grid[1]*gpu_grid[2] + j*gpu_grid[2] + k; 
+                        bounding_box[watershed_shared_index] = gpu_watershed[watershed_idx];
+
+                     }
+                     else{
+                     
+                        bounding_box[watershed_shared_index] = 0;
+                     }
+                 }
+             }
+         }
         
-        for(int edge_step = 0 ;edge_step < (n_subind_edges); edge_step++){
+         for(int edge_step = 0 ;edge_step < (n_subind_edges); edge_step++){
          
-            bounding_box[shared_edge_jump + edge_step] = gpu_subind_edges[edge_step];
+             bounding_box[shared_edge_jump + edge_step] = gpu_subind_edges[edge_step];
 
-        } 
+         } 
 
-        for(int border_step = 0;border_step < (n_subind_borders); border_step++){
+         for(int border_step = 0;border_step < (n_subind_borders); border_step++){
            
-            bounding_box[shared_edge_jump + n_subind_edges + border_step] = gpu_subind_borders[border_step];
-        }
-    }
-     
-    __syncthreads();
+             bounding_box[shared_edge_jump + n_subind_edges + border_step] = gpu_subind_borders[border_step];
+         }
 
-    for(int fill_id = 0; fill_id < n_steps_edges; fill_id++){
+     }
+     
+     __syncthreads();
+
+     for(int fill_id = 0; fill_id < n_steps_edges; fill_id++){
    
         gpu_tile_chk[fill_id] = 0;  
-    }
+     }
 
-    if(label != 0){
-
+     if(label != 0){
   
-     // store the edges of the current label in a temporary structure
-     cnt_edges = gpu_edges[(label-1)*cnst_size];
-     for(int s = 2; s < cnt_edges;s++){
-         tmp_edges[s-1] = gpu_edges[(label-1)*cnst_size + s];
-     } 
-     tmp_edges[0] = cnt_edges-2;
+       // store the edges of the current label in a temporary structure
+       cnt_edges = gpu_edges[(label-1)*cnst_size];
+       
+       for(int s = 2; s < cnt_edges;s++){
 
+           tmp_edges[s-1] = gpu_edges[(label-1)*cnst_size + s];
+       } 
+       
+       tmp_edges[0] = cnt_edges-2;
 
-     // calculate the indices of the edge 
-     for(int cnt_id = 0;cnt_id < (label-1);cnt_id++){
+       // calculate the indices of the edge 
+       for(int cnt_id = 0;cnt_id < (label-1);cnt_id++){
 
           start_index += gpu_edges[cnt_id*cnst_size];
 
-     }
-     start_index =  start_index - (2*(label-1));
+       }
+       start_index =  start_index - (2*(label-1));
 
-     watershed_shared_index = (blockDim.z+(blockdim_padded*2))*(blockDim.z+(blockdim_padded*2))*
+       watershed_shared_index = (blockDim.z+(blockdim_padded*2))*(blockDim.z+(blockdim_padded*2))*
                               (threadIdx.z+blockdim_padded) +
                               (blockDim.y+(blockdim_padded*2))*(threadIdx.y+blockdim_padded) +
                                threadIdx.x+blockdim_padded;
 
 
-     curr_index[0] = threadIdx.z + blockdim_padded;
-     curr_index[1] = threadIdx.y + blockdim_padded;
-     curr_index[2] = threadIdx.x + blockdim_padded;
+       curr_index[0] = threadIdx.z + blockdim_padded;
+       curr_index[1] = threadIdx.y + blockdim_padded;
+       curr_index[2] = threadIdx.x + blockdim_padded;
 
-     for(int y= 0;y < n_steps_edges; y++){
+       for(int y= 0;y < n_steps_edges; y++){
       
-       dilation_cur[y*3+0] = curr_index[0] +  bounding_box[shared_edge_jump + y*3 + 0];
-       dilation_cur[y*3+1] = curr_index[1] +  bounding_box[shared_edge_jump + y*3 + 1];
-       dilation_cur[y*3+2] = curr_index[2] +  bounding_box[shared_edge_jump + y*3 + 2];
+           dilation_cur[y*3+0] = curr_index[0] +  bounding_box[shared_edge_jump + y*3 + 0];
+           dilation_cur[y*3+1] = curr_index[1] +  bounding_box[shared_edge_jump + y*3 + 1];
+           dilation_cur[y*3+2] = curr_index[2] +  bounding_box[shared_edge_jump + y*3 + 2];
 
-     }
-     for(int step = 0; step < n_steps_borders; step++){
-         edge_val = bounding_box[watershed_shared_index + gpu_steps_borders[step]];
-         counter = 0;
-         store_index = 0;
-         if(edge_val > label && edge_val != 0){
-             while(counter < tmp_edges[0]){
-                 if(edge_val == tmp_edges[counter+1]){
-                     dilation_index[0] = threadIdx.z + blockdim_padded + bounding_box[shared_edge_jump + n_subind_edges + step*3 + 0];
-                     dilation_index[1] = threadIdx.y + blockdim_padded + bounding_box[shared_edge_jump + n_subind_edges + step*3 + 1];
-                     dilation_index[2] = threadIdx.x + blockdim_padded + bounding_box[shared_edge_jump + n_subind_edges + step*3 + 2];
+       }
+       for(int step = 0; step < n_steps_borders; step++){
+           edge_val = bounding_box[watershed_shared_index + gpu_steps_borders[step]];
+           counter = 0;
+           store_index = 0;
+           if(edge_val > label && edge_val != 0){
+              
+               while(counter < tmp_edges[0]){
+                   if(edge_val == tmp_edges[counter+1]){
+                   
+                       dilation_index[0] = threadIdx.z + blockdim_padded + bounding_box[shared_edge_jump + n_subind_edges + step*3 + 0];
+                       dilation_index[1] = threadIdx.y + blockdim_padded + bounding_box[shared_edge_jump + n_subind_edges + step*3 + 1];
+                       dilation_index[2] = threadIdx.x + blockdim_padded + bounding_box[shared_edge_jump + n_subind_edges + step*3 + 2];
                     
-                     store_index = start_index + counter;
+                       store_index = start_index + counter;
                       
-                     if(gpu_borders[store_index*gpu_count_edges[1]] == label){
-                         if(gpu_borders[store_index*gpu_count_edges[1] + 1] == edge_val){
+                       if(gpu_borders[store_index*gpu_count_edges[1]] == label){
+                           
+                           if(gpu_borders[store_index*gpu_count_edges[1] + 1] == edge_val){
  
-                            assert(true);
+                               assert(true);
 
-                        }else{
+                           }else{
 
-                            assert(false);
-                        }
+                               assert(false);
+                           }
 
-                     }else{
-                        printf("%d-%d-%d-%d ",label,edge_val,gpu_borders[(store_index)*gpu_count_edges[1]], store_index);
-                        assert(false);
-                     }
+                       }else{
+ 
+                           printf("%d-%d-%d-%d ",label,edge_val,gpu_borders[(store_index)*gpu_count_edges[1]], store_index);
+                           assert(false);
+                       }
 
-                     //get the indices  that form a border with this edge
-                     get_dilation(gpu_steps_edges, n_steps_edges, &bounding_box[shared_edge_jump], n_subind_edges, dilation_index,
+                       //get the indices  that form a border with this edge
+                       get_dilation(gpu_steps_edges, n_steps_edges, &bounding_box[shared_edge_jump], n_subind_edges, dilation_index,
                                     curr_index, label, edge_val, idx_x ,idx_y, idx_z, store_index, gpu_grid, gpu_borders, border_size,
                                     dilation_cur, gpu_tile_chk);
                         
-                     break;
-                 }else{
+                       break;
+                   }else{
+
                      counter++;
-                 }
-             }
-          }
-      
+                   }
+               }
+           }      
        } 
        for(int step = 0; step < n_steps_edges; step++){
           edge_val = bounding_box[watershed_shared_index + gpu_steps_edges[step]];
           counter = 0;
           store_index = 0;
+
           if(edge_val >  label){
+
               while(counter <  tmp_edges[0]){
+
                    if(edge_val == tmp_edges[counter+1]){
+
                       dilation_index[0] = threadIdx.z + blockdim_padded + bounding_box[shared_edge_jump + step*3 + 0];
                       dilation_index[1] = threadIdx.y + blockdim_padded + bounding_box[shared_edge_jump + step*3 + 1];
                       dilation_index[2] = threadIdx.x + blockdim_padded + bounding_box[shared_edge_jump + step*3 + 2];
                       store_index = start_index + counter;
+
                       if(gpu_borders[store_index*gpu_count_edges[1]] == label){
+                          
                           if(gpu_borders[store_index*gpu_count_edges[1] + 1] == edge_val){
                      
                               assert(true);
@@ -277,26 +309,26 @@ __global__ void get_borders(const unsigned int* const gpu_watershed, const npy_i
                               assert(false);
                           }
  
-                     }else{
+                      }else{
+
                           printf("%d-%d-%d-%d ",label,edge_val,gpu_borders[(store_index)*gpu_count_edges[1]], store_index);
                           assert(false);
-                     }
+                      }
                    
                      //get the indices  that form a border with this edge
-                     get_dilation(gpu_steps_edges, n_steps_edges, &bounding_box[shared_edge_jump], n_subind_edges, dilation_index,
+                      get_dilation(gpu_steps_edges, n_steps_edges, &bounding_box[shared_edge_jump], n_subind_edges, dilation_index,
                                   curr_index, label, edge_val, idx_x ,idx_y, idx_z, store_index, gpu_grid, gpu_borders, border_size,
                                   dilation_cur, gpu_tile_chk);
-                     break;
+                      break;
+
                    }else{
                      
                      counter++;
                    }
-              }
-         }
-      }
- 
+               }
+           }
+       }
    } 
-   
 }
 
 
@@ -308,7 +340,9 @@ __global__ void initialize_edge_test(npy_uint8* gpu_edge_test, const npy_uint64 
    unsigned long int idx = j*n_labels + i;
 
    if(idx < size){ 
+
      gpu_edge_test[idx] = 0;
+
    }
 
 }
@@ -344,37 +378,28 @@ __device__ void get_dilation(const npy_intp* const steps, const int num_steps, c
    __syncthreads();
 
    for(int m = 0;m < num_steps;m++){
+       
        for(int n = 0;n < num_steps;n++){                  
+       
            if(dila_1[m*3] == dila_2[n*3] && dila_1[m*3+1] == dila_2[n*3+1] && dila_1[m*3+2] == dila_2[n*3+2]){ 
-              do_add = true;
-              offset[0] = dila_2[n*3] - curr_idx[0];     
-              offset[1] = dila_2[n*3+1] - curr_idx[1];
-              offset[2] = dila_2[n*3+2] - curr_idx[2];
-              test_idx = offset[0]*3*3 + offset[1]*3 + offset[2];
-              if(test_idx > 13 || test_idx < -13)
-                assert(false);
+              
+               do_add = true;
+               offset[0] = dila_2[n*3] - curr_idx[0];     
+               offset[1] = dila_2[n*3+1] - curr_idx[1];
+               offset[2] = dila_2[n*3+2] - curr_idx[2];
+               test_idx = offset[0]*3*3 + offset[1]*3 + offset[2];
+               if(test_idx > 13 || test_idx < -13)
+                   assert(false);
                 
-              border_ind = (x_global+offset[0])*grid_shape[2]*grid_shape[1] + (y_global+offset[1])*grid_shape[2] + z_global+offset[2];
-              assert(boundary[start*brd_size + 2] < brd_size);
-              cnt = boundary[start*brd_size + 2];
-              /*for(int f = 3;f < cnt;f++){
-                   if(border_ind ==  boundary[start*brd_size + f]){
-                      do_add = false;
-                      break;
-                   }
-              }*/
-              //if(tile_test[test_idx+13] != 1){ 
-                k = atomicAdd(&boundary[start*brd_size + 2] , 1);
-                boundary[start*brd_size  + k] = border_ind;
-                //tile_test[test_idx +13] = 1;
-              /*if(lab == 1 && edge_value == 2){
-                      printf("%d", border_ind);
-              }*/
-              //}   
+               border_ind = (x_global+offset[0])*grid_shape[2]*grid_shape[1] + (y_global+offset[1])*grid_shape[2] + z_global+offset[2];
+               assert(boundary[start*brd_size + 2] < brd_size);
+               cnt = boundary[start*brd_size + 2];
+               k = atomicAdd(&boundary[start*brd_size + 2] , 1);
+               boundary[start*brd_size  + k] = border_ind;
+                
            }    
        }         
    }
-
 }
 
 __global__ void get_nearest_neigh(const unsigned int* const watershed, const npy_intp* const steps, 

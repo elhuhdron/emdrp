@@ -1,9 +1,9 @@
-/******************************************************
+/************************************************************
  * Author - Rutuja
  * Date - 2/27/2016
- * Extension to convert the python data structures 
- * to cpp data structures and calling the cuda wrappers
-*******************************************************/
+ * Function - Extension to convert the python data structures 
+   to cpp data structures and calling the cuda wrappers
+************************************************************/
 //C extension includes
 #include "Python.h"
 #define NPY_NO_DEPRECATED_API NPY_1_10_API_VERSION
@@ -267,6 +267,7 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
         //CALL_CUDA(cudaMemcpy(h_edges,gpu_edges,(batch_edge_size)*sizeof(unsigned int),cudaMemcpyDeviceToHost));
         timer1.Stop();
         time_memtransfer += timer1.Elapsed()/1000;
+        
         // serial post processing on cpu -- to remove all the duplicates that might be added due to asynchronous functioning 
         assert(batch_edge_size > count_edges[0]);
         count_edges[1] = count_edges[0];
@@ -290,6 +291,7 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     assert(edgelist_size > count_edges[0]);
     std::vector<std::tuple<unsigned int,unsigned int>>::iterator i = list_of_edges.begin();
     for(i = list_of_edges.begin(); i != list_of_edges.end();i++){
+        
         edges[cnt*2 + 0] = std::get<0>(*i);
         edges[cnt*2 + 1] = std::get<1>(*i);
         //borders[cnt*batch_borders + 0] = std::get<0>(*i);
@@ -515,19 +517,24 @@ static PyObject *build_frag_borders(PyObject *self, PyObject *args){
     std::cout << "post_processing_started" << std::endl;
     timer3.Start();
     for(unsigned int edge_size = 0; edge_size < count[0] ; edge_size++){
+         
          edge_index = edge_size * n_borders_dim[1];
          begin = edge_index + 3;
          end = edge_index + borders[edge_index + 2];
          std::vector<npy_uint32> indices(borders + begin, borders + end);
          std::sort(indices.begin() , indices.end());
+         
          if(edge_size == 3){
              std::cout << indices.size() << std::endl;}
          auto last = std::unique(indices.begin(), indices.end());
          indices.erase(last, indices.end());
+         
          if(edge_size == 3)
            std::cout << indices.size() <<std::endl;
          indices.erase(std::remove(indices.begin(), indices.end(), 0), indices.end());
+         
          borders[edge_index + 2] = indices.size();
+         
          if(edge_size == 3){
            std::cout << borders[edge_index + 2] << std::endl;}
          std::copy(indices.begin(), indices.end(),borders + edge_index+3);
@@ -685,20 +692,27 @@ static PyObject *build_frag_borders_nearest_neigh(PyObject *self, PyObject *args
 
     npy_uint32 start_label = 1;
     while(start_label <= n_supervoxels){
+       
        timer3.Start();
        cnt_edges = 0;
+       
        for(int a = start_label;a <  (start_label+label_jump_borders);a++){
-          if(a <= n_supervoxels && cnt_edges < label_jump_borders){
+          
+           if(a <= n_supervoxels && cnt_edges < label_jump_borders){
+           
               cnt_edges += h_edges[(a-1)*tmp_edge_size] - 2;
               nxt_lbl = a-1;
-          }
+
+           }
        }
       
        stride = 0;
 
        if(cnt_edges != 0)
+       
            cnt_edges -= h_edges[(nxt_lbl)*tmp_edge_size] - 2;
        else{
+          
            break;
        }  
       

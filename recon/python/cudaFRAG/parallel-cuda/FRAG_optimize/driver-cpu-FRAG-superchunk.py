@@ -44,7 +44,7 @@ batch_borders = np.uint32(args.batch_borders)[0]
 # labeled chunks
 chunk = [16,17,0]
 #size = [1024,1024,480]
-size = [384, 384, 384]
+size = [256, 256, 256]
 offset = [0,0,32]
 has_ECS = True
 
@@ -121,8 +121,10 @@ neigh_sel = scipy.ndimage.morphology.binary_dilation(dilate_array, binary_struct
 neigh_sel_indices = np.transpose(np.nonzero(neigh_sel))
 neigh_sel_indices = neigh_sel_indices - (neigh_sel_size//2)
 neigh_sel_indices = np.array(neigh_sel_indices, dtype = np.int)
+
 #sel_indices = np.array([False,False,True,False, True, True, False, True, True,False, False, True,False,False,True, False, True,True,False, False,True,False,True,True, False,True,True],dtype=np.bool)
 #neigh_sel_indices = neigh_sel_indices[sel_indices==True]
+
 #calculate the jump steps required for 2X dilation to check for borders. Always look two times the actual dilation to
 # calculate the borders
 border_sel_size = (4*frag.neighbor_perim)+1

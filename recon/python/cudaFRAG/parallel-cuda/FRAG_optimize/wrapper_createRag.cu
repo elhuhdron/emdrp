@@ -1,7 +1,7 @@
 /************************************************************************
-*Author - Rutuja
-*Date - 03/26/2017
-
+* Author - Rutuja
+* Date - 03/26/2017
+* Function - Wrapper Functions calling cuda kernels.
 *************************************************************************/
 #include "wrapper_createRag.h"
 

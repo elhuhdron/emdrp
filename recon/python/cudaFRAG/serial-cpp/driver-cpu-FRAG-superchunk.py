@@ -35,7 +35,7 @@ tmp_edge_size = args.tmp_edge_size
 # labeled chunks
 chunk = [16,17,0]
 #size = [1024,1024,480]
-size = [384, 384, 384]
+size = [128, 128, 128]
 offset = [0,0,32]#32
 has_ECS = True
 
