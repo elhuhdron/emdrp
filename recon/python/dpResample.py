@@ -107,6 +107,8 @@ class dpResample(dpWriteh5):
                         self.slices[i*ff + j*f + k] = np.s_[i::f,j::f,k::f]
 
     def iterResample(self):
+        assert( (self.cube_size % self.factor == 0).all() ) # xxx - this probably could be fixed
+
         # xxx - ahhhhhh, this has to be fixed somehow
         if self.chunksize is not None and (self.chunksize < 0).all(): self.chunksize = self.use_chunksize
         self.cubeIter = dpCubeIter.cubeIterGen(self.volume_range_beg,self.volume_range_end,self.overlap,self.cube_size,
