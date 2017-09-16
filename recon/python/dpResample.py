@@ -53,6 +53,10 @@ class dpResample(dpWriteh5):
         assert( self.nresample_dims > 0 )   # no resample dims specified
         self.nslices = self.factor**self.nresample_dims
 
+        # print out all initialized variables in verbose mode
+        if self.dpResample_verbose:
+            print('dpResample, verbose mode:\n'); print(vars(self))
+
         ## xxx - probably a way to do this programatically, but easier to read as enumerated.
         ##   this code commented out was only for downsampling by factor of 2
         #if (self.resample_dims == np.array([1,0,0])).all():
@@ -101,10 +105,6 @@ class dpResample(dpWriteh5):
                 for j in range(f):
                     for k in range(f):
                         self.slices[i*ff + j*f + k] = np.s_[i::f,j::f,k::f]
-
-        # print out all initialized variables in verbose mode
-        if self.dpResample_verbose:
-            print('dpResample, verbose mode:\n'); print(vars(self))
 
     def iterResample(self):
         # xxx - ahhhhhh, this has to be fixed somehow

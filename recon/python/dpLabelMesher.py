@@ -54,7 +54,7 @@ class dpLabelMesher(emLabels):
 
     # type to use for all processing operations
     PDTYPE = np.double
-    RAD = 5  # for padding
+    #RAD = 5  # for padding, calculate this based on smoothing kernel size
 
     #print_every = 500 # modulo for print update
     #dataset_root = 'meshes'
@@ -145,10 +145,11 @@ class dpLabelMesher(emLabels):
         self.seeds = np.arange(1, self.nVoxels.size+1, dtype=np.int64); self.seeds = self.seeds[self.nVoxels>0]
         #print(np.argmax(self.nVoxels))
 
+        r = self.smooth.max() + 1
         if self.dpLabelMesher_verbose:
-            print('Padding data with %d zero border' % (self.RAD,)); t = time.time()
+            print('Padding data with %d zero border' % (r,)); t = time.time()
         # Pad data with zeros so that meshes are closed on the edges
-        sizes = np.array(cube.shape); r = self.RAD; sz = sizes + 2*r;
+        sizes = np.array(cube.shape); sz = sizes + 2*r;
         dataPad = np.zeros(sz, dtype=self.data_type); dataPad[r:sz[0]-r, r:sz[1]-r, r:sz[2]-r] = cube
         del self.data_cube, cube
         if self.dpLabelMesher_verbose:
@@ -212,6 +213,7 @@ class dpLabelMesher(emLabels):
             self.crpdpls = crpdpls
             # save bounds relative to entire dataset
             self.bounds_beg[i] = self.mins[i] + self.dataset_index
+            # xxx - this is an inclusive end!!! but, no one is currently using it (not viewer here or knossos)
             self.bounds_end[i] = self.mins[i] + self.rngs[i] - 1 + self.dataset_index;
 
             #call the vtk Pipeline
