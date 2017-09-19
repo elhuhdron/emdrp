@@ -1,0 +1,18 @@
+,,,,,,,
+,,,,,,,
+,Cube Size,mem transfer time ,kernel processing time, post processing time,Total-border calculation,Total – frag creation and border calculation,Speedup
+,128 128 128 ,20.28s ,,,,,
+,serial ,0s,0.10s,0.498s,0.599s,0.79s,25.31
+,parallel,0.13s,0.08s,0.22s,0.457s,0.512s,39.6
+,,,,,,,
+,256 256 256 ,151.23s(2.5 min),,,,,
+,serial ,0s,0.65s,4.14s,4.80s,6.62s,23.01
+,parallel,1.21s,0.755s,1.67s,3.67s,4.2s,36
+,,,,,,,
+,384 384 384,509 s(8.55 min),,,,,
+,serial ,0.0s,2.24s,14.44s,16.70s,22.9s,22.2
+,parallel,3.92s,3.433s,5.48s,12.93s,15.44s,32.9
+,,,,,,,
+,640 640 480,1835s(30min),,,,,
+,serial ,0s,9.02s,53.74s,62.98s,103.86s,17.81
+,parallel,16.54s,25.47s,18.89s,60.93s,78s,23.52

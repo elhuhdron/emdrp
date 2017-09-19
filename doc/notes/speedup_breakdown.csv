@@ -1,0 +1,22 @@
+,,,,,,,
+,detial description of above result,mem transfer time ,kernel processing time, post processing time,Total-border calculation,Total – frag creation and border calculation,Speedup
+,128 128 128 ,20s ,,,,,
+,serial ,0s,0.10s,0.498s,0.599s,0.79s,25.31
+,parallel,0.26s,0.13s,0.25s,0.63s,0.65s,30.76
+,,,,,,,
+,256 256 256 ,152.38s(2.5 min),,,,,
+,serial ,0s,0.65s,4.14s,4.80s,6.62s,23.01
+,parallel,2.47s,0.64s,1.97s,5.10s,5.47s,27.85
+,,,,,,,
+,384 384 384,513 s(8.55 min),,,,,
+,serial ,0.0s,2.24s,14.44s,16.70s,22.9s,22.2
+,parallel,8.00s,3.41s,6.77s,18.26s,20.82s,24.65
+,,,,,,,
+,512 512 480,1158s(19min),,,,,
+,serial ,0s,4.96s,33.88s,38.85s,55.37s,20.94
+,parallel,17.87s,12.93s,14.70s,45.62s,54.40s,21.28
+,,,,,,,
+,,,,,,,
+,640 640 480,1835s(30min),,,,,
+,serial ,0s,9.02s,53.74s,62.98s,103.86s,17.81
+,parallel,34.50s,22.71s,23.16s,80.58s,98.26s,18.65
