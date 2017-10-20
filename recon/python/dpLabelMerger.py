@@ -95,7 +95,7 @@ class dpLabelMerger(emLabels):
     
                 # only load superchunks that contain some object supervoxels
                 ind = np.ravel_multi_index(cur_volume, self.volume_step_seg)
-                if self.sc_to_nobjs[ind] < 1: continue
+                if len(self.sc_to_objs[ind]) < 1: continue
     
                 if self.dpLabelMerger_verbose:
                     print('Merge in chunk %d %d %d, seglevel %d' % tuple(self.chunk.tolist() + [s])); t = time.time()
@@ -129,8 +129,7 @@ class dpLabelMerger(emLabels):
                 # get bounding boxes for all supervoxels in this volume
                 svox_bnd = nd.measurements.find_objects(dataPad, cur_ncomps)
 
-                for i in range(self.sc_to_nobjs[ind]):
-                    cobj = self.sc_to_objs[ind,i]
+                for cobj in self.sc_to_objs[ind]:
                     #self.mergelists[cobj] = {'ids':allids[:,0], 'scids':allids[:,1:5], 'inds':inds}
                     cinds = np.nonzero(ind == self.mergelists[cobj]['inds'])[0]
                     for j in cinds:
@@ -206,8 +205,8 @@ class dpLabelMerger(emLabels):
         self.volume_size_seg = np.prod(self.volume_step_seg)
         
         loadfiles = glob.glob(self.annotation_file_glob); nFiles = len(loadfiles);
-        self.mergelists = {}; self.sc_to_nobjs = np.zeros((self.volume_size_seg,), dtype=np.int64);
-        self.sc_to_objs = np.zeros((self.volume_size_seg,10), dtype=np.uint32); self.nobjects= 0
+        assert( nFiles > 0 ) # empty glob for knossos annotation files
+        self.mergelists = {}; self.nobjects = 0; self.sc_to_objs = [set() for x in range(self.volume_size_seg)]; 
         for j in range(nFiles):
             # get the mergelist out of the zipped knossos annotation file
             zf = zipfile.ZipFile(loadfiles[j], mode='r');
@@ -218,14 +217,16 @@ class dpLabelMerger(emLabels):
 
             for i in range(n):
                 # Object_ID, ToDo_flag, Immutability_flag, [Supervoxel_ID, SCx, SCy, SCz, SClevel]* '\n'
-                curmergeline = merge_list[i*4].split(' '); cobj = int(curmergeline[0]) + self.nobjects
+                curmergeline = merge_list[i*4].split(' '); #cobj = int(curmergeline[0]) + self.nobjects
+                # object ID in annotation list can be missing ids and out of order, so just use the order in the file
+                cobj = i + self.nobjects + 1
                 allids = np.array(curmergeline[3::],dtype=np.uint32).reshape((-1,5))
                 scids = allids[:,1:5].copy()
                 scids[:,:3] = (scids[:,:3]-self.cubeIter.volume_range_beg)//self.cubeIter.cube_size
                 inds = np.ravel_multi_index(scids.T, self.volume_step_seg); uinds = np.unique(inds)
                 # add this object to the mapping for all superchunks / seg levels that it contains in its mergelist
                 for k in uinds:
-                    cind = self.sc_to_nobjs[k]; self.sc_to_objs[k,cind] = cobj; self.sc_to_nobjs[k] += 1
+                    self.sc_to_objs[k].add(cobj)
                 # keep a hash of all the objects and their constituent supervoxels ids / superchunks / seg levels
                 self.mergelists[cobj] = {'ids':allids[:,0], 'scids':allids[:,1:5], 'inds':inds}
             self.nobjects = len(self.mergelists.keys())
@@ -250,7 +251,7 @@ class dpLabelMerger(emLabels):
         p.add_argument('--smooth', nargs=3, type=int, default=[7,7,7], metavar=('X', 'Y', 'Z'),
             help='Size of smoothing kernel (zeros for none)')
         p.add_argument('--contour-lvl', nargs=1, type=float, default=[0.2], metavar=('LVL'),
-            help='Level [0,1] to use to create mesh isocontours')
+            help='Level [0,1] to use to binarize after smoothing applied')
 
         p.add_argument('--dpLabelMerger-verbose', action='store_true',
             help='Debugging output for dpLabelMerger')
