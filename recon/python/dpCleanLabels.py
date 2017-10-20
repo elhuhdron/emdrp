@@ -136,7 +136,6 @@ class dpCleanLabels(emLabels):
             image_with_zeros[rad:-rad,rad:-rad,rad:-rad] = self.data_cube  # embed label array into zeros array
 
             image_with_brd = np.lib.pad(self.data_cube,((rad,rad), (rad,rad), (rad,rad)),'edge');
-            nSeeds = self.data_cube.max()
 
             # do not smooth ECS labels
             sel_ECS, ECS_label = self.getECS(image_with_brd)
@@ -147,8 +146,7 @@ class dpCleanLabels(emLabels):
             svox_bnd = nd.measurements.find_objects(image_with_zeros)
 
             # iterate over labels
-            nSeeds = self.data_cube.max(); lbls = np.zeros(sz, dtype=self.data_cube.dtype)
-            assert( nSeeds == len(svox_bnd) )
+            nSeeds = len(svox_bnd); lbls = np.zeros(sz, dtype=self.data_cube.dtype)
             for j in range(nSeeds):
                 if ECS_label and j+1 == ECS_label: continue
 
@@ -215,7 +213,25 @@ class dpCleanLabels(emLabels):
 
         # NOTE: cavity_fill not intended to work with ECS labeled with single value (ECS components are fine)
         if self.cavity_fill:
-            self.data_cube, selbg, msk = self.cavity_fill_voxels(self.data_cube)
+            if self.labelwise:
+                if self.dpCleanLabels_verbose:
+                    print('Removing cavities labelwise using conn %d' % (self.bg_connectivity,))
+                    print('\tGetting bounding boxes'); t = time.time()
+
+                # iterate over labels, fill each label within bounding box
+                svox_bnd = nd.measurements.find_objects(self.data_cube)
+                if self.dpCleanLabels_verbose:
+                    print('\t\tdone in %.4f s' % (time.time() - t)); t = time.time(); 
+                    verbose = self.dpCleanLabels_verbose; self.dpCleanLabels_verbose = False
+                nSeeds = len(svox_bnd); lbls = np.zeros(self.size, dtype=self.data_cube.dtype)
+                for j in range(nSeeds):
+                    csel, selbg, msk = self.cavity_fill_voxels(self.data_cube[svox_bnd[j]] == j+1, tab=True)
+                    lbls[svox_bnd[j]][csel] = j+1
+                
+                if verbose:
+                    print('\tdone in %.4f s' % (time.time() - t)); self.dpCleanLabels_verbose = True
+            else:
+                self.data_cube, selbg, msk = self.cavity_fill_voxels(self.data_cube)
 
             # this prevents any supervoxels as being classified as "membrane".
             # many scripts assume that membrane is labeled as background (label 0).
@@ -448,6 +464,11 @@ class dpCleanLabels(emLabels):
         # used to set min label value for both relabel and minsize
         p.add_argument('--min-label', nargs=1, type=int, default=[1], metavar=('min'),
                        help='First label after relabel if relabeling (also minsize)')
+
+        # xxx - new switch intended to have actions performed per label instead of the whole volume at once.
+        #   intended for medium-large volumes but in situations where superchunking is not desireable.
+        #   currently supported for: cavity_fill
+        p.add_argument('--labelwise', action='store_true', help='Perform operations on each label sequentially')
 
         # other options
         p.add_argument('--fg-connectivity', nargs=1, type=int, default=[1], choices=[1,2,3],
