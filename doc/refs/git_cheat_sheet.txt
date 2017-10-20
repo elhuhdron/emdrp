@@ -46,4 +46,9 @@ git push -u origin 3D_meshes
 git stash; git pull origin 3D_meshes; git stash pop
 git fetch origin; git reset --hard origin/3D_meshes
 
+for tagging stuff for releases
+git tag v5.0-3D_meshes
+git push -u origin 3D_meshes --tags
+git push --delete origin v5.0-3D_meshes
+git tag --delete v5.0-3D_meshes
 
