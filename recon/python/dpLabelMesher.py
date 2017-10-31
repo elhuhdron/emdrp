@@ -44,6 +44,7 @@ from scipy import ndimage as nd
 import scipy.ndimage.filters as filters
 import vtk
 from vtk.util import numpy_support as nps
+from skimage.measure import mesh_surface_area
 
 #from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
@@ -174,6 +175,8 @@ class dpLabelMesher(emLabels):
         self.bounds_beg = n * [None]; self.bounds_end = n * [None]
         self.nFaces = np.zeros((n,), dtype=np.uint64); self.nVertices = np.zeros((n,), dtype=np.uint64);
         if self.doplots or self.mesh_outfile_stl: self.allPolyData = vtk.vtkAppendPolyData()
+        # compute and store surface area, number is based on whatever units are stored in the vertices
+        self.surface_area = np.zeros((n,), dtype=np.double)
 
         # get bounding boxes for each supervoxel
         if self.dpLabelMesher_verbose:
@@ -223,6 +226,9 @@ class dpLabelMesher(emLabels):
             # store vertices and faces for future reference
             self.nVertices[i] = self.vertices[i].shape[0]
             self.nFaces[i] = self.faces[i].shape[0]
+            
+            # calculate surface area based on units in vertices
+            self.surface_area[i] = mesh_surface_area(vertices, faces)
 
         if self.dpLabelMesher_verbose: print('Total ellapsed time meshing %.3f s' % (time.time() - tloop,))
 
@@ -382,7 +388,8 @@ class dpLabelMesher(emLabels):
                 # decided to use a fixed point for the vertex coordinates
                 vertices = np.fix((self.vertices[i] - mins)*self.vertex_divisor)
                 str_seed = ('%08d' % self.seeds[i])
-                self.writeData(h5file, beg, end, str_seed, self.faces[i], vertices, self.nVoxels[i])
+                self.writeData(h5file, beg, end, str_seed, self.faces[i], vertices, self.nVoxels[i], 
+                               surface_area=self.surface_area[i])
 
             self.nlabels = self.seeds[self.seed_range[1]-1]
             self.writeMeta(h5file)
@@ -390,7 +397,7 @@ class dpLabelMesher(emLabels):
             if self.dpLabelMesher_verbose:
                 print('\tdone in %.3f s' % (time.time() - t,))
 
-    def writeData(self, h5file, beg, end, str_seed, faces, vertices, nVoxels):
+    def writeData(self, h5file, beg, end, str_seed, faces, vertices, nVoxels, surface_area=None):
         nVertices = vertices.shape[0]; nFaces = faces.shape[0]
 
         # do some checking on the stored types
@@ -423,6 +430,7 @@ class dpLabelMesher(emLabels):
             h5file.create_dataset(dsetpath + '/faces', data=faces, dtype=self.FACE_DTYPE)
         dset = h5file[self.dataset_root][str_seed]['vertices']
         dset.attrs.create('nVoxels',nVoxels)
+        if surface_area is not None: dset.attrs.create('surface_area',surface_area)
         beg = np.array([int(x) for x in beg*self.vertex_divisor], dtype=self.BOUNDS_DTYPE)
         end = np.array([int(x) for x in end*self.vertex_divisor], dtype=self.BOUNDS_DTYPE)
         dset.attrs.create('bounds_beg',beg); dset.attrs.create('bounds_end',end)

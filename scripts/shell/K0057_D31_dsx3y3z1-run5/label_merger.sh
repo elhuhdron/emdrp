@@ -8,5 +8,7 @@ mv /home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z
 
 ./dpCleanLabels.py --dataset labels --cavity-fill --ECS-label 0 --dpWriteh5-verbose --dpCleanLabels-verbose --srcfile /home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4.h5 --outfile /home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5 --chunk 0 0 0 --size 1696 1440 640 --labelwise
 
+python -u $HOME/gits/emdrp/recon/python/dpLabelMesher.py --dataset labels --dpLabelMesher-verbose --set-voxel-scale --dataset-root 0 --reduce-frac 0.02 --smooth 5 5 5 --mesh-outfile /home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5 --srcfile ~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5 --chunk 0 0 0 --size 1696 1440 640 
+
 dpLoadh5.py --srcfile ~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5 --dataset labels --chunk 0 0 0 --size 1696 1440 640 --outraw ~/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas.nrrd --dpL
 

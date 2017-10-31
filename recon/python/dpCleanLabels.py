@@ -227,6 +227,7 @@ class dpCleanLabels(emLabels):
                 for j in range(nSeeds):
                     csel, selbg, msk = self.cavity_fill_voxels(self.data_cube[svox_bnd[j]] == j+1, tab=True)
                     lbls[svox_bnd[j]][csel] = j+1
+                del self.data_cube; self.data_cube = lbls
                 
                 if verbose:
                     print('\tdone in %.4f s' % (time.time() - t)); self.dpCleanLabels_verbose = True
