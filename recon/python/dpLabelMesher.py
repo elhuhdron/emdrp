@@ -624,16 +624,21 @@ class dpLabelMesher(emLabels):
             #self.set_voxel_scale = dset_root[str_seed]['faces'].attrs['set_voxel_scale']
 
         # this loop continues until ctrl-C, automatically updates to next annotation file
-        while True:
-            # get the nml skeleton file and mergelist out of the zipped knossos annotation file
-            zf = zipfile.ZipFile(self.annotation_file, mode='r');
-            inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
-            zf.close()
-            # read the merge list
-            merge_list = inmerge.decode("utf-8").split('\n'); nlines = len(merge_list); n = nlines // 4
-
-            # read the skeletons
-            info, meta, commentsString = knossos_read_nml(krk_contents=inskel.decode("utf-8")); m = len(info)
+        loop = True
+        while loop:
+            loop = not self.show_all
+            if not self.show_all:
+                # get the nml skeleton file and mergelist out of the zipped knossos annotation file
+                zf = zipfile.ZipFile(self.annotation_file, mode='r');
+                inmerge = zf.read('mergelist.txt'); inskel = zf.read('annotation.xml');
+                zf.close()
+                # read the merge list
+                merge_list = inmerge.decode("utf-8").split('\n'); nlines = len(merge_list); n = nlines // 4
+    
+                # read the skeletons
+                info, meta, commentsString = knossos_read_nml(krk_contents=inskel.decode("utf-8")); m = len(info)
+            else:
+                n = len(dset_root) - 1; m = 0
 
             # allocate renderer for this pass
             renderer = vtk.vtkRenderer()
@@ -649,12 +654,15 @@ class dpLabelMesher(emLabels):
             for i in range(n):
                 self.allPolyData[i] = vtk.vtkAppendPolyData()
 
-                # Object_ID, ToDo_flag, Immutability_flag, Supervoxel_IDs, '\n'
-                tomerge = merge_list[i*4].split(' ')
-                cobj = int(tomerge[0])
+                if not self.show_all:
+                    # Object_ID, ToDo_flag, Immutability_flag, Supervoxel_IDs, '\n'
+                    tomerge = merge_list[i*4].split(' ')
+                    cobj = int(tomerge[0]); tomerge = tomerge[3:]
+                else:
+                    cobj = i+1; tomerge = np.array([cobj])
+                    
                 if nobjs > 0 and cobj not in self.merge_objects: continue
-                obj_cnt += 1; obj_sel[i] = 1
-                tomerge = tomerge[3:]
+                obj_cnt += 1; obj_sel[i] = 1; cmap_cnt = (obj_cnt - 1) % self.cmap.shape[0]
 
                 nsvox = len(tomerge); self.nSVoxels[i] = nsvox
                 self.faces[i] = nsvox * [None]; self.vertices[i] = nsvox * [None]
@@ -698,8 +706,8 @@ class dpLabelMesher(emLabels):
                 ##mapper.SetLookupTable(self.colorMap)  # xxx - couldn't get this to work
                 self.allActors[i] = vtk.vtkActor()
                 self.allActors[i].SetMapper(self.allMappers[i])
-                self.allActors[i].GetProperty().SetColor(self.cmap[obj_cnt-1,0],self.cmap[obj_cnt-1,1],
-                    self.cmap[obj_cnt-1,2])
+                self.allActors[i].GetProperty().SetColor(self.cmap[cmap_cnt,0],self.cmap[cmap_cnt,1],
+                              self.cmap[cmap_cnt,2])
                 self.allActors[i].GetProperty().SetOpacity(self.opacity)
                 renderer.AddActor(self.allActors[i])
 
@@ -714,7 +722,7 @@ class dpLabelMesher(emLabels):
             skel_cnt = 0; skel_sel = np.zeros((m,),dtype=np.bool)
             for i in range(m):
                 if nskels > 0 and info[i]['thingID'] not in self.skeletons: continue
-                skel_cnt += 1; skel_sel[i] = 1
+                skel_cnt += 1; skel_sel[i] = 1; cmap_cnt = (skel_cnt - 1) % self.cmap.shape[0]
 
                 cvertices = info[i]['nodes'][:,:3].copy(order='C'); cfaces = info[i]['edges']
                 nvertices = cvertices.shape[0]; nfaces = cfaces.shape[0]
@@ -749,8 +757,8 @@ class dpLabelMesher(emLabels):
                 self.skel_allMappers[i].ScalarVisibilityOff()
                 self.skel_allActors[i] = vtk.vtkActor()
                 self.skel_allActors[i].SetMapper(self.skel_allMappers[i])
-                self.skel_allActors[i].GetProperty().SetColor(self.cmap[skel_cnt,0],self.cmap[skel_cnt,1],
-                    self.cmap[skel_cnt,2])
+                self.skel_allActors[i].GetProperty().SetColor(self.cmap[cmap_cnt,0],self.cmap[cmap_cnt,1],
+                    self.cmap[cmap_cnt,2])
                 renderer.AddActor(self.skel_allActors[i])
 
                 if self.show_node_ids:
@@ -1022,6 +1030,7 @@ class dpLabelMesher(emLabels):
                        help='Input annotation file from knossos (show merged meshes)')
         p.add_argument('--annotation-file-mesh', action='store_true',
                        help='Mesh only supervoxels from the knossos annotation file')
+        p.add_argument('--show-all', action='store_true', help='Show all meshes in mesh_infiles')
         p.add_argument('--write_hdf5', action='store_true',
                        help='Write separate mesh file for annotated meshes')
         p.add_argument('--dataset-root', nargs=1, type=str, default='meshes', help='Top level for hdf5 outfile')
@@ -1066,7 +1075,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     seg2mesh = dpLabelMesher(args)
-    if seg2mesh.annotation_file:
+    if seg2mesh.annotation_file or seg2mesh.show_all:
         if seg2mesh.annotation_file_mesh:
             # create or recreate meshes but only for supervoxels in merge list from knossos annotation file
             seg2mesh.mergeMesh()
