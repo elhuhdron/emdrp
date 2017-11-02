@@ -26,32 +26,33 @@
 
 % Iterate over multiple magnifications and write to separate datasets in hdf5
 %mags = [1 2 4 8 16];
-mags = 1;
+%mags = 1;
+mags = 16;
 
 for mag = mags
 
   % Name of the dataset, stored in meta, used in filename
-  dataset = 'M0027_11';
+  %dataset = 'M0027_11';
   %dataset = 'k0725';
-  %dataset = 'K0057_D31';
+  dataset = 'K0057_D31';
 
   % Paths to root of Knossos raw data and path to where hdf5 should be written.
-  inpath = sprintf('/mnt/cdcu/Common/ECS_paper/ECS_3d_analysis/M0027_11/cubes/M0027_11_mag%d',mag);
+  %inpath = sprintf('/mnt/cdcu/Common/ECS_paper/ECS_3d_analysis/M0027_11/cubes/M0027_11_mag%d',mag);
   %outpath = '/Data/big_datasets';
   %inpath = sprintf('/mnt/cdcu/common/110629_k0725/cubes/%s_mag%d',dataset,mag);
-  %inpath = sprintf('/run/media/watkinspv/My Passport/K0057_D31/cubes/K0057_D31_mag%d',mag);
-  outpath = '/Data/watkinspv';
+  inpath = sprintf('/mnt/ext/K0057_D31/cubes/mag%d',mag);
+  outpath = '/Data_yello/watkinspv/Downloads';
 
   % The raw size of the Knossos cubes
   rawsize = [128 128 128];
   
   % name of the Knossos configuration file with data to be added to hdf5 meta folder
-  knossos_conf_fn = 'Knossos.conf';
+  knossos_conf_fn = 'knossos.conf';
   
   % The prefix of the raw file names (Knossos cubes)
-  raw_prefix = sprintf('M0027_11_mag%d',mag);
+  %raw_prefix = sprintf('M0027_11_mag%d',mag);
   %raw_prefix = sprintf('110629_k0725_mag%d',mag);
-  %raw_prefix = sprintf('K0057_D31_mag%d',mag);
+  raw_prefix = sprintf('K0057_D31_mag%d',mag);
   
   % Chunksize written to hdf5 file, typically same as the Knossos raw size
   chunksize = rawsize;
@@ -62,6 +63,9 @@ for mag = mags
   % Whether to use the size from Knossos conf instead of parsing the dirs.
   use_conf_size = true;
 
+  % Whether dataset size needs to be scaled by mag or not
+  scale_conf_size = true;
+  
   % Whether to rerun the script for parsing to Knossos paths to find all populated raw files in the hypercube.
   reparse_dirs = false;
 
@@ -71,7 +75,7 @@ for mag = mags
   % Options for only writing a subset of the Knossos raw chunks to the hdf5 file.
   % This will result in chunk indices into the hdf5 file that start at (0,0,0) for the offset defined here.
   % Use false for writing the entire hypercube to the hdf5 file.
-  do_chunk_select = true;
+  do_chunk_select = false;
   assert( ~do_chunk_select || length(mags)==1 ); % xxx - can't do select with multiple mags right now
   chunk_sel_offset = [12 14 2];
   nchunks_sel = [8 8 4];
@@ -97,7 +101,10 @@ for mag = mags
   matname = [dataset '_' data_name '_dirs_info.mat'];
   if use_conf_size
     fprintf(1,'Using Knossos conf size %d,%d,%d\n',knossos_conf.boundary);
-    %assert( all(mod(knossos_conf.boundary, rawsize)==0) );
+    if scale_conf_size
+      knossos_conf.boundary = fix(knossos_conf.boundary / mag);
+      fprintf(1,'Scaling Knossos conf size to %d,%d,%d\n',knossos_conf.boundary);
+    end
     nchunks = ceil(double(knossos_conf.boundary) ./ rawsize);
     chunk_lists = true(nchunks);
     fprintf(1,'Ceil size size %d,%d,%d\n',nchunks.*chunksize);
