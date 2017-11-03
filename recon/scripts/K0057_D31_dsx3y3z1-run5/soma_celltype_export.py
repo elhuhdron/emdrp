@@ -11,7 +11,7 @@ from scipy import io as sio
 #from skimage import morphology as morph
 #import networkx as nx
 
-#from dpLoadh5 import dpLoadh5
+from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
 #from typesh5 import emLabels, emProbabilities, emVoxelType
 from typesh5 import emLabels
@@ -32,8 +32,8 @@ soma_valid_labels = np.transpose(np.nonzero(sizes > 0)) + 1
 print( 'Number of soma labels is %d' % (soma_valid_labels.size,) )
 
 # get the soma label and cell type for each soma center
-sel = (cell_centers_types > 0); soma_labels = somas[sel]; soma_types = cell_centers_types[sel]
-inds = np.transpose(np.nonzero(sel))
+sel = (cell_centers_types > 0); soma_labels = somas[sel]; soma_types = cell_centers_types[sel]; del cell_centers_types
+inds = np.transpose(np.nonzero(sel)); del sel
 # remove unlabeled somas
 sel = (soma_labels > 0); soma_labels = soma_labels[sel]; soma_types = soma_types[sel]; inds = inds[sel,:]
 nLabels = soma_labels.size
@@ -54,3 +54,8 @@ mat_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas.mat'
 sio.savemat(mat_out, {'soma_labels':soma_labels, 'soma_types':soma_types, 'soma_center_inds':inds,
                       'soma_volumes':soma_volumes, 'soma_surface_areas':soma_surface_areas,
                       'soma_valid_labels':soma_valid_labels})
+
+# export another volume with each soma labeled with its cell type
+soma_types = np.insert(soma_types,0,0); somas = soma_types[somas]
+somas_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_celltypes.gipl'
+dpLoadh5.gipl_write_volume(somas.transpose((2,1,0)), np.array(somas.shape), somas_out, hdr['scales'][:3])
