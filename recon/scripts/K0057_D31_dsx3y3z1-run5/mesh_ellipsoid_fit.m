@@ -2,7 +2,7 @@
 function mesh_ellipsoid_fit
 
 % xxx - change this to wherever you downloaded the file to
-h5file = '/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-old.0.mesh.h5';
+h5file = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
 
 %ncuts = 0;
 ncuts = 10;
@@ -42,7 +42,6 @@ for seed=1:nseeds
     for i=1:ncuts
       for j=1:ncuts
         sel = (pts(:,1) > x(i)) & (pts(:,1) < y(j));
-        %[ center, radii, evecs, v, chi2, d, ind ] = best_ellipsoid_fit( pts(sel,:), fit_params, nsteps );
         [ ~,radii,~,~,~, d, ~ ] = best_ellipsoid_fit( pts(sel,:), {}, nsteps );
         if d < dmin
           % expand the cut back out by some amount in both directions
@@ -62,17 +61,14 @@ for seed=1:nseeds
       [~,~,V] = svd(cCpts,0); pts = bsxfun(@plus,(V'*bsxfun(@minus,pts',cC')),cC')';
     end
     
-    % https://www.mathworks.com/matlabcentral/fileexchange/24693-ellipsoid-fit
-    %[ center, radii, evecs, v, chi2, d, ind ] = best_ellipsoid_fit( pts(selmin, :), fit_params, nsteps );
-    [ center, radii, evecs, v, ~, d, ~ ] = best_ellipsoid_fit( pts(selmin, :), {'0'}, nsteps );
-    
+    [ center, radii, evecs, v, ~, d, ~ ] = best_ellipsoid_fit( pts(selmin, :), {''}, nsteps );
     plot_pts_fit(pts, selmin, center, radii, evecs, v, d, nsteps);
     pause
   end
 end
 
 function [ center, radii, evecs, v, chi2, dmin, ind ] = best_ellipsoid_fit( pts, fit_params, nsteps )
-if isempty(fit_params), fit_params = {'' 'xy' 'xz' 'xyz' '0' '0xy' '0xz'}; end
+if isempty(fit_params), fit_params = {'' 'xy' 'xz' 'yz' 'xyz' '0' '0xy' '0xz' '0yz'}; end
 dmin = inf;
 for i=1:length(fit_params)
   [ ccenter, cradii, cevecs, cv, cchi2 ] = ellipsoid_fit( pts, fit_params{i} );
@@ -80,7 +76,7 @@ for i=1:length(fit_params)
   epts = ellipse_pts_sph(ccenter,cradii,nsteps); [~, d] = knnsearch(pts, epts);
   % what metric to use with nearest point distances?
   d = mean(d);
-  % only take ellipsoids
+  % only take ellipsoids, other quadric sections have negative radii
   if all(cradii > 0) && d < dmin 
     dmin = d; ind = i; center = ccenter; radii = cradii; evecs = cevecs; v = cv; chi2 = cchi2;
   end
