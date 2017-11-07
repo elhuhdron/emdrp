@@ -1,6 +1,6 @@
 
 % xxx - change this to wherever you downloaded the file to
-h5file = '/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-old.0.mesh.h5';
+h5file = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
 
 inf = h5info(h5file);
 dataset_root = '0';

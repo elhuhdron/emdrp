@@ -3,20 +3,24 @@ function mesh_ellipsoid_fit
 
 % xxx - change this to wherever you downloaded the file to
 h5file = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
+outcutfile = '~/Downloads/K0057_soma_annotation/out/soma_cuts.mat';
+outfitfile = '~/Downloads/K0057_soma_annotation/out/soma_fits.mat';
 
 %ncuts = 0;
-ncuts = 10;
-nsteps = 100;
+ncuts = 20;
 scale = 4; % fudge factor
-doplots = true;
+nsteps = 200;
+doplots = false;
+savefits = false;
 
 info = h5info(h5file);
 dataset_root = '0';
 nseeds = length({info.Groups(1).Groups.Name})-1;
-%cmap = hsv(32);
-%cmap = cmap(randperm(size(cmap,1)),:);
 
+cut_n = zeros(nseeds,3); cut_d = zeros(nseeds,2);
+fit_v = zeros(nseeds,10); fit_r =  zeros(nseeds,3); fit_R = zeros(nseeds,3,3); fit_C = zeros(nseeds,3);
 for seed=1:nseeds
+  t = now;
   seed_root = sprintf('/%s/%08d',dataset_root,seed);
   %faces = h5read(h5file, [seed_root '/faces']);
   vertices = h5read(h5file, [seed_root '/vertices']);
@@ -27,49 +31,67 @@ for seed=1:nseeds
   % in matlab V is returned normal (not transposed), so "eigenvectors" are along columns,
   %   i.e. V(:,1) V(:,2) V(:,3)
   %[~,S,V] = svd(Cpts,0); s = sqrt(diag(S).^2/(npts-1));
-  [~,~,V] = svd(Cpts,0); %s = sqrt(diag(S).^2/(npts-1));
+  [~,~,V] = svd(Cpts,0);
   
   % rotate the points to align on cartesian axes
-  pts = bsxfun(@plus,(V'*bsxfun(@minus,pts',C')),C')';
-  C = mean(pts,1); %Cpts = bsxfun(@minus,pts,C);
+  rpts = bsxfun(@plus,(V'*bsxfun(@minus,pts',C')),C')';
+  rC = mean(rpts,1);
 
   if ncuts > 0
     % march cutting plane along principal eigen axis starting at either end into centroid
-    mind = min( pts ); maxd = max( pts ); dmin = inf;
-    stepmin = ( C - mind ) / ncuts; stepmax = ( maxd - C ) / ncuts;
-    x = linspace( mind(1) + stepmin(1), C(1) - stepmin(1), ncuts );
-    y = linspace( C(1) + stepmax(1), maxd(1) - stepmax(1), ncuts );
+    mind = min( rpts ); maxd = max( rpts ); dmin = inf;
+    stepmin = ( rC - mind ) / ncuts; stepmax = ( maxd - rC ) / ncuts;
+    x = linspace( mind(1), rC(1) - stepmin(1), ncuts ); y = linspace( rC(1) + stepmax(1), maxd(1), ncuts );
     for i=1:ncuts
       for j=1:ncuts
-        sel = (pts(:,1) > x(i)) & (pts(:,1) < y(j));
-        [ ~,radii,~,~,~, d, ~ ] = best_ellipsoid_fit( pts(sel,:), {}, nsteps );
+        sel = (rpts(:,1) > x(i)) & (rpts(:,1) < y(j));
+        [ ~,radii,~,~,~, d, ~ ] = best_ellipsoid_fit( rpts(sel,:), {}, nsteps );
         if d < dmin
           % expand the cut back out by some amount in both directions
-          dmin = d; selmin = (pts(:,1) > x(i) - radii(1)/scale) & (pts(:,1) < y(j) + radii(1)/scale);
+          minx = x(i) - radii(1)/scale; maxx = y(j) + radii(1)/scale;
+          dmin = d; %selmin = (rpts(:,1) > minx) & (rpts(:,1) < maxx);
         end
       end
     end
+    
+    % get the equation of the cutting plane in the original coordinate system
+    cut_pts = [rC; rC]; cut_pts(1,1) = minx; cut_pts(2,1) = maxx;
+    % rotate cutting plane points back to original frame
+    cut_pts = bsxfun(@plus,(V*bsxfun(@minus,cut_pts',C')),C')';
+    % calculate the plane offsets using the cutting points
+    n = (V*[1;0;0])'; d = [-sum(n.*cut_pts(1,:)) -sum(n.*cut_pts(2,:))];
+    cut_n(seed,:) = n; cut_d(seed,:) = d;
+    
+    % create point select in original coordinate frame as sanity check
+    selmin = (sum(bsxfun(@times,pts,n),2) + d(1) > 0) & (sum(bsxfun(@times,pts,n),2) + d(2) < 0);
   else
     selmin = true(npts,1);
   end
 
+  if doplots || savefits
+    [ center, radii, evecs, v, ~, d, ~ ] = best_ellipsoid_fit( rpts(selmin, :), {}, nsteps );
+    fit_v(seed,:) = v; fit_R(seed,:,:) = V; fit_C(seed,:) = C; fit_r(seed,:) = radii;
+  end
+  
   if doplots
-    if ncuts > 0
-      % rotate again to align the eigenvectors of cut points along cartesian axes
-      cpts = pts(selmin, :);
-      cC = mean(cpts,1); cCpts = bsxfun(@minus,pts,cC);
-      [~,~,V] = svd(cCpts,0); pts = bsxfun(@plus,(V'*bsxfun(@minus,pts',cC')),cC')';
-    end
-    
-    [ center, radii, evecs, v, ~, d, ~ ] = best_ellipsoid_fit( pts(selmin, :), {''}, nsteps );
-    plot_pts_fit(pts, selmin, center, radii, evecs, v, d, nsteps);
+    plot_pts_fit(rpts, selmin, center, radii, evecs, v, d, nsteps);
     pause
   end
+  
+  fprintf(1,'seed %d of %d in %.4f s\n',seed,nseeds,(now-t)*86400);
 end
+
+if ncuts > 0
+  save(outcutfile, 'cut_n', 'cut_d');
+end
+
+if savefits
+  save(outfitfile, 'fit_v', 'fit_R', 'fit_C', 'fit_r');
+end  
 
 function [ center, radii, evecs, v, chi2, dmin, ind ] = best_ellipsoid_fit( pts, fit_params, nsteps )
 if isempty(fit_params), fit_params = {'' 'xy' 'xz' 'yz' 'xyz' '0' '0xy' '0xz' '0yz'}; end
-dmin = inf;
+dmin = inf; ind = 0; center = []; radii = []; evecs = []; v = []; chi2 = [];
 for i=1:length(fit_params)
   [ ccenter, cradii, cevecs, cv, cchi2 ] = ellipsoid_fit( pts, fit_params{i} );
   %fv = ellipse_pts(pts,nsteps,cv); [~, d] = knnsearch(pts, fv.vertices);
@@ -94,8 +116,8 @@ plot3( x(~sel), y(~sel), z(~sel), '.r' ); hold on
 %epts = ellipse_pts_sph(center, radii, nsteps);
 %plot3(epts(:,1),epts(:,2),epts(:,3),'.g');
 p = patch( ellipse_pts(pts,50,v) ); set( p, 'FaceColor', 'g', 'EdgeColor', 'none', 'facealpha', 0.5);
-%view( -70, 40 ); 
-view( 2 ); 
+view( -70, 40 ); 
+%view( 2 ); 
 axis vis3d equal; camlight; lighting phong;
 title(sprintf('distance metric %g', sqrt( dist / size( pts, 1 ) )));
 xlabel('x'); ylabel('y'); zlabel('z');
