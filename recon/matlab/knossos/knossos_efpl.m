@@ -490,7 +490,7 @@ for prm=1:o.nparams
     %   (3) intersect the supervoxel with the plane
     %   (4) get diameter as major axis of supervoxel intersected with plane
     pass = 3; % which pass to use for error free, 3 is split or merger
-    minnormal = 1e-4;
+    minnormal = 1e-2;
     % xxx - distance to plane method doesn't work, see below
     %dx = o.scale*10; dthr = sqrt(sum(o.scale.^2))*10; % worked for debug using sensitivity simulated labels
     %dx = o.scale/2; dthr = min(o.scale)/2; % for realistic supervoxels
@@ -536,11 +536,12 @@ for prm=1:o.nparams
         n2pt = (o.info(n).nodes(n2,1:3) - o.loadcorner - corner).*o.scale;
 
         % create the plane orthgonal to the edge within cropped area
-        normal = n1pt - n2pt; d = -sum((n1pt+n2pt)/2 .* normal); assert(any(abs(normal)>minnormal));
-        if normal(3) > minnormal || normal(3) < -minnormal
+        normal = n1pt - n2pt; d = -sum((n1pt+n2pt)/2 .* normal);
+        assert(any(abs(normal)>minnormal)); [~,j] = max(abs(normal));
+        if j==3
           [xx,yy] = ndgrid(0:dx(1):srng(1),0:dx(2):srng(2));
           zz = -(normal(1)*xx + normal(2)*yy + d)/normal(3);
-        elseif normal(2) > minnormal || normal(2) < -minnormal
+        elseif j==2
           [xx,zz] = ndgrid(0:dx(1):srng(1),0:dx(3):srng(3));
           yy = -(normal(1)*xx + normal(3)*zz + d)/normal(2);
         else
