@@ -23,7 +23,7 @@ from dpWriteh5 import dpWriteh5
 from typesh5 import emLabels
 #from pyCext import binary_warping
 
-somas_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas.gipl'
+somas_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas.gipl'
 data, hdr, info = dpWriteh5.gipl_read_volume(somas_in)
 somas = data.reshape(hdr['sizes'][:3][::-1]).transpose(((2,1,0)))
 sampling = hdr['scales'][:3]
@@ -33,12 +33,12 @@ sizes = emLabels.getSizes(somas); sizes = sizes[1:];
 soma_valid_labels = (np.transpose(np.nonzero(sizes > 0)) + 1).reshape(-1).tolist()
 print( 'Number of soma labels is %d' % (len(soma_valid_labels),) )
 
-#mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/soma_cuts.mat'
-mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/soma_fits.mat'
+mat_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/soma_cuts.mat'
+#mat_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/soma_fits.mat'
 d = sio.loadmat(mat_in)
 
-apply_cuts=False
-apply_ellipsoids=True
+apply_cuts=True
+apply_ellipsoids=False
 
 # iterate over labels, fill each label within bounding box
 svox_bnd = nd.measurements.find_objects(somas, max_label=sizes.size)
@@ -48,12 +48,15 @@ for j in soma_valid_labels:
     if apply_cuts:
         sel = (somas[svox_bnd[j-1]] == j) # binary select within bounding box
         pts = np.transpose(np.nonzero(sel)).astype(np.double)*sampling # pts is nx3
+        npts = pts.shape[0]
     
         # remove points outside cutting planes loaded from mat file
         #(sum(bsxfun(@times,pts,n),2) + d(1) > 0) & (sum(bsxfun(@times,pts,n),2) + d(2) < 0);
-        sel_pts = np.logical_and((pts*d['cut_n'][j-1,:]).sum(1) + d['cut_d'][j-1,0] > 0,
-            (pts*d['cut_n'][j-1,:]).sum(1) + d['cut_d'][j-1,1] < 0)
-    
+        sel_pts = np.ones((npts,), np.bool)
+        if not np.isinf(d['cut_d'][j-1,0]):
+            sel_pts = np.logical_and(sel_pts, (pts*d['cut_n'][j-1,:]).sum(1) + d['cut_d'][j-1,0] > 0)
+        if not np.isinf(d['cut_d'][j-1,1]):
+            sel_pts = np.logical_and(sel_pts, (pts*d['cut_n'][j-1,:]).sum(1) + d['cut_d'][j-1,1] < 0)
 
     if apply_ellipsoids:
         sel = np.ones(somas[svox_bnd[j-1]].shape, dtype=np.bool) # binary select of all bounding box
@@ -72,6 +75,6 @@ for j in soma_valid_labels:
     cut_somas[svox_bnd[j-1]][sel_out] = j
 
         
-#somas_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_cut.gipl'
-somas_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_ellip.gipl'
+somas_out='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_cut.gipl'
+#somas_out='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_ellip.gipl'
 dpLoadh5.gipl_write_volume(cut_somas.transpose((2,1,0)), np.array(cut_somas.shape), somas_out, hdr['scales'][:3])

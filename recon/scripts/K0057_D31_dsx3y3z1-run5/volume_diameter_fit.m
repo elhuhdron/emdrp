@@ -3,13 +3,15 @@ function volume_diameter_fit
 
 % xxx - change this to wherever you downloaded the file to
 h5mesh = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
-h5vol = '/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5';
+h5vol = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5';
 bounds_mat = '~/Downloads/K0057_soma_annotation/out/soma_bounds.mat';
+outcutfile = '~/Downloads/K0057_soma_annotation/out/soma_cuts.mat';
 
-ncuts = 50;
-smoothdia = 500; % nm
+ncuts = 100;
+smoothdia = 500; % nm, smoothing window size for diameters
+slope_cut = 0.5; % fudge factor for determining point to cut
 dataset_root = '0';
-doplots = true;
+doplots = false;
 getbounds = false;
 
 scale = h5readatt(h5vol,'/labels','scale')';
@@ -28,9 +30,9 @@ end
 info = h5info(h5mesh);
 nseeds = length({info.Groups(1).Groups.Name})-1;
 
-%cut_n = zeros(nseeds,3); cut_d = zeros(nseeds,2);
+cut_n = zeros(nseeds,3); cut_d = inf(nseeds,2);
 for seed=1:nseeds
-  %t = now;
+  t = now;
   
   % load the meshes
   seed_root = sprintf('/%s/%08d',dataset_root,seed);
@@ -72,10 +74,12 @@ for seed=1:nseeds
     mind = min( rpts ); maxd = max( rpts ); step = ( maxd - mind ) / (ncuts+1); 
     cut_pts = repmat( rC, [ncuts 1] );
     cut_pts(:,1) = linspace( mind(1) + step(1), maxd(1) - step(1), ncuts );
+    
     % rotate cutting plane points back to original frame
     rcut_pts = bsxfun(@plus,(V*bsxfun(@minus,cut_pts',C')),C')';
     % calculate the plane offsets using the cutting points
     normal = (V*[1;0;0])'; d = -sum(bsxfun(@times,normal,rcut_pts),2);
+    cut_n(seed,:) = normal;
 
     diameters = nan(1,ncuts);
     for i=1:ncuts
@@ -113,27 +117,24 @@ for seed=1:nseeds
     sdiameters = nan(1,length(diameters)); dsdiameters = nan(1,length(diameters)); 
     tmp = filter(ones(1, box)/box, 1, diameters); 
     sdiameters(1:end-fdelay) = tmp(fdelay+1:end);
-    tmp = filter(ones(1, box)/box, 1, diff(sdiameters)); 
-    dsdiameters(1:end-fdelay-1) = abs(tmp(fdelay+1:end));
+    % smooth the derivative of diameters
+    tmp = filter(ones(1, box)/box, 1, diff(sdiameters)/step(1)); 
+    dsdiameters(1:end-fdelay-1) = tmp(fdelay+1:end);
 
-    % heuristics to find a good cutting plane, if any
-    selbig = (sdiameters > max(sdiameters)/2);
-    selsteep = (dsdiameters > max(dsdiameters(selbig))/2);
-    selcut = (~selbig & ~selsteep & isfinite(sdiameters) & isfinite(dsdiameters));
-    bwp = regionprops(selcut,'basic'); [~,j] = max([bwp.Area]);
-    cuti = 0; cutright = false;
-    if ~isempty(bwp)
-      left = ceil(bwp(j).BoundingBox(1)); right = ceil(bwp(j).BoundingBox(1)) + bwp(j).BoundingBox(3);
-      if left < box
-        %cuti = right - 1;
-        cuti = right;
-        selmin = (rvertices(:,1) > cut_pts(cuti,1));
-      elseif right > ncuts - box
-        %cuti = left + 1; 
-        cuti = left; 
-        cutright = true;
-        selmin = (rvertices(:,1) < cut_pts(cuti,1));
-      end
+    % take only the main diameter peak of the soma
+    cutL = 0; cutR = 0;
+    [m,j] = max(sdiameters); sel = (sdiameters < m/3);
+    k = find((dsdiameters(j:-1:1) <= slope_cut) & sel(j:-1:1),1);
+    if ~isempty(k)
+      cutL = j-k+2; 
+      selmin = selmin & (rvertices(:,1) > cut_pts(cutL,1));
+      cut_d(seed,1) = d(cutL);
+    end
+    k = find((dsdiameters(j:end) >= -slope_cut) & sel(j:end),1);
+    if ~isempty(k)
+      cutR = j+k-2; 
+      selmin = selmin & (rvertices(:,1) < cut_pts(cutR,1));
+      cut_d(seed,2) = d(cutR);
     end
   end
   
@@ -142,13 +143,13 @@ for seed=1:nseeds
     
     figure(1235);clf
     [ax,hLine1,hLine2] = plotyy(xdiameters, sdiameters, xdiameters, dsdiameters); hold on
-    if cuti > 0
-      if cutright
-        plot([xdiameters(cuti) xdiameters(cuti)], [0 max(sdiameters)], 'r--');
-      else
-        plot([xdiameters(cuti) xdiameters(cuti)], [0 max(sdiameters)], 'r');
-      end
+    if cutL > 0
+      plot([xdiameters(cutL) xdiameters(cutL)], [0 max(sdiameters)], 'r');
     end
+    if cutR > 0
+      plot([xdiameters(cutR) xdiameters(cutR)], [0 max(sdiameters)], 'r');
+    end
+    
     hLine1.Marker = '.'; hLine2.Marker = '.';
     xlabel('eigenaxis distance (nm)')
     set(ax(1),'xlim',[xdiameters(1) xdiameters(end)]);
@@ -156,6 +157,12 @@ for seed=1:nseeds
     
     pause
   end
+  
+  fprintf(1,'seed %d of %d in %.4f s\n',seed,nseeds,(now-t)*86400);
+end
+
+if ncuts > 0
+  save(outcutfile, 'cut_n', 'cut_d');
 end
 
   
