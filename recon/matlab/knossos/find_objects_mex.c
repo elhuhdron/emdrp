@@ -31,9 +31,9 @@
 #include "mex.h"
 
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
-  uint32_T *lbls, nlabels, label;
+  uint32_T *lbls, nlabels;
   int64_T *label_mins, *label_maxs, subs[3];
-  size_t numel, m, n, nz, i, j, k;
+  size_t numel, m, n, nz, i, j, k, ind;
   mwSize ndims = mxGetNumberOfDimensions(prhs[0]);
   
   //function [label_mins, label_maxs] = find_objects(labels, nlabels)
@@ -55,7 +55,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
 
   // initialize maxes to -1 and mins beyond label size
   for( i=0; i < nlabels; i++ ) {
-    label_mins[i*3] = n+1; label_mins[i*3+1] = m+1; label_mins[i*3+2] = nz+1;
+    label_mins[i*3] = m+1; label_mins[i*3+1] = n+1; label_mins[i*3+2] = nz+1;
     label_maxs[i*3] = -1; label_maxs[i*3+1] = -1; label_maxs[i*3+2] = -1;
   }
 
@@ -64,13 +64,12 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[]) {
     for( i = 0; i < numel; i++ ) {
       subs[0] = i % m; subs[1] = (i / m) % n; subs[2] = i / m / n; // ind2sub for 3d
       
-      label = lbls[i];
-      if( label > 0 && label <= nlabels ) {
-        label--; // to use it as an index
+      if( lbls[i] > 0 && lbls[i] <= nlabels ) {
+        ind = 3u*(lbls[i]-1);
         for( j = 0; j < 3; j++ ) {
           subs[j]++; // be consistent with matlab, start at 1
-          if( subs[j] < label_mins[label*3+j] ) label_mins[label*3+j] = subs[j];
-          if( subs[j] > label_maxs[label*3+j] ) label_maxs[label*3+j] = subs[j];
+          if( subs[j] < label_mins[ind+j] ) label_mins[ind+j] = subs[j];
+          if( subs[j] > label_maxs[ind+j] ) label_maxs[ind+j] = subs[j];
         }
       }
     }
