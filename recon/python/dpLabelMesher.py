@@ -802,14 +802,15 @@ class dpLabelMesher(emLabels):
             print('\tnEdges %s' % (np.array_str(self.skel_nFaces[skel_sel])[1:-1]))
             dpLabelMesher.vtkShow(renderer=renderer)
 
-            parts = re.match('(.+?)\.(\d+?)\.(.+)', self.annotation_file).groups()
-            if len(parts) == 3:
-                try:
-                    self.annotation_file = '%s.%03d.%s' % (parts[0],int(parts[1])+1,parts[2])
-                except ValueError:
-                    pass
-            fn = input('Enter next annotation file [%s]: ' % self.annotation_file).strip()
-            if len(fn) > 0: self.annotation_file = fn
+            if loop:
+                parts = re.match('(.+?)\.(\d+?)\.(.+)', self.annotation_file).groups()
+                if len(parts) == 3:
+                    try:
+                        self.annotation_file = '%s.%03d.%s' % (parts[0],int(parts[1])+1,parts[2])
+                    except ValueError:
+                        pass
+                fn = input('Enter next annotation file [%s]: ' % self.annotation_file).strip()
+                if len(fn) > 0: self.annotation_file = fn
 
         if h5file is not None: h5file.close()
 
