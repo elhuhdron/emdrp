@@ -2,16 +2,16 @@
 function mesh_ellipsoid_fit
 
 % xxx - change this to wherever you downloaded the file to
-h5file = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
+h5file = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut.0.mesh.h5';
 outcutfile = '~/Downloads/K0057_soma_annotation/out/soma_cuts.mat';
-outfitfile = '~/Downloads/K0057_soma_annotation/out/soma_fits.mat';
+outfitfile = '~/Downloads/K0057_soma_annotation/out/somas_cut_fits.mat';
 
-%ncuts = 0;
-ncuts = 20;
+ncuts = 0;
+%ncuts = 20;
 scale = 4; % fudge factor
-nsteps = 200;
+nsteps = 100;
 doplots = false;
-savefits = false;
+savefits = true;
 
 info = h5info(h5file);
 dataset_root = '0';

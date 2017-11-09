@@ -1,7 +1,8 @@
 
 load('~/Downloads/K0057_soma_annotation/out/somas_cut.mat');
-load('~/Downloads/K0057_soma_annotation/out/soma_fits.mat');
 dsfactor=[12 12 4]./[16 16 16];
+baseno = 1000;
+figno=0;
 
 % print out "mergers" or discrepancies
 [unique_soma_labels,ia,ic] = unique(soma_labels);
@@ -25,7 +26,6 @@ fprintf(1,'Total %d unique soma labels\n', length(unique_soma_labels));
 
 soma_surface_areas = soma_surface_areas/1e6;
 soma_volumes = soma_volumes/1e9;
-fit_r = fit_r/1000;
 sphericity = pi^(1/3)*(6*soma_volumes).^(2/3)./soma_surface_areas;
 
 bins = 0:30:1200; cbins = bins(2:end)-((bins(2)-bins(1))/2);
@@ -38,16 +38,13 @@ types = {'CR','TH','CB','?'}; ntypes = length(types);
 types_clrs = reshape(hex2dec(...
   {'95' '19' '0c', '97' 'cc' '04', '08' '4e' 'ab', 'e3' 'b5' '05', '14' '14' '13'}...
   ),3,[])'/255;
-vlim=[0 1100]; salim=[0 900]; sphlim=[0.4 0.95]; rlim=[0 15];
+vlim=[0 1000]; salim=[0 700]; sphlim=[0.5 0.95]; rlim=[0 15];
 
 hvol = zeros(ntypes,length(bins)-1); hsa = zeros(ntypes,length(bins)-1); 
 hsph = zeros(ntypes,length(sbins)-1); cnt_types = zeros(ntypes,1);
 hvolsa = zeros(ntypes,length(bins2)-1,length(bins2)-1);
 hvolsph = zeros(ntypes,length(bins2)-1,length(sbins2)-1);
 hsasph = zeros(ntypes,length(bins2)-1,length(sbins2)-1);
-hrad0 = zeros(ntypes,length(rbins)-1);
-hrad1 = zeros(ntypes,length(rbins)-1);
-hrad2 = zeros(ntypes,length(rbins)-1);
 types_cnts_str = cell(1,ntypes);
 for type=1:ntypes
   sel = (soma_types==type);
@@ -61,26 +58,16 @@ for type=1:ntypes
   hvolsa(type,:,:) = histcounts2(soma_volumes(sel), soma_surface_areas(sel), bins2, bins2);
   hvolsph(type,:,:) = histcounts2(soma_volumes(sel), sphericity(sel), bins2, sbins2);
   hsasph(type,:,:) = histcounts2(soma_surface_areas(sel), sphericity(sel), bins2, sbins2);
-
-  hrad0(type,:) = histcounts(fit_r(sel,1), rbins);
-  hrad1(type,:) = histcounts(fit_r(sel,2), rbins);
-  hrad2(type,:) = histcounts(fit_r(sel,3), rbins);
 end
 % cdfs
 cvol = bsxfun(@rdivide, cumsum(hvol,2), cnt_types);
 csa = bsxfun(@rdivide, cumsum(hsa,2), cnt_types);
 csph = bsxfun(@rdivide, cumsum(hsph,2), cnt_types);
-crad0 = bsxfun(@rdivide, cumsum(hrad0,2), cnt_types);
-crad1 = bsxfun(@rdivide, cumsum(hrad1,2), cnt_types);
-crad2 = bsxfun(@rdivide, cumsum(hrad2,2), cnt_types);
 
 % normalize for pdfs, comment for counts
 hvol = bsxfun(@rdivide, hvol, cnt_types);
 hsa = bsxfun(@rdivide, hsa, cnt_types);
 hsph = bsxfun(@rdivide, hsph, cnt_types);
-hrad0 = bsxfun(@rdivide, hrad0, cnt_types);
-hrad1 = bsxfun(@rdivide, hrad1, cnt_types);
-hrad2 = bsxfun(@rdivide, hrad2, cnt_types);
 dlbl = 'probability density';
 %dlbl = 'count';
 
@@ -89,7 +76,7 @@ hvolsa = bsxfun(@rdivide, hvolsa, cnt_types);
 hvolsph = bsxfun(@rdivide, hvolsph, cnt_types);
 hsasph = bsxfun(@rdivide, hsasph, cnt_types);
 
-figure(1234); clf
+figno = figno+1; figure(figno+baseno); clf
 subplot(2,2,1);
 set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
 plot(cbins, hvol);
@@ -106,7 +93,7 @@ plot(csbins, hsph);
 xlabel('sphericity'); ylabel(dlbl)
 set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',sphlim);
 
-figure(1235); clf
+figno = figno+1; figure(figno+baseno); clf
 subplot(2,2,1);
 set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
 plot(cbins, cvol);
@@ -123,7 +110,7 @@ plot(csbins, csph);
 xlabel('sphericity'); ylabel('cumulative density')
 set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',sphlim);
 
-% figure(1236); clf
+% figno = figno+1; figure(figno+baseno); clf
 % for type=1:ntypes
 %   sel = (soma_types==type);
 %   scatter(soma_volumes(sel), sphericity(sel), 16, types_clrs(type,:)); hold on;
@@ -152,43 +139,73 @@ set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',sphlim);
 %   title(types{type})
 % end
 
-figure(2345); clf
-for type=1:ntypes
-  sel = (soma_types==type);
-  scatter3(fit_r(sel,1), fit_r(sel,2), fit_r(sel,3), 16, types_clrs(type,:)); hold on;
-end
-xlabel('x rad (mm)'); ylabel('y rad (mm)'); zlabel('z rad (mm)'); 
 
-figure(2346); clf
-subplot(2,2,1);
-set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
-plot(crbins, hrad0);
-xlabel('major r (mm)'); legend(types_cnts_str); ylabel(dlbl)
-set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
-subplot(2,2,2);
-set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
-plot(crbins, hrad1);
-xlabel('middle r (mm)'); ylabel(dlbl)
-set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
-subplot(2,2,3);
-set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
-plot(crbins, hrad2);
-xlabel('minor r (mm)'); ylabel(dlbl)
-set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
 
-figure(2347); clf
-subplot(2,2,1);
-set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
-plot(crbins, crad0);
-xlabel('major r (mm)'); legend(types_cnts_str,'location','southeast'); ylabel('cumulative density')
-set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
-subplot(2,2,2);
-set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
-plot(crbins, crad1);
-xlabel('middle r (mm)'); ylabel('cumulative density')
-set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
-subplot(2,2,3);
-set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
-plot(crbins, crad2);
-xlabel('minor r (mm)'); ylabel('cumulative density')
-set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
+% % xxx - ellipse fit analysis
+% 
+% 
+% load('~/Downloads/K0057_soma_annotation/out/somas_cut_fits.mat');
+% 
+% fit_r = fit_r/1000;
+% 
+% hrad0 = zeros(ntypes,length(rbins)-1);
+% hrad1 = zeros(ntypes,length(rbins)-1);
+% hrad2 = zeros(ntypes,length(rbins)-1);
+% for type=1:ntypes
+%   sel = (soma_types==type);
+% 
+%   hrad0(type,:) = histcounts(fit_r(sel,1), rbins);
+%   hrad1(type,:) = histcounts(fit_r(sel,2), rbins);
+%   hrad2(type,:) = histcounts(fit_r(sel,3), rbins);
+% end
+% crad0 = bsxfun(@rdivide, cumsum(hrad0,2), cnt_types);
+% crad1 = bsxfun(@rdivide, cumsum(hrad1,2), cnt_types);
+% crad2 = bsxfun(@rdivide, cumsum(hrad2,2), cnt_types);
+% 
+% % normalize for pdfs, comment for counts
+% hrad0 = bsxfun(@rdivide, hrad0, cnt_types);
+% hrad1 = bsxfun(@rdivide, hrad1, cnt_types);
+% hrad2 = bsxfun(@rdivide, hrad2, cnt_types);
+% dlbl = 'probability density';
+% %dlbl = 'count';
+% 
+% figno = figno+1; figure(figno+baseno); clf
+% for type=1:ntypes
+%   sel = (soma_types==type);
+%   scatter3(fit_r(sel,1), fit_r(sel,2), fit_r(sel,3), 16, types_clrs(type,:)); hold on;
+% end
+% xlabel('x rad (mm)'); ylabel('y rad (mm)'); zlabel('z rad (mm)'); 
+% 
+% figno = figno+1; figure(figno+baseno); clf
+% subplot(2,2,1);
+% set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
+% plot(crbins, hrad0);
+% xlabel('major r (mm)'); legend(types_cnts_str); ylabel(dlbl)
+% set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
+% subplot(2,2,2);
+% set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
+% plot(crbins, hrad1);
+% xlabel('middle r (mm)'); ylabel(dlbl)
+% set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
+% subplot(2,2,3);
+% set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
+% plot(crbins, hrad2);
+% xlabel('minor r (mm)'); ylabel(dlbl)
+% set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
+% 
+% figno = figno+1; figure(figno+baseno); clf
+% subplot(2,2,1);
+% set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
+% plot(crbins, crad0);
+% xlabel('major r (mm)'); legend(types_cnts_str,'location','southeast'); ylabel('cumulative density')
+% set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
+% subplot(2,2,2);
+% set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
+% plot(crbins, crad1);
+% xlabel('middle r (mm)'); ylabel('cumulative density')
+% set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
+% subplot(2,2,3);
+% set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
+% plot(crbins, crad2);
+% xlabel('minor r (mm)'); ylabel('cumulative density')
+% set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);

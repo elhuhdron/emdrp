@@ -1,7 +1,6 @@
 
 function volume_diameter_fit
 
-% xxx - change this to wherever you downloaded the file to
 h5mesh = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
 h5vol = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5';
 bounds_mat = '~/Downloads/K0057_soma_annotation/out/soma_bounds.mat';
@@ -10,18 +9,19 @@ outcutfile = '~/Downloads/K0057_soma_annotation/out/soma_cuts.mat';
 ncuts = 100;
 smoothdia = 500; % nm, smoothing window size for diameters
 slope_cut = 0.5; % fudge factor for determining point to cut
+cut_axis = 3; % which eigenaxis to cut along
 dataset_root = '0';
 doplots = false;
 getbounds = false;
 
 scale = h5readatt(h5vol,'/labels','scale')';
-minnormal = 1e-4;
+minnormal = 1e-2;
 dx = scale/5;
 
 if getbounds
   % read the whole volume and get bounding boxes
   Vlbls = h5read(h5vol, '/labels'); nseeds = double(max(Vlbls(:)));
-  [label_mins, label_maxs] = find_objects_mex(Vlbls, uint32(nseeds)); clear Vlbls
+  [label_mins, label_maxs] = find_objects_mex(uint32(Vlbls), uint32(nseeds)); clear Vlbls
   save(bounds_mat, 'label_mins', 'label_maxs', 'nseeds');
 else
   load(bounds_mat);
@@ -31,7 +31,9 @@ info = h5info(h5mesh);
 nseeds = length({info.Groups(1).Groups.Name})-1;
 
 cut_n = zeros(nseeds,3); cut_d = inf(nseeds,2);
+rcut_n = zeros(3,1); rcut_n(cut_axis) = 1;
 for seed=1:nseeds
+%for seed=710:nseeds
   t = now;
   
   % load the meshes
@@ -73,22 +75,22 @@ for seed=1:nseeds
     % march plane along principal eigen axis and measure diameter
     mind = min( rpts ); maxd = max( rpts ); step = ( maxd - mind ) / (ncuts+1); 
     cut_pts = repmat( rC, [ncuts 1] );
-    cut_pts(:,1) = linspace( mind(1) + step(1), maxd(1) - step(1), ncuts );
+    cut_pts(:,cut_axis) = linspace( mind(cut_axis) + step(cut_axis), maxd(cut_axis) - step(cut_axis), ncuts );
     
     % rotate cutting plane points back to original frame
     rcut_pts = bsxfun(@plus,(V*bsxfun(@minus,cut_pts',C')),C')';
     % calculate the plane offsets using the cutting points
-    normal = (V*[1;0;0])'; d = -sum(bsxfun(@times,normal,rcut_pts),2);
+    normal = (V*rcut_n)'; d = -sum(bsxfun(@times,normal,rcut_pts),2);
     cut_n(seed,:) = normal;
 
     diameters = nan(1,ncuts);
     for i=1:ncuts
         % create the plane orthgonal to the edge within cropped area
-        assert(any(abs(normal)>minnormal));
-        if normal(3) > minnormal || normal(3) < -minnormal
+        assert(any(abs(normal)>minnormal)); [~,j] = max(abs(normal));
+        if j==3
           [xx,yy] = ndgrid(0:dx(1):srng(1),0:dx(2):srng(2));
           zz = -(normal(1)*xx + normal(2)*yy + d(i))/normal(3);
-        elseif normal(2) > minnormal || normal(2) < -minnormal
+        elseif j==2
           [xx,zz] = ndgrid(0:dx(1):srng(1),0:dx(3):srng(3));
           yy = -(normal(1)*xx + normal(3)*zz + d(i))/normal(2);
         else
@@ -112,13 +114,13 @@ for seed=1:nseeds
     end
     
     % smooth the diameters
-    box = ceil(smoothdia/step(1)); if mod(box,2)==0, box=box+1; end 
-    fdelay = (box-1)/2; xdiameters = (1:length(diameters))*step(1);
+    box = ceil(smoothdia/step(cut_axis)); if mod(box,2)==0, box=box+1; end 
+    fdelay = (box-1)/2; xdiameters = (1:length(diameters))*step(cut_axis);
     sdiameters = nan(1,length(diameters)); dsdiameters = nan(1,length(diameters)); 
     tmp = filter(ones(1, box)/box, 1, diameters); 
     sdiameters(1:end-fdelay) = tmp(fdelay+1:end);
     % smooth the derivative of diameters
-    tmp = filter(ones(1, box)/box, 1, diff(sdiameters)/step(1)); 
+    tmp = filter(ones(1, box)/box, 1, diff(sdiameters)/step(cut_axis)); 
     dsdiameters(1:end-fdelay-1) = tmp(fdelay+1:end);
 
     % take only the main diameter peak of the soma
@@ -127,14 +129,14 @@ for seed=1:nseeds
     k = find((dsdiameters(j:-1:1) <= slope_cut) & sel(j:-1:1),1);
     if ~isempty(k)
       cutL = j-k+2; 
-      selmin = selmin & (rvertices(:,1) > cut_pts(cutL,1));
       cut_d(seed,1) = d(cutL);
+      selmin = selmin & (sum(bsxfun(@times,vertices,cut_n(seed,:)),2) + cut_d(seed,1) > 0);
     end
     k = find((dsdiameters(j:end) >= -slope_cut) & sel(j:end),1);
     if ~isempty(k)
       cutR = j+k-2; 
-      selmin = selmin & (rvertices(:,1) < cut_pts(cutR,1));
       cut_d(seed,2) = d(cutR);
+      selmin = selmin & (sum(bsxfun(@times,vertices,cut_n(seed,:)),2) + cut_d(seed,2) < 0);
     end
   end
   
@@ -175,9 +177,9 @@ figure(1234); clf
 plot3( x(sel), y(sel), z(sel), '.b' ); hold on
 plot3( x(~sel), y(~sel), z(~sel), '.r' ); hold on
 h = trisurf(faces, x, y, z);
-set(h,'edgecolor','none','facecolor','g','facealpha',0.8);
+%set(h,'edgecolor','none','facecolor','g','facealpha',0.8);
 set( h, 'FaceColor', 'g', 'EdgeColor', 'none', 'facealpha', 0.5);
 %view( -70, 40 );
-view( 0, 90 );
+view( 90, 0 );
 axis vis3d equal; camlight; lighting phong;
 xlabel('x'); ylabel('y'); zlabel('z');

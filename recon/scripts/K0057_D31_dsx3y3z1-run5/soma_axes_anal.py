@@ -23,22 +23,22 @@ from dpWriteh5 import dpWriteh5
 from typesh5 import emLabels
 #from pyCext import binary_warping
 
-somas_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas.gipl'
+somas_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_clean_cut.gipl'
 data, hdr, info = dpWriteh5.gipl_read_volume(somas_in)
 somas = data.reshape(hdr['sizes'][:3][::-1]).transpose(((2,1,0)))
 sampling = hdr['scales'][:3]
-print(data.shape, data.dtype, sampling)
+print(somas.shape, somas.dtype, sampling)
 
 sizes = emLabels.getSizes(somas); sizes = sizes[1:]; 
 soma_valid_labels = (np.transpose(np.nonzero(sizes > 0)) + 1).reshape(-1).tolist()
 print( 'Number of soma labels is %d' % (len(soma_valid_labels),) )
 
-mat_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/soma_cuts.mat'
-#mat_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/soma_fits.mat'
+#mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/soma_cuts.mat'
+mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas_cut_fits.mat'
 d = sio.loadmat(mat_in)
 
-apply_cuts=True
-apply_ellipsoids=False
+apply_cuts=False
+apply_ellipsoids=True
 
 # iterate over labels, fill each label within bounding box
 svox_bnd = nd.measurements.find_objects(somas, max_label=sizes.size)
@@ -55,6 +55,7 @@ for j in soma_valid_labels:
         sel_pts = np.ones((npts,), np.bool)
         if not np.isinf(d['cut_d'][j-1,0]):
             sel_pts = np.logical_and(sel_pts, (pts*d['cut_n'][j-1,:]).sum(1) + d['cut_d'][j-1,0] > 0)
+            assert(sel_pts.sum() < npts)
         if not np.isinf(d['cut_d'][j-1,1]):
             sel_pts = np.logical_and(sel_pts, (pts*d['cut_n'][j-1,:]).sum(1) + d['cut_d'][j-1,1] < 0)
 
@@ -75,6 +76,6 @@ for j in soma_valid_labels:
     cut_somas[svox_bnd[j-1]][sel_out] = j
 
         
-somas_out='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_cut.gipl'
-#somas_out='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_ellip.gipl'
+#somas_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_clean_cut.gipl'
+somas_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057_D31_dsx12y12z4_somas_clean_cut_ellipses.gipl'
 dpLoadh5.gipl_write_volume(cut_somas.transpose((2,1,0)), np.array(cut_somas.shape), somas_out, hdr['scales'][:3])

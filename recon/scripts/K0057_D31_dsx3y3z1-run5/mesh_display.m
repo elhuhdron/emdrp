@@ -17,10 +17,10 @@ for seed=1:nseeds
   
   vertices = bsxfun(@plus, uint32(vertices), corner);
   h = trisurf(faces' + 1, vertices(1,:), vertices(2,:), vertices(3,:));
-  set(h,'edgecolor','none','facecolor',cmap(mod(seed-1,size(cmap,1))+1,:),'facealpha',0.8);
+  set(h,'edgecolor','none','facecolor',cmap(mod(seed-1,size(cmap,1))+1,:),'facealpha',0.5);
   hold on
 end
 
 set(gca,'dataaspectratio',[1 1 1]);
-l = light('Position',[-0.4 0.2 0.9],'Style','infinite');
-lighting gouraud
+view( -70, 40 );
+axis vis3d equal; camlight; lighting phong;
