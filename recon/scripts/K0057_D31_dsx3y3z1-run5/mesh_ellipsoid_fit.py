@@ -1,5 +1,5 @@
 
-#import argparse
+import time
 import numpy as np
 import numpy.random as nr
 import h5py
@@ -11,18 +11,22 @@ import h5py
 #from typesh5 import emLabels
 
 from scipy import linalg as sla
+from scipy import optimize as opt
+from scipy import spatial as spt
+from scipy.special import ellipkinc, ellipeinc
+
 import vtk
 from vtk.util import numpy_support as nps
 
-from scipy.special import ellipkinc, ellipeinc
  
  
 
 mesh_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut.0.mesh.h5'
 
-nsurfpts = 1000
+points_per_area = 1e-4
 doplots = True
 plot_surf = False
+plotsvdfit = True
 
 
 def vtkShow(mapper=None, renderer=None):
@@ -52,23 +56,34 @@ def vtkShow(mapper=None, renderer=None):
     renderInteractor = vtk.vtkRenderWindowInteractor()
     renderInteractor.GetInteractorStyle().SetCurrentStyleToTrackballCamera()
     renderInteractor.SetRenderWindow(renderWin)
-    renderWin.SetSize(400, 400)
+    renderWin.SetSize(600, 600)
     renderInteractor.Initialize()
     renderWin.Render()
     renderInteractor.Start()
 
-#def ellipsoid_distance(X, pts, nsurfpts):
-
-# https://www.johndcook.com/blog/2014/07/06/ellipsoid-surface-area/
 def ellipsoid_SA(r):
-    a,b,c = r[0],r[1],r[2]
-    phi = np.arccos(c/a)
-    m = (a**2 * (b**2 - c**2)) / (b**2 * (a**2 - c**2))
-    temp = ellipeinc(phi, m)*np.sin(phi)**2 + ellipkinc(phi, m)*np.cos(phi)**2
-    ellipsoid_area = 2*np.pi*(c**2 + a*b*temp/np.sin(phi))
+    r = np.sort(r.reshape(-1), axis=0); a,b,c = r[2],r[1],r[0]
+    if np.isclose(a,b) and np.isclose(b,c):
+        #print('sphere')
+        ellipsoid_area = 4*np.pi*a**2
+    else:
+        # https://www.johndcook.com/blog/2014/07/06/ellipsoid-surface-area/
+        if np.isclose(a,b):
+            #print('oblate')
+            m=1
+        elif np.isclose(b,c):
+            #print('prolate')
+            m=0
+        else:
+            #print('triaxial')
+            m = (a**2 * (b**2 - c**2)) / (b**2 * (a**2 - c**2))
+        phi = np.arccos(c/a)
+        temp = ellipeinc(phi, m)*np.sin(phi)**2 + ellipkinc(phi, m)*np.cos(phi)**2
+        ellipsoid_area = 2*np.pi*(c**2 + a*b*temp/np.sin(phi))
     return ellipsoid_area
 
-def ellipsoid_points(X, points_per_area):
+def ellipsoid_points(R, C, points_per_area):
+    # incorrect method
     #    theta, phi = np.mgrid[0:nsurfpts+1, 0:nsurfpts+1]/nsurfpts
     #    theta = theta*np.pi - np.pi/2; phi = phi*2*np.pi - np.pi
     #
@@ -77,13 +92,36 @@ def ellipsoid_points(X, points_per_area):
     #    z = X[2]*np.sin(theta);
     #    return np.vstack((x.reshape(-1), y.reshape(-1), z.reshape(-1))).T + np.array(X[3:]).reshape((1,3))
 
-    SA = ellipsoid_SA(X[:3]); nsurfpts = int(SA*points_per_area)
-    print(SA,nsurfpts)
+    SA = ellipsoid_SA(R); nsurfpts = int(SA*points_per_area)
 
+    # for broadcoast, use npts x 3, dimensions along axis 1
+    R = R.reshape((1,3)); C = C.reshape((1,3))
+    
     # https://math.stackexchange.com/questions/973101/how-to-generate-points-uniformly-distributed-on-the-surface-of-an-ellipsoid?answertab=oldest#tab-top
-    x = nr.randn(nsurfpts,1); y = nr.randn(nsurfpts,1); z = nr.randn(nsurfpts,1);
-    d = np.sqrt( x*x/X[0]/X[0] + y*y/X[1]/X[1] + z*z/X[2]/X[2] ); print(d.shape)
-    return np.vstack((x.reshape(-1), y.reshape(-1), z.reshape(-1))).T/d + np.array(X[3:]).reshape((1,3))
+    pts = nr.randn(nsurfpts,3) * R; d = np.sqrt( (pts*pts/R/R).sum(1) )[:, None]
+    return pts/d + C
+
+    # brute force method
+    #    npts = 0; pts = np.zeros((nsurfpts,3),dtype=np.double)
+    #    while npts < nsurfpts:
+    #        cpts = nr.rand(1e6,3) * 2*(R+1) - (R+1)
+    #        sel = (abs(np.sqrt((cpts*cpts/R/R).sum(1)) - 1) < 1e-3)
+    #        cnpts = sel.sum(); print(cnpts)
+    #        if npts + cnpts < nsurfpts:
+    #            pts[npts:npts+cnpts,:] = cpts[sel,:]; npts = npts + cnpts
+    #        else:
+    #            pts[npts:,:] = cpts[sel,:][:nsurfpts-npts,:]; npts = nsurfpts
+    #    return pts + C
+
+def ellipsoid_distance(X, tree, points_per_area):
+    #print(X)
+    epts = ellipsoid_points(X[:3],X[3:],points_per_area)
+    d,i = tree.query(epts)
+    #print(d.mean())
+    #return np.sqrt(d)
+    return d.mean()
+    #return np.sqrt(d).mean()
+
 
 # get the volume and surface area data from the mesh file
 h5file = h5py.File(mesh_in, 'r'); dset_root = h5file['0']
@@ -91,7 +129,14 @@ str_seed = ('%08d' % 0)
 scale = dset_root[str_seed]['faces'].attrs['scale']; voxel_volume = scale.prod()
 vertex_divisor = dset_root[str_seed]['faces'].attrs['vertex_divisor']
 nseeds = len(dset_root)-1
+
+# for saving fits
+svd_rads = np.zeros((nseeds,3),np.double); svd_ctrs = np.zeros((nseeds,3),np.double)
+min_rads = np.zeros((nseeds,3),np.double); min_ctrs = np.zeros((nseeds,3),np.double)
+
 for i in range(nseeds):
+    print('Processing soma %d' % (i,)); t = time.time()
+                        
     str_seed = ('%08d' % (i+1,))
     #soma_volumes[i] = dset_root[str_seed]['vertices'].attrs['nVoxels'] * voxel_volume
     #soma_surface_areas[i] = dset_root[str_seed]['vertices'].attrs['surface_area']
@@ -126,18 +171,59 @@ for i in range(nseeds):
     C = pts.mean(0)[:,None];
     U, S, Vt = sla.svd(pts - C.T,overwrite_a=False,full_matrices=False)
     # the std of the points along the eigenvectors
-    s = np.sqrt(S**2/(npts-1));
+    svd_std = np.sqrt(S**2/(npts-1))[:,None];
 
-    # scale ellipse by some number of stds as one method of fitting ellipsoid
-    s = 4**(1/3)*s
-      
     # rotate the points to align on cartesian axes
     rpts = ((np.dot(Vt, pts.T - C) + C).T).copy(order='C')
 
-    # for testing ellipse points    
-    #    rpts = ellipsoid_points((s[0],s[1],s[2],C[0],C[1],C[2]),1e-5).copy(order='C'); nvertices = rpts.shape[0]
-    #    faces = np.arange(nvertices, dtype=faces.dtype)[:,None]; nfaces = nvertices
-    #    pfaces = np.hstack((1*np.ones((nfaces, 1),dtype=faces.dtype), faces))
+    # create kdtree to find closest points to mesh vertices
+    tree = spt.cKDTree(rpts)
+
+    # for optimization bounds
+    minrpts = rpts.min(0); maxrpts = rpts.max(0)
+    minR = 0.5**(1/3)*svd_std.copy(); maxR = 8**(1/3)*svd_std.copy()
+    bounds = ((minR[0],maxR[0]),(minR[1],maxR[1]),(minR[2],maxR[2]),
+              (minrpts[0],maxrpts[0]),(minrpts[1],maxrpts[1]),(minrpts[2],maxrpts[2]))
+
+    # scale ellipse by some number of stds as one method of fitting ellipsoid
+    svd_ctr = C; fit_dist = np.inf
+    for s in np.arange(1,10,0.1):
+        crad = s**(1/3)*svd_std
+        cdist = ellipsoid_distance(np.vstack((crad,svd_ctr)), tree, points_per_area)
+        if cdist < fit_dist:
+            svd_rad = crad; fit_dist = cdist
+    print('\tDistance %.4f with SVD rad %.4f %.4f %.4f ctr %.4f %.4f %.4f' % (fit_dist,
+       svd_rad[0],svd_rad[1],svd_rad[2],svd_ctr[0],svd_ctr[1],svd_ctr[2]))
+    svd_rads[i,:] = svd_rad.reshape(-1); svd_ctrs[i,:] = svd_ctr.reshape(-1)
+
+    # for testing ellipsoid_distance
+    #ellipsoid_distance(np.vstack((s,C)), tree, points_per_area)
+
+    ## for testing ellipse points
+    #s = np.array((500,1000,1500),dtype=np.double); C = np.zeros((3,1), np.double)
+    #rpts = ellipsoid_points(s,C,points_per_area).copy(order='C'); nvertices = rpts.shape[0]
+    #faces = np.arange(nvertices, dtype=faces.dtype)[:,None]; nfaces = nvertices
+    #pfaces = np.hstack((1*np.ones((nfaces, 1),dtype=faces.dtype), faces))
+
+    # normal local minimization functions do not work, error function is not smooth at all
+    #X,success = opt.leastsq(ellipsoid_distance, np.vstack((minR*1.1,C-500)), 
+    #                        args=(tree, points_per_area))
+    #print(X,success)
+    #res = opt.minimize(ellipsoid_distance, np.vstack((minR*1.1,C-500)), 
+    #                        args=(tree, points_per_area), bounds=bounds)
+    #print(res)
+
+    # global minimization methods
+    #X = opt.brute(ellipsoid_distance, bounds, args=(tree, points_per_area))
+    res = opt.differential_evolution(ellipsoid_distance, bounds, args=(tree, points_per_area), 
+                                     maxiter=10000, strategy='randtobest1bin', polish=False, disp=False)
+    fit_rad = np.array(res.x[:3]).reshape((3,1)); fit_ctr = np.array(res.x[3:]).reshape((3,1))
+    fit_dist = ellipsoid_distance(np.vstack((fit_rad,fit_ctr)), tree, points_per_area)
+    print('\tDistance %.4f with min rad %.4f %.4f %.4f ctr %.4f %.4f %.4f' % (fit_dist,
+       fit_rad[0],fit_rad[1],fit_rad[2],fit_ctr[0],fit_ctr[1],fit_ctr[2]))
+    min_rads[i,:] = fit_rad.reshape(-1); min_ctrs[i,:] = fit_ctr.reshape(-1)
+
+    print('\tdone in %.4f s' % (time.time() - t,))
     
     if doplots:
         renderer = vtk.vtkRenderer()
@@ -150,9 +236,9 @@ for i in range(nseeds):
         sphSrc.SetThetaResolution(100)
         sphSrc.SetPhiResolution(100)
         translation = vtk.vtkTransform();
-        translation.Scale(s[0],s[1],s[2])
+        translation.Scale(fit_rad[0],fit_rad[1],fit_rad[2])
         translation.PostMultiply()
-        translation.Translate(C[0],C[1],C[2]);
+        translation.Translate(fit_ctr[0],fit_ctr[1],fit_ctr[2]);
         transformFilter = vtk.vtkTransformPolyDataFilter();
         transformFilter.SetInputConnection(sphSrc.GetOutputPort());
         transformFilter.SetTransform(translation);
@@ -164,6 +250,29 @@ for i in range(nseeds):
         sphActor.GetProperty().SetColor(0,0,1)
         sphActor.GetProperty().SetOpacity(0.7)
         renderer.AddActor(sphActor)
+
+        if plotsvdfit:
+            # create a sphere in red
+            sphSrc2 = vtk.vtkSphereSource();
+            sphSrc2.SetCenter(0,0,0);
+            sphSrc2.SetRadius(1.0);
+            sphSrc2.SetThetaResolution(100)
+            sphSrc2.SetPhiResolution(100)
+            translation2 = vtk.vtkTransform();
+            translation2.Scale(svd_rad[0],svd_rad[1],svd_rad[2])
+            translation2.PostMultiply()
+            translation2.Translate(svd_ctr[0],svd_ctr[1],svd_ctr[2]);
+            transformFilter2 = vtk.vtkTransformPolyDataFilter();
+            transformFilter2.SetInputConnection(sphSrc2.GetOutputPort());
+            transformFilter2.SetTransform(translation2);
+    
+            sphMapper2 = vtk.vtkPolyDataMapper()
+            sphMapper2.SetInputConnection(transformFilter2.GetOutputPort())
+            sphActor2 = vtk.vtkActor()
+            sphActor2.SetMapper(sphMapper2)
+            sphActor2.GetProperty().SetColor(1,0,0)
+            sphActor2.GetProperty().SetOpacity(0.7)
+            renderer.AddActor(sphActor2)
 
         # create vertices for polydata
         # http://www.vtk.org/Wiki/VTK/Examples/Python/GeometricObjects/Display/Polygon
