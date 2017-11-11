@@ -4,7 +4,7 @@ import numpy as np
 import numpy.random as nr
 import h5py
 #from scipy import ndimage as nd
-#from scipy import io as sio
+from scipy import io as sio
 
 #from dpLoadh5 import dpLoadh5
 #from dpWriteh5 import dpWriteh5
@@ -21,12 +21,12 @@ from vtk.util import numpy_support as nps
  
  
 
-mesh_in='/Users/pwatkins/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut.0.mesh.h5'
+mesh_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut.0.mesh.h5'
 
 points_per_area = 1e-4
-doplots = True
+doplots = False
 plot_surf = False
-plotsvdfit = True
+plotsvdfit = False
 
 
 def vtkShow(mapper=None, renderer=None):
@@ -133,8 +133,10 @@ nseeds = len(dset_root)-1
 # for saving fits
 svd_rads = np.zeros((nseeds,3),np.double); svd_ctrs = np.zeros((nseeds,3),np.double)
 min_rads = np.zeros((nseeds,3),np.double); min_ctrs = np.zeros((nseeds,3),np.double)
+svd_rots = np.zeros((nseeds,3,3),np.double) 
 
 for i in range(nseeds):
+#for i in range(3):
     print('Processing soma %d' % (i,)); t = time.time()
                         
     str_seed = ('%08d' % (i+1,))
@@ -195,6 +197,7 @@ for i in range(nseeds):
     print('\tDistance %.4f with SVD rad %.4f %.4f %.4f ctr %.4f %.4f %.4f' % (fit_dist,
        svd_rad[0],svd_rad[1],svd_rad[2],svd_ctr[0],svd_ctr[1],svd_ctr[2]))
     svd_rads[i,:] = svd_rad.reshape(-1); svd_ctrs[i,:] = svd_ctr.reshape(-1)
+    svd_rots[i,:,:] = Vt
 
     # for testing ellipsoid_distance
     #ellipsoid_distance(np.vstack((s,C)), tree, points_per_area)
@@ -216,7 +219,7 @@ for i in range(nseeds):
     # global minimization methods
     #X = opt.brute(ellipsoid_distance, bounds, args=(tree, points_per_area))
     res = opt.differential_evolution(ellipsoid_distance, bounds, args=(tree, points_per_area), 
-                                     maxiter=10000, strategy='randtobest1bin', polish=False, disp=False)
+                                     maxiter=10000, strategy='best1bin', polish=False, disp=False)
     fit_rad = np.array(res.x[:3]).reshape((3,1)); fit_ctr = np.array(res.x[3:]).reshape((3,1))
     fit_dist = ellipsoid_distance(np.vstack((fit_rad,fit_ctr)), tree, points_per_area)
     print('\tDistance %.4f with min rad %.4f %.4f %.4f ctr %.4f %.4f %.4f' % (fit_dist,
@@ -303,6 +306,9 @@ for i in range(nseeds):
         renderer.AddActor(allActors)
 
         vtkShow(renderer=renderer)
-      
-h5file.close()
 
+h5file.close()
+  
+mat_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf.mat'
+sio.savemat(mat_out, {'svd_rads':svd_rads, 'svd_ctrs':svd_ctrs, 'min_rads':min_rads,
+                      'min_ctrs':min_ctrs, 'svd_rots':svd_rots})
