@@ -143,11 +143,10 @@ set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',sphlim);
 
 % xxx - ellipse fit analysis
 
+% NOTE: fits are in order by LABEL, need to re-order with soma_labels!!!
+load('~/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf_penalty.mat');
 
-load('~/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf.mat');
-
-%fit_r = fit_r/1000;
-fit_r = min_rads/1000;
+fit_r = min_rads(soma_labels,:)/1000;
 vol_r = 4/3*pi*prod(fit_r,2);
 
 hrad0 = zeros(ntypes,length(rbins)-1);
@@ -175,18 +174,18 @@ hvolr = bsxfun(@rdivide, hvolr, cnt_types);
 dlbl = 'probability density';
 %dlbl = 'count';
 
-figno = figno+1; figure(figno+baseno); clf
-for type=1:ntypes
-  sel = (soma_types==type);
-  scatter3(fit_r(sel,1), fit_r(sel,2), fit_r(sel,3), 16, types_clrs(type,:)); hold on;
-end
-xlabel('x rad (mm)'); ylabel('y rad (mm)'); zlabel('z rad (mm)'); 
+% figno = figno+1; figure(figno+baseno); clf
+% for type=1:ntypes
+%   sel = (soma_types==type);
+%   scatter3(fit_r(sel,1), fit_r(sel,2), fit_r(sel,3), 16, types_clrs(type,:)); hold on;
+% end
+% xlabel('x rad (mm)'); ylabel('y rad (mm)'); zlabel('z rad (mm)'); 
 
 figno = figno+1; figure(figno+baseno); clf
 subplot(2,2,1);
 set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
 plot(crbins, hrad0);
-xlabel('major r (mm)'); legend(types_cnts_str); ylabel(dlbl)
+xlabel('major r (mm)'); ylabel(dlbl)
 set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
 subplot(2,2,2);
 set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
@@ -208,7 +207,7 @@ figno = figno+1; figure(figno+baseno); clf
 subplot(2,2,1);
 set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
 plot(crbins, crad0);
-xlabel('major r (mm)'); legend(types_cnts_str,'location','southeast'); ylabel('cumulative density')
+xlabel('major r (mm)'); ylabel('cumulative density')
 set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',rlim);
 subplot(2,2,2);
 set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
@@ -225,3 +224,9 @@ set(gca, 'ColorOrder', types_clrs, 'NextPlot', 'replacechildren');
 plot(cbins, cvolr);
 xlabel('volume (mm^3)'); legend(types_cnts_str,'location','southeast'); ylabel('cumulative density')
 set(gca,'plotboxaspectratio',[1 1 1]); set(gca,'xlim',vlim);
+
+% % difference between volumes calculated different ways
+% figno = figno+1; figure(figno+baseno); clf
+% vdiff = (vol_r - soma_volumes');
+% plot(vdiff)
+% ylabel('rasterized volume - fit volume'); xlabel('soma')

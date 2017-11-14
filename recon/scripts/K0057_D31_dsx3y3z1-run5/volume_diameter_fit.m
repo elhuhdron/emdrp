@@ -1,18 +1,18 @@
 
 function volume_diameter_fit
 
-h5mesh = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.0.mesh.h5';
-h5vol = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean.h5';
-bounds_mat = '~/Downloads/K0057_soma_annotation/out/soma_bounds.mat';
-outcutfile = '~/Downloads/K0057_soma_annotation/out/soma_cuts.mat';
+h5mesh = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut-fit-ellipses.0.mesh.h5';
+h5vol = '~/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut-fit-ellipses.h5';
+bounds_mat = '~/Downloads/K0057_soma_annotation/out/soma_bounds_fit_ellipses.mat';
+outcutfile = '~/Downloads/K0057_soma_annotation/out/soma_cuts_fit_ellipses.mat';
 
-ncuts = 100;
+ncuts = 0;
 smoothdia = 500; % nm, smoothing window size for diameters
 slope_cut = 0.5; % fudge factor for determining point to cut
 cut_axis = 3; % which eigenaxis to cut along
 dataset_root = '0';
-doplots = false;
-getbounds = false;
+doplots = true;
+getbounds = falses;
 
 scale = h5readatt(h5vol,'/labels','scale')';
 minnormal = 1e-2;
@@ -143,19 +143,21 @@ for seed=1:nseeds
   if doplots
     plot_pts_surf(faces, rvertices, selmin);
     
-    figure(1235);clf
-    [ax,hLine1,hLine2] = plotyy(xdiameters, sdiameters, xdiameters, dsdiameters); hold on
-    if cutL > 0
-      plot([xdiameters(cutL) xdiameters(cutL)], [0 max(sdiameters)], 'r');
+    if ncuts > 0
+      figure(1235);clf
+      [ax,hLine1,hLine2] = plotyy(xdiameters, sdiameters, xdiameters, dsdiameters); hold on
+      if cutL > 0
+        plot([xdiameters(cutL) xdiameters(cutL)], [0 max(sdiameters)], 'r');
+      end
+      if cutR > 0
+        plot([xdiameters(cutR) xdiameters(cutR)], [0 max(sdiameters)], 'r');
+      end
+      
+      hLine1.Marker = '.'; hLine2.Marker = '.';
+      xlabel('eigenaxis distance (nm)')
+      set(ax(1),'xlim',[xdiameters(1) xdiameters(end)]);
+      set(ax(2),'xlim',[xdiameters(1) xdiameters(end)]);
     end
-    if cutR > 0
-      plot([xdiameters(cutR) xdiameters(cutR)], [0 max(sdiameters)], 'r');
-    end
-    
-    hLine1.Marker = '.'; hLine2.Marker = '.';
-    xlabel('eigenaxis distance (nm)')
-    set(ax(1),'xlim',[xdiameters(1) xdiameters(end)]);
-    set(ax(2),'xlim',[xdiameters(1) xdiameters(end)]);
     
     pause
   end

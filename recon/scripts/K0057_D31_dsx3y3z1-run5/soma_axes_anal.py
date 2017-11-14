@@ -34,7 +34,7 @@ soma_valid_labels = (np.transpose(np.nonzero(sizes > 0)) + 1).reshape(-1).tolist
 print( 'Number of soma labels is %d' % (len(soma_valid_labels),) )
 
 #mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/soma_cuts.mat'
-mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf.mat'
+mat_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf_penalty.mat'
 d = sio.loadmat(mat_in)
 
 apply_cuts=False
@@ -61,8 +61,11 @@ for j in soma_valid_labels:
 
     if apply_ellipsoids:
         sel = np.ones(somas[svox_bnd[j-1]].shape, dtype=np.bool) # binary select of all bounding box
-        pts = np.transpose(np.nonzero(sel)).astype(np.double)*sampling # pts is nx3
+        # global coordinates
+        pts = (np.transpose(np.nonzero(sel)).astype(np.double) + \
+               np.array([x.start for x in svox_bnd[j-1]], dtype=np.double) + 0.5)*sampling # pts is nx3
 
+        # least squares method from matlab mesh_ellipsoid_fit.m, xxx - might need udpating
         #R = d['fit_R'][j-1,:,:].reshape([3,3]); C = d['fit_C'][j-1,:].reshape([3,1])
         #rpts = (np.dot(R.T, pts.T - C) + C).T # eigenvector rotation matrix around center from matlab
         #v = d['fit_v'][j-1,:].reshape([10]); x = rpts[:,0]; y = rpts[:,1]; z = rpts[:,2]
@@ -70,12 +73,16 @@ for j in soma_valid_labels:
         #    2*v[3] *x*y + 2*v[4]*x*z + 2*v[5] * y*z + \
         #    2*v[6] *x    + 2*v[7]*y    + 2*v[8] * z >= -v[9])
 
+        # minimum distance from ellipse surface to mesh vertices, mesh_ellipsoid_fit.py
         #sio.savemat(mat_out, {'svd_rads':svd_rads, 'svd_ctrs':svd_ctrs, 'min_rads':min_rads,
         #                      'min_ctrs':min_ctrs, 'svd_rots':svd_rots})
-        R = d['svd_rots'][j-1,:,:].reshape([3,3]); C = d['svd_ctrs'][j-1,:].reshape([1,3])
+        R = d['svd_rots'][j-1,:,:].reshape([3,3]); C = d['svd_ctrs'][j-1,:].reshape([3,1])
         rpts = (np.dot(R, pts.T - C) + C).T # eigenvector rotation matrix around center from matlab
         r = d['min_rads'][j-1,:].reshape([1,3]); c = d['min_ctrs'][j-1,:].reshape([1,3])
         sel_pts = (((rpts-c)**2/r/r).sum(1) <= 1)
+
+        # coordinates within bounding box
+        pts = np.transpose(np.nonzero(sel)).astype(np.double)*sampling # pts is nx3
 
     pts = np.round(pts[sel_pts,:]/sampling).astype(np.int64)
     sel_out = np.zeros_like(sel); sel_out[[pts[:,x] for x in range(3)]] = 1

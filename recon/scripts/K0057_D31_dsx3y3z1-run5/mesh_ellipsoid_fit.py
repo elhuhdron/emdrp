@@ -24,9 +24,11 @@ from vtk.util import numpy_support as nps
 mesh_in='/home/watkinspv/Downloads/K0057_soma_annotation/out/K0057-D31-somas_dsx12y12z4-clean-cut.0.mesh.h5'
 
 points_per_area = 1e-4
-doplots = False
+doplots = True
+plotsvdfit = True
 plot_surf = False
-plotsvdfit = False
+opacity = 0.5
+penalty = 0.
 
 
 def vtkShow(mapper=None, renderer=None):
@@ -113,15 +115,20 @@ def ellipsoid_points(R, C, points_per_area):
     #            pts[npts:,:] = cpts[sel,:][:nsurfpts-npts,:]; npts = nsurfpts
     #    return pts + C
 
-def ellipsoid_distance(X, tree, points_per_area):
+def ellipsoid_distance(X, surf_tree, surf_pts, points_per_area, penalty=0.):
     #print(X)
-    epts = ellipsoid_points(X[:3],X[3:],points_per_area)
+    R = X[:3].reshape((1,3)); C = X[3:].reshape((1,3))
+    epts = ellipsoid_points(R,C,points_per_area)
     d,i = tree.query(epts)
-    #print(d.mean())
-    #return np.sqrt(d)
-    return d.mean()
-    #return np.sqrt(d).mean()
-
+    dist1 = d.mean()
+    
+    if penalty > 0:
+        # introduce some penalty for surface points that are inside the ellipse
+        sel = (((surf_pts-C)**2/R/R).sum(1) < 1)
+        perc_inside = sel.sum(dtype=np.double)/surf_pts.shape[0]
+        return dist1 + perc_inside*dist1*penalty
+    else:
+        return dist1
 
 # get the volume and surface area data from the mesh file
 h5file = h5py.File(mesh_in, 'r'); dset_root = h5file['0']
@@ -150,7 +157,8 @@ for i in range(nseeds):
     nvertices = vertices.shape[0]; nfaces = faces.shape[0]
     
     vertices = vertices.astype(np.double) / vertex_divisor
-    #vertices += dset_root[str_seed]['vertices'].attrs['bounds_beg']
+    # for global coordinates add bounding box offset
+    vertices += dset_root[str_seed]['vertices'].attrs['bounds_beg'] / vertex_divisor
 
     # vtk needs unstructured grid preceded with number of points in each cell
     if plot_surf:
@@ -191,13 +199,16 @@ for i in range(nseeds):
     svd_ctr = C; fit_dist = np.inf
     for s in np.arange(1,10,0.1):
         crad = s**(1/3)*svd_std
-        cdist = ellipsoid_distance(np.vstack((crad,svd_ctr)), tree, points_per_area)
+        cdist = ellipsoid_distance(np.vstack((crad,svd_ctr)), tree, rpts, points_per_area, penalty)
         if cdist < fit_dist:
             svd_rad = crad; fit_dist = cdist
     print('\tDistance %.4f with SVD rad %.4f %.4f %.4f ctr %.4f %.4f %.4f' % (fit_dist,
        svd_rad[0],svd_rad[1],svd_rad[2],svd_ctr[0],svd_ctr[1],svd_ctr[2]))
     svd_rads[i,:] = svd_rad.reshape(-1); svd_ctrs[i,:] = svd_ctr.reshape(-1)
     svd_rots[i,:,:] = Vt
+    
+    # default to svd "fits"
+    fit_rad = svd_rad; fit_ctr = svd_ctr;
 
     # for testing ellipsoid_distance
     #ellipsoid_distance(np.vstack((s,C)), tree, points_per_area)
@@ -218,10 +229,10 @@ for i in range(nseeds):
 
     # global minimization methods
     #X = opt.brute(ellipsoid_distance, bounds, args=(tree, points_per_area))
-    res = opt.differential_evolution(ellipsoid_distance, bounds, args=(tree, points_per_area), 
+    res = opt.differential_evolution(ellipsoid_distance, bounds, args=(tree, rpts, points_per_area, penalty), 
                                      maxiter=10000, strategy='best1bin', polish=False, disp=False)
     fit_rad = np.array(res.x[:3]).reshape((3,1)); fit_ctr = np.array(res.x[3:]).reshape((3,1))
-    fit_dist = ellipsoid_distance(np.vstack((fit_rad,fit_ctr)), tree, points_per_area)
+    fit_dist = ellipsoid_distance(np.vstack((fit_rad,fit_ctr)), tree, rpts, points_per_area, penalty)
     print('\tDistance %.4f with min rad %.4f %.4f %.4f ctr %.4f %.4f %.4f' % (fit_dist,
        fit_rad[0],fit_rad[1],fit_rad[2],fit_ctr[0],fit_ctr[1],fit_ctr[2]))
     min_rads[i,:] = fit_rad.reshape(-1); min_ctrs[i,:] = fit_ctr.reshape(-1)
@@ -251,7 +262,7 @@ for i in range(nseeds):
         sphActor = vtk.vtkActor()
         sphActor.SetMapper(sphMapper)
         sphActor.GetProperty().SetColor(0,0,1)
-        sphActor.GetProperty().SetOpacity(0.7)
+        sphActor.GetProperty().SetOpacity(opacity)
         renderer.AddActor(sphActor)
 
         if plotsvdfit:
@@ -274,7 +285,7 @@ for i in range(nseeds):
             sphActor2 = vtk.vtkActor()
             sphActor2.SetMapper(sphMapper2)
             sphActor2.GetProperty().SetColor(1,0,0)
-            sphActor2.GetProperty().SetOpacity(0.7)
+            sphActor2.GetProperty().SetOpacity(opacity)
             renderer.AddActor(sphActor2)
 
         # create vertices for polydata
@@ -302,13 +313,13 @@ for i in range(nseeds):
         allActors.SetMapper(allMappers)
         allActors.GetProperty().SetColor(0,1,0)
         allActors.GetProperty().SetPointSize(2)
-        ##allActors.GetProperty().SetOpacity(0.8)
+        allActors.GetProperty().SetOpacity(opacity)
         renderer.AddActor(allActors)
 
         vtkShow(renderer=renderer)
 
 h5file.close()
   
-mat_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf.mat'
+mat_out='/home/watkinspv/Downloads/K0057_soma_annotation/out/somas_cut_fit_surf_penalty.mat'
 sio.savemat(mat_out, {'svd_rads':svd_rads, 'svd_ctrs':svd_ctrs, 'min_rads':min_rads,
                       'min_ctrs':min_ctrs, 'svd_rots':svd_rots})
