@@ -1,7 +1,7 @@
 
-load('~/Downloads/K0057_soma_annotation/out/somas_cut_fit_ellipses.mat');
+load('~/Downloads/K0057_soma_annotation/out/somas_clean_cut.mat');
 dsfactor=[12 12 4]./[16 16 16];
-baseno = 1000;
+baseno = 2000;
 figno=0;
 
 % print out "mergers" or discrepancies
