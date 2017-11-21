@@ -106,7 +106,11 @@ for c = 1:length(skels)
     fprintf(fid,'    <nodes>\n');
     for n = 1:size(skels{c}.nodes,1)
       a1 = skels{c}.nodes(n,1);
-      a2 = node_meta.rad;
+      if size(skels{c}.nodes,2) > 4
+        a2 = skels{c}.nodes(n,5);
+      else
+        a2 = node_meta.rad;
+      end
       a3 = skels{c}.nodes(n,2);
       a4 = skels{c}.nodes(n,3);
       a5 = skels{c}.nodes(n,4);
