@@ -1,0 +1,46 @@
+diff --git neon/layers/layer.py neon/layers/layer.py
+index ceb316f..4e161e8 100644
+--- neon/layers/layer.py
++++ neon/layers/layer.py
+@@ -743,13 +743,14 @@ class Convolution(ParameterLayer):
+         pad_tuple = tuple(self.convparams[k] for k in ['pad_' + d for d in padstr_dim])
+         str_tuple = tuple(self.convparams[k] for k in ['str_' + d for d in padstr_dim])
+         dil_tuple = tuple(self.convparams[k] for k in ['dil_' + d for d in padstr_dim])
++        shp_tuple = tuple(self.fshape[:input_spatial_dim])
+ 
+         fmt_tuple = (self.name,) + self.in_shape + self.out_shape + (
+-                     pad_tuple + str_tuple + dil_tuple)
++                     pad_tuple + str_tuple + dil_tuple + shp_tuple)
+         fmt_string = "Convolution Layer '%s': " + \
+                      input_spatial_str + " inputs, " + output_spatial_str + " outputs, " + \
+                      padstr_str + " padding, " + padstr_str + " stride, " + \
+-                     padstr_str + " dilation"
++                     padstr_str + " dilation, " + padstr_str + " shape"
+ 
+         return ((fmt_string % fmt_tuple))
+ 
+diff --git neon/models/model.py neon/models/model.py
+index 92934b5..bfc494d 100644
+--- neon/models/model.py
++++ neon/models/model.py
+@@ -383,6 +383,10 @@ class Model(NervanaObject):
+ 
+         pdict['model'] = self.layers.get_description(get_weights=get_weights,
+                                                      keep_states=keep_states)
++
++        # xxx - watkinspv, hack to save some data meta
++        if hasattr(self, 'batch_meta'): pdict['batch_meta'] = self.batch_meta
++
+         return pdict
+ 
+     def save_params(self, param_path, keep_states=True):
+@@ -480,6 +484,9 @@ class Model(NervanaObject):
+                 # could come about when switching backend types (ex GPU to CPU)
+                 logger.warning("Problems restoring existing RNG state: %s", str(e))
+ 
++        # xxx - watkinspv, hack to load some data meta
++        if 'batch_meta' in model_dict: self.batch_meta = model_dict['batch_meta']
++
+     # serialize tells how to write out the parameters we've learned so
+     # far and associate them with layers. it can ignore layers with no
+     # learned parameters. the model stores states to pass to the
