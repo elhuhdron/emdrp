@@ -1,7 +1,10 @@
 
+% Change paths appropriately.
+basepath = '/home/watkinspv/Data/ECS_tutorial';
+
 p = struct;
 datasets = {'M0027_11' 'M0007_33'};
-chunk_sels = {[16 17 0] []};
+chunk_sels = {[12 14 2] [16 17 0]};
 
 for i=1:length(datasets)
   
@@ -12,8 +15,8 @@ for i=1:length(datasets)
   p.dataset = datasets{i};
   
   % Paths to root of Knossos raw data and path to where hdf5 should be written.
-  p.inpath = sprintf('~/Data/ECS_tutorial/%s', datasets{i});
-  p.outpath = '~/Data/ECS_tutorial';
+  p.inpath = fullfile(basepath, datasets{i});
+  p.outpath = basepath;
   
   % The raw size of the Knossos cubes
   p.rawsize = [128 128 128];
@@ -25,7 +28,7 @@ for i=1:length(datasets)
   p.raw_prefix = sprintf('%s_mag%d',p.dataset,p.mag);
   
   % Chunksize written to hdf5 file, typically same as the Knossos raw size
-  p.chunksize = rawsize;
+  p.chunksize = p.rawsize;
   
   % Whether to write in C order, typically false, needs to be false for frontend readable
   p.do_Corder = false;

@@ -23,17 +23,15 @@
 % Function for creating EM data hdf5 file from Knossos raw format.
 function make_hdf5_from_knossos_raw(p)
 
-assert( ~p.do_chunk_select || length(p.mags)==1 ); % xxx - can't do select with multiple mags right now
-
 tall = now;
 knossos_conf = parse_knossos_conf(p.inpath, p.knossos_conf_fn);
 rawtotal = prod(int64(p.rawsize));
 
-matname = [p.dataset '_' data_name '_dirs_info.mat'];
-if use_conf_size
+matname = [p.dataset '_' p.data_name '_dirs_info.mat'];
+if p.use_conf_size
   fprintf(1,'Using Knossos conf size %d,%d,%d\n',knossos_conf.boundary);
   if p.scale_conf_size
-    knossos_conf.boundary = fix(knossos_conf.boundary / mag);
+    knossos_conf.boundary = fix(knossos_conf.boundary / p.mag);
     fprintf(1,'Scaling Knossos conf size to %d,%d,%d\n',knossos_conf.boundary);
   end
   nchunks = ceil(double(knossos_conf.boundary) ./ p.rawsize);
@@ -56,8 +54,8 @@ if ~p.do_chunk_select
   p.do_chunk_select_crop = true;
 end
 
-chunksizer = p.chunksize; p.chunksize = chunksize(p.dim_order);
-nchunks_selr = p.nchunks_sel; p.nchunks_sel = nchunks_sel(p.dim_order);
+chunksizer = p.chunksize; p.chunksize = p.chunksize(p.dim_order);
+nchunks_selr = p.nchunks_sel; p.nchunks_sel = p.nchunks_sel(p.dim_order);
 if p.do_chunk_select_crop
   totalsize = p.chunksize.*p.nchunks_sel;
 else
@@ -76,7 +74,7 @@ data_conf.chunkOffset = int32(p.chunk_sel_offset);
 data_conf.dimOrdering = int32(p.dim_order);
 data_conf.nchunks = int32(p.nchunks_sel);
 % debated on this as downsample or upsample factor, upsampling from native not common, so use downsample factor.
-data_conf.factor = double([mag mag mag]);
+data_conf.factor = double([p.mag p.mag p.mag]);
 
 %   if do_Corder, str = 'Corder'; else str = 'Forder'; end
 %   if do_chunk_select
@@ -99,10 +97,10 @@ if p.do_write
   % xxx - be carefule with this, not sure how to delete an existing dataset
   evalc('delete(outfile)'); % silently remove existing file
   if p.do_Corder
-    h5create(outfile,['/' data_name],totalsize([3 2 1]),'ChunkSize',p.chunksize([3 2 1]),'Datatype','uint8',...
+    h5create(outfile,['/' p.data_name],totalsize([3 2 1]),'ChunkSize',p.chunksize([3 2 1]),'Datatype','uint8',...
       'Deflate',5,'Fletcher32',true,'Shuffle',true,'FillValue',uint8(0));
   else
-    h5create(outfile,['/' data_name],totalsize,'ChunkSize',p.chunksize,'Datatype','uint8','Deflate',5,...
+    h5create(outfile,['/' p.data_name],totalsize,'ChunkSize',p.chunksize,'Datatype','uint8','Deflate',5,...
       'Fletcher32',true,'Shuffle',true,'FillValue',uint8(0));
   end
 end
@@ -120,19 +118,19 @@ for ix1 = 1:nchunks(1)
             chunk_ind_write = chunk_ind_write + p.chunk_sel_offset;
           end
           if ~block_disp
-            disp(['writing hdf mag' num2str(mag) ' data for all-yz chunks starting at chunk ',num2str(chunk_ind),...
+            disp(['writing hdf mag' num2str(p.mag) ' data for all-yz chunks starting at chunk ',num2str(chunk_ind),...
               ' to all-yz chunks starting at chunk ', num2str(chunk_ind_write),' in ',hdffname]);
             block_disp = true;
           end
           fn = fullfile(p.inpath,sprintf('x%04d',chunk_ind(1)),sprintf('y%04d',chunk_ind(2)),...
-            sprintf('z%04d',chunk_ind(3)),sprintf('%s_x%04d_y%04d_z%04d.raw',raw_prefix,chunk_ind));
+            sprintf('z%04d',chunk_ind(3)),sprintf('%s_x%04d_y%04d_z%04d.raw',p.raw_prefix,chunk_ind));
           if exist(fn,'file')
             fh = fopen(fn); V = fread(fh,bytes_per_chunk,'uint8=>uint8'); fclose(fh);
             if length(V) == rawtotal
               chunk_lists(ix1,ix2,ix3) = true; % valid chunk
               V = reshape(V,chunksizer);
               if p.do_write
-                write_hd5_chunk(permute(V,dim_order),outfile, data_name, chunk_ind_write(p.dim_order), ...
+                write_hd5_chunk(permute(V,p.dim_order),outfile, p.data_name, chunk_ind_write(p.dim_order), ...
                   p.do_Corder, false);
               end
             end % if raw file is correct size
@@ -148,11 +146,11 @@ end % for x chunk
 
 % write all the meta data, knossos conf and data conf
 if p.do_write
-  write_struct_to_hd5attr(knossos_conf,outfile,data_name);
-  write_struct_to_hd5attr(data_conf,outfile,data_name);
+  write_struct_to_hd5attr(knossos_conf,outfile,p.data_name);
+  write_struct_to_hd5attr(data_conf,outfile,p.data_name);
   
   % write out another dataset that contains a boolean mask of valid chunks (chunk_lists)
-  cname = [data_name '_chunk_mask']; csize = size(chunk_lists);
+  cname = [p.data_name '_chunk_mask']; csize = size(chunk_lists);
   cdata = uint8(permute(chunk_lists,p.dim_order));
   if p.do_Corder
     h5create(outfile,['/' cname],csize([3 2 1]),'ChunkSize',csize,'Datatype','uint8',...
@@ -167,4 +165,4 @@ if p.do_write
   h5disp(outfile)
 end
 
-display(sprintf('done writing %s in %.3f s',data_name,(now-tall)*86400));
+display(sprintf('done writing %s in %.3f s',p.data_name,(now-tall)*86400));

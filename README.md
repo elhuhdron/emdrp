@@ -48,7 +48,34 @@ Manually annotated training data also needs to be converted to hdf5 using script
 
 ### Train convnets
 
+For training against all training data with neon, activate the neon environment and run from the emdrp neon3 subdirectory (change paths appropriately):
 
+```
+python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0007.ini --image_in_size 128 --serialize 800 -s /home/watkinspv/Data/ECS_tutorial/convnet_out/M0007_0.prm -o /home/watkinspv/Data/ECS_tutorial/convnet_out/M0007_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0
+
+python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_0.prm -o /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0
+```
+
+Typically 4 independent convnets are trained on all training data to export probabilities used to create segmentations to be tested against skeleton metrics. However, the agglomeration step of the pipeline trains much better against segmentations created from the test volumes of cross-validation trained convnets. For a small number of training volumes, a leave-one-volume-out as test approach has empirically given the best agglomeration training results.
+
+`emneon.py` contains a handy flag `--chunk-skip-list` for leave-n-out cross validations:
+
+```
+python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_test0_0.prm -o /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_test0_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0 --test_range 200001 200001 --chunk_skip_list 0 --eval 800
+```
+
+A total of 28 trainined convnets for each dataset should result, 4 each for the six leave-one-volume-out and for training on all volumes. Probability of class membership then needs to be exported for each.
+
+### Exporting and merging probabilities
+
+
+### Watershed
+
+### Agglomeration
+
+### Cleaning
+
+### Skeleton metrics
 
 ## Legacy
 
