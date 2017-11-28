@@ -22,6 +22,7 @@ import binascii
 import time
 import socket
 import sys
+import fcntl
 import random
 
 NUM_GPUS, GPU_JOB_SUBDIR, GPU_PREFIX = 10, 'gpu_jobs', 'gpu' # init NUM_GPUS as max gpus, set in get_paths
@@ -116,8 +117,8 @@ def run_next_jobs(force=False):
         #   the next job. hang problem was persistent to moved to a randomized pause time.
         if started_job: time.sleep(random.randrange(17,31))
         else: started_job = True
-        #os.system(cmd_to_start)
-        subprocess.call(cmd_to_start)
+        os.system(cmd_to_start)
+        #subprocess.call(cmd_to_start)
         os.remove(job_script)
         
         # xxx - this is a hack to get around nvidia-smi not working
@@ -132,8 +133,8 @@ def run_next_jobs(force=False):
         if len(pids) < 11:
             outfile.write('GPU %d error job did not start???\n' % (gpu,)); outfile.close(); continue
         pid = pids[10]; cmd_to_start = 'touch ' + os.path.join(cur_gpu_path,pid + '.lck')
-        #os.system(cmd_to_start)
-        subprocess.call(cmd_to_start)
+        os.system(cmd_to_start)
+        #subprocess.call(cmd_to_start)
         
         outfile.write('GPU %d free! starting queued job (see log) with pid ' % (gpu,) + pid + '\n')
         outfile.close();
@@ -227,21 +228,23 @@ def create_pid_lck(pid, gpu):
     if gpu < NUM_GPUS:
         cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(gpu))
         cmd_to_start = 'touch ' + os.path.join(cur_gpu_path, str(pid) + '.lck')
-        #os.system(cmd_to_start)
-        subprocess.call(cmd_to_start)
+        os.system(cmd_to_start)
+        #subprocess.call(cmd_to_start)
 
+# https://stackoverflow.com/questions/380870/python-single-instance-of-program
 def get_lock(process_name):
-    job_path, convnet_out_path, convnet_paths = get_paths()
-
     # Without holding a reference to our socket somewhere it gets garbage
     # collected when the function exits
     get_lock._lock_socket = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    fh = get_lock._lock_socket
 
     try:
-        get_lock._lock_socket.bind('\0' + process_name)
+        fh.bind('\0' + process_name)
+        # prevent shell subprocesses from inheriting the lock
+        fcntl.fcntl(fh, fcntl.F_SETFD, fcntl.fcntl(fh, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
         #print('I got the lock')
     except socket.error:
-        #print('lock exists')
+        print('gpu_job locked by another gpu_job process')
         sys.exit()
 
 if __name__ == '__main__':
