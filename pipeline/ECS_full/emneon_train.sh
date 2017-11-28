@@ -2,9 +2,9 @@
 # run on gpu-clone in ~/gits/emdrp/neon3
 # queues one set of jobs each for training on all GT cubes (1) and leave-one-out cross-fold training (num GT cubes)
 
-declare -a card=("0" "2" "0" "2" "1" "3" "1" "3")
+declare -a card=("1" "2" "1" "2" "0" "3" "0" "3")
 declare -a skip_lists=("0" "1" "2" "3" "4" "5")
-declare -a machine_skip_inds=('0 5 4 3 1 5 3' '1 0 5' '2 1 0 4 2 0 4' '3 2 1 5 3 1 5' '4 3 2 0 4 2')
+declare -a machine_skip_inds=('1 0 5' '0 5 4 3 1 5 3' '2 1 0 4 2 0 4' '3 2 1 5 3 1 5' '4 3 2 0 4 2')
 cnt=0
 
 # run for both datasets
