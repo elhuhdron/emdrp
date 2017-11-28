@@ -44,6 +44,8 @@ def run_next_jobs(force=False):
     for gpu in range(NUM_GPUS):
         cur_gpu_path = os.path.join(job_path, GPU_PREFIX + str(gpu))
         outfile = open(os.path.join(job_path, GPU_STATUS % (gpu,)), 'w')
+        # this file is left open while subprocesses started, so do not let child processes inherit handle
+        fcntl.fcntl(outfile, fcntl.F_SETFD, fcntl.fcntl(outfile, fcntl.F_GETFD) | fcntl.FD_CLOEXEC)
 
         # check for PID locks first, use this to not start queued jobs until after some dependent process finishes
         # lock file (<PID>.lck in each gpu directory) is removed if the process id is not active
