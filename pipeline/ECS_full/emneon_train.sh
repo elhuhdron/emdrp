@@ -22,7 +22,7 @@ for i in ${!lips[@]}; do
 done
 cmachine_skip_inds=(${machine_skip_inds[$machine]})
 
-echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-${dataset}.ini --serialize 800 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i ${card[$cnt]} >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
+echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_full/EMdata-3class-64x64out-rand-${dataset}.ini --serialize 800 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i ${card[$cnt]} >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
 # just run on all 5 machines
 #if [ ${#cmachine_skip_inds[@]} -lt 5 ]; then
     ./run_gpu_job.py -s run_tmp.sh
@@ -34,7 +34,7 @@ iter=0
 while [ $iter -lt ${#cmachine_skip_inds[@]} ]
 do
 
-    echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-${dataset}.ini --serialize 800 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i ${card[$cnt]} --chunk_skip_list ${skip_lists[${cmachine_skip_inds[$iter]}]} --test_range 200001 200001 --eval 800 >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
+    echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_full/EMdata-3class-64x64out-rand-${dataset}.ini --serialize 800 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i ${card[$cnt]} --chunk_skip_list ${skip_lists[${cmachine_skip_inds[$iter]}]} --test_range 200001 200001 --eval 800 >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
     ./run_gpu_job.py -s run_tmp.sh
     #cat run_tmp.sh
 
