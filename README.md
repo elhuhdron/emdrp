@@ -20,17 +20,17 @@ The emdrp utilizes [neon](https://github.com/NervanaSystems/neon) as the convnet
 
 python C extensions were created for fast performance of some pipeline steps. Build these are built with a simple [Makefile](recon/python/utils/pyCext/Makefile) after modifying the appropriate paths to python and numpy install locations.
 
-Currently the emdrp is more a collection of python, matlab and shell scripts than a toolbox or single install. Until this is remedied, the following need to be added to the respective paths:
+Currently the emdrp is more a collection of python, matlab and shell scripts than a toolbox or single install. Until this is remedied, the following need to be added to the respective paths (relative to emdrp clone path):
 
 - PATH
   - `emdrp/recon/python`
 - PYTHONPATH
-  - `recon/python`
-  - `recon/python/utils`
-  - `recon/python/utils/pyCext`
+  - `emdrp/recon/python`
+  - `emdrp/recon/python/utils`
+  - `emdrp/recon/python/utils/pyCext`
 - matlab path
-  - `recon/matlab/hdf5`
-  - `recon/matlab/knossos`
+  - `emdrp/recon/matlab/hdf5`
+  - `emdrp/recon/matlab/knossos`
 
 ## Tutorial / Example Run
 
@@ -38,9 +38,21 @@ Reset the repository to the [commit]() that works with the example.
 
 Download [datasets](https://elifesciences.org/articles/08206/figures#data-sets) and training and testing data (Figure 3—source data 1 to 4) generated for the [ECS preservation paper](https://elifesciences.org/articles/08206).
 
-xxx - add pipeline steps
+All scripts for running through this tutorial are located at `pipeline/ECS_tutorial`. Many scripts will require changing paths to the location data files were downloaded to.
 
-## Modified cuda-convnets2 (Legacy)
+### Create hdf5 data files
+
+The emdrp uses hdf5 as the container for all data. The first step is to create hdf5 files for the raw EM data using top-level matlab script `top_make_hdf5_from_knossos_raw.m`
+
+Manually annotated training data also needs to be converted to hdf5 using scripts `label_maker*.sh` The emdrp does not support tiff stacks, so the downloaded label data should convert to either nrrd, gipl or raw formats ([fiji](https://fiji.sc/) recommended). Labels can be validated using `label_validator*.sh` scripts. The raw format exports from the emdrp data scripts are typically used in conjunction with [itksnap](http://www.itksnap.org/pmwiki/pmwiki.php) for viewing small volumes.
+
+### Train convnets
+
+
+
+## Legacy
+
+### Modified cuda-convnets2
 
 Sample run for training modified [cuda-convnet2](https://github.com/akrizhevsky/cuda-convnet2) for EM data:
 
