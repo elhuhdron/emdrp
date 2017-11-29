@@ -1,5 +1,5 @@
 
-# run on gpu-clone in ~/gits/emdrp/neon3
+# run on gpu-clones 2-5 in ~/gits/emdrp/neon3
 
 declare -a card=("0" "1" "2" "3" "0" "1" "2" "3" "0" "1" "2" "3" "0" "1" "2" "3" "0" "1" "2" "3")
 declare -a skip_lists=("0" "1" "2" "3" "4" "5")
