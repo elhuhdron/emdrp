@@ -33,7 +33,9 @@ do
     count=$icount
     while [ $count -lt ${#slices[@]} ]
     do
-        echo "python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/ECS_full_run2/EMdata-3class-64x64out-export-${dataset}.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_${slices[$count]}_test${itestc}_${count}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_${slices[$count]}_test${itestc}_${count}.h5 --test_range 200001 200256 --nbebuf 1 -i ${card[$totalc]} --chunk_skip_list $testc" > run_tmp.sh
+        # no skip list because just exporting the whole volume for each run
+        echo "python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/ECS_full_run2/EMdata-3class-64x64out-export-${dataset}.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_${slices[$count]}_test${itestc}_${count}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_${slices[$count]}_test${itestc}_${count}.h5 --test_range 200001 200256 --nbebuf 1 -i ${card[$totalc]}" > run_tmp.sh
+        #echo "python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/ECS_full_run2/EMdata-3class-64x64out-export-${dataset}.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_${slices[$count]}_test${itestc}_${count}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_${slices[$count]}_test${itestc}_${count}.h5 --test_range 200001 200256 --nbebuf 1 -i ${card[$totalc]} --chunk_skip_list $testc" > run_tmp.sh
         #cat run_tmp.sh
         ./run_gpu_job.py -s run_tmp.sh
        
