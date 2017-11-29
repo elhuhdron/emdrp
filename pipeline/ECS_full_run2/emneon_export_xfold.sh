@@ -1,20 +1,32 @@
 
 # run on gpu-clone in ~/gits/emdrp/neon3
-#   this version just runs on one clone (still relatively fast)
 
 declare -a card=("0" "1" "2" "3" "0" "1" "2" "3" "0" "1" "2" "3" "0" "1" "2" "3" "0" "1" "2" "3")
 declare -a skip_lists=("0" "1" "2" "3" "4" "5")
 declare -a slices=('xyz' 'xyz' 'xyz' 'xyz')
+# for both datasets on 4 machines
+declare -a machine_skip_inds=('x' '0 1 2' '3 4 5' '0 1 2' '3 4 5')
 
-# run for both datasets
+# run for both datasets (depending on which machine running on, got lazy and not automatic)
 dataset=M0007
 #dataset=M0027
 
+# map IP to machine index
+declare -a lips=(1 2 65 129 193)
+machine=$(ifconfig eno1 | grep 'inet ' | perl -nle'/\s*inet \d+\.\d+\.\d+\.(\d+)/ && print $1')
+machine=($machine)
+for i in ${!lips[@]}; do
+   if [[ ${lips[$i]} = ${machine} ]]; then
+       machine=${i}
+   fi
+done
+cmachine_skip_inds=(${machine_skip_inds[$machine]})
+
 iter=0
 totalc=0
-while [ $iter -lt ${#skip_lists[@]} ]
+while [ $iter -lt ${#cmachine_skip_inds[@]} ]
 do
-    atestc=(${skip_lists[$iter]}); itestc=${atestc[0]}; ntestc=${#atestc[@]}
+    atestc=(${skip_lists[${cmachine_skip_inds[$iter]}]}); itestc=${atestc[0]}; ntestc=${#atestc[@]}
     testc=$( IFS=' '; echo "${atestc[*]}" )
 
     icount=0
