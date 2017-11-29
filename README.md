@@ -32,48 +32,66 @@ Currently the emdrp is more a collection of python, matlab and shell scripts tha
   - `emdrp/recon/matlab/hdf5`
   - `emdrp/recon/matlab/knossos`
 
-## Tutorial / Example Run
+## Tutorial / Example Workflow
 
 Reset the repository to the [commit]() that works with the example.
 
 Download [datasets](https://elifesciences.org/articles/08206/figures#data-sets) and training and testing data (Figure 3—source data 1 to 4) generated for the [ECS preservation paper](https://elifesciences.org/articles/08206).
 
+Raw data for these test cases is two volumes of size 1024x1024x512 voxels with voxel resolution of 9.8x9.8x25 nm. The data are used for the 3D section of the ECS preservation paper; `M0027_11` is prepared using standard tissue preparation techniques for EM, while `M0007_33` preserves a large percentage of extracellular space.
+
 All scripts for running through this tutorial are located at `pipeline/ECS_tutorial`. Many scripts will require changing paths to the location data files were downloaded to.
 
-### Create hdf5 data files
+### Create data containers
 
 The emdrp uses hdf5 as the container for all data. The first step is to create hdf5 files for the raw EM data using top-level matlab script `top_make_hdf5_from_knossos_raw.m`
 
-Manually annotated training data also needs to be converted to hdf5 using scripts `label_maker*.sh` The emdrp does not support tiff stacks, so the downloaded label data should convert to either nrrd, gipl or raw formats ([fiji](https://fiji.sc/) recommended). Labels can be validated using `label_validator*.sh` scripts. The raw format exports from the emdrp data scripts are typically used in conjunction with [itksnap](http://www.itksnap.org/pmwiki/pmwiki.php) for viewing small volumes.
+Manually annotated training data also needs to be converted to hdf5 using scripts `label_maker*.sh` The emdrp does not support tiff stacks, so the downloaded label data needs to be converted to either nrrd, gipl or raw formats ([fiji](https://fiji.sc/) recommended). Labels can be validated using `label_validator*.sh` scripts. The raw format exports from the emdrp data scripts are typically used in conjunction with [itksnap](http://www.itksnap.org/pmwiki/pmwiki.php) for viewing small volumes.
 
 ### Train convnets
 
-For training against all training data with neon, activate the neon environment and run from the emdrp neon3 subdirectory (change paths appropriately):
+To train against all training data with neon, activate the neon environment and run from the emdrp neon3 subdirectory (change paths appropriately):
 
 ```
-python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0007.ini --image_in_size 128 --serialize 800 -s /home/watkinspv/Data/ECS_tutorial/convnet_out/M0007_0.prm -o /home/watkinspv/Data/ECS_tutorial/convnet_out/M0007_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0
+python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0007.ini --image_in_size 128 --serialize 800 -s ~/Data/ECS_tutorial/convnet_out/M0007_0.prm -o ~/Data/ECS_tutorial/convnet_out/M0007_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0
 
-python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_0.prm -o /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0
+python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s ~/Data/ECS_tutorial/convnet_out/M0027_0.prm -o ~/Data/ECS_tutorial/convnet_out/M0027_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0
 ```
 
-Typically 4 independent convnets are trained on all training data to export probabilities used to create segmentations to be tested against skeleton metrics. However, the agglomeration step of the pipeline trains much better against segmentations created from the test volumes of cross-validation trained convnets. For a small number of training volumes, a leave-one-volume-out as test approach has empirically given the best agglomeration training results.
+Typically 4 independent convnets are trained on all training data. However, the agglomeration step of the pipeline trains much better against segmentations created from the test volumes of cross-validated convnets. For a small number of training volumes, a leave-one-volume-out cross-validation, follwed by training the agglomeration with the test volumes, has given the best agglomeration training results.
 
 `emneon.py` contains a handy flag `--chunk-skip-list` for leave-n-out cross validations:
 
 ```
-python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_test0_0.prm -o /home/watkinspv/Data/ECS_tutorial/convnet_out/M0027_test0_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0 --test_range 200001 200001 --chunk_skip_list 0 --eval 800
+python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s ~/Data/ECS_tutorial/convnet_out/M0027_test0_0.prm -o ~/Data/ECS_tutorial/convnet_out/M0027_test0_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0 --test_range 200001 200001 --chunk_skip_list 0 --eval 800
 ```
 
-A total of 28 trainined convnets for each dataset should result, 4 each for the six leave-one-volume-out and for training on all volumes. Probability of class membership then needs to be exported for each.
+A total of 28 trained convnets for each dataset should result, 4 each for the six leave-one-volume-out and for training on all volumes.
 
-### Exporting and merging probabilities
+### Export probabilities
 
+This step exports probability of voxel classification types from each trained convnet. To simplify scripts and preserve some amount of context, the entirety of the volumes is exported for each trained convnet (28 for each dataset). Context outside of the test cube is optionally used by the watershed and agglomeration steps. For example, for each trained convnet:
+
+```
+python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-export-M0007.ini --model_file ~/Data/ECS_tutorial/convnet_out/M0007_0.prm --write_output ~/Data/M0007_0_probs.h5 --test_range 200001 200256 -i 0
+```
+
+### Merge probabilities
+
+Although any number of aggregation of the trained convnets could be used, empirically probability mean and max operations have given the best segmentation results. The means are used to generate segmentations in the watershed step and the means and maxes are used as training features in the agglomeration step.
+
+TODO: example command line or script
 
 ### Watershed
 
-### Agglomeration
+This step which creates the initial segmentations is a custom automatically-seeded watershed algorithm. The algorithm automatically picks seed locations by preserving 3D regions that have fallen below a particular size with increasing thresholds on the mean probabilities. Three segmentations are created:
+  1. with_background: voxel identity as predicted with winner-take-all probability from the convnet outputs are preserved
+  2. no_adjacencies: supervoxels are flushed out but background is preserved to maintain non-adjacency between components
+  3. zero_background: fully watershedded segmentation with no background remaining
 
-### Cleaning
+TODO: example command line or script
+
+### Agglomerate
 
 ### Skeleton metrics
 
