@@ -8,6 +8,10 @@ declare -a slices=('xyz' 'xyz' 'xyz' 'xyz')
 dataset=M0007
 #dataset=M0027
 
+# because M0007 runs up against the top of the entire dataset, context sizes are different
+ctx_cubes=500
+#ctx_cubes=600
+
 totalc=0
 icount=0
 count=$icount
