@@ -73,14 +73,19 @@ A total of 28 trained convnets for each dataset should result, 4 each for the si
 This step exports probability of voxel classification types from each trained convnet. To simplify scripts and preserve some amount of context, the entirety of the volumes is exported for each trained convnet (28 for each dataset). Context outside of the test cube is optionally used by the watershed and agglomeration steps. For example, for each trained convnet:
 
 ```
-python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-export-M0007.ini --model_file ~/Data/ECS_tutorial/convnet_out/M0007_0.prm --write_output ~/Data/M0007_0_probs.h5 --test_range 200001 200256 -i 0
+python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-export-M0007.ini --model_file ~/Data/ECS_tutorial/convnet_out/M0007_0.prm --write_output ~/Data/ECS_tutorial/xfold/M0007_0_probs.h5 --test_range 200001 200256 -i 0
 ```
 
 ### Merge probabilities
 
-Although any number of aggregation of the trained convnets could be used, empirically probability mean and max operations have given the best segmentation results. The means are used to generate segmentations in the watershed step and the means and maxes are used as training features in the agglomeration step.
+Although any number of aggregation of the trained convnets could be used, empirically probability mean, min and max operations have given the best segmentation results. The means are used to generate segmentations in the watershed step and the means and maxes are used as training features in the agglomeration step.
 
-TODO: example command line or script
+For example, for a single cross-validation:
+```
+python -u dpMergeProbs.py --srcpath ~/Data/ECS_tutorial/xfold --srcfiles M0007_0_probs.h5 M0007_1_probs.h5 M0007_2_probs.h5 M0007_3_probs.h5 --dim-orderings xyz xyz xyz xyz --outprobs ~/Data/ECS_tutorial/xfold/M0007_probs.h5 --chunk 18 15 3 --size 128 128 128 --types ICS --ops mean min --dpM
+
+python -u dpMergeProbs.py --srcpath ~/Data/ECS_tutorial/xfold --srcfiles M0007_0_probs.h5 M0007_1_probs.h5 M0007_2_probs.h5 M0007_3_probs.h5 --dim-orderings xyz xyz xyz xyz --outprobs ~/Data/ECS_tutorial/xfold/M0007_probs.h5 --chunk 18 15 3 --size 128 128 128 --types MEM ECS --ops mean max --dpM
+```
 
 ### Watershed
 
@@ -89,7 +94,11 @@ This step which creates the initial segmentations is a custom automatically-seed
   2. no_adjacencies: supervoxels are flushed out but background is preserved to maintain non-adjacency between components
   3. zero_background: fully watershedded segmentation with no background remaining
 
-TODO: example command line or script
+For example, for a single cross-validation:
+```
+python -u dpWatershedTypes.py --probfile ~/Data/ECS_tutorial/xfold/M0007_probs.h5 --chunk 18 15 3 --offset 0 0 0 --size 128 128 128 --outlabels ~/Data/ECS_tutorial/xfold/M0007_supervoxels.h5 --ThrRng 0.5 0.999 0.1 --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 
+0.9999 0.99995 0.99999 --dpW
+```
 
 ### Agglomerate
 
