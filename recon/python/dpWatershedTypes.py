@@ -207,7 +207,7 @@ class dpWatershedTypes(object):
         emVoxelType.writeVoxType(outfile=self.outlabels, chunk=self.chunk.tolist(),
             offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
             chunksize=self.chunksize.tolist(), verbose=writeVerbose, attrs=d,
-            data=data, subgroups_out=self.subgroups)
+            data=data, subgroups_out=self.subgroups_out)
 
         # only allow a voxel to be included in the type of component that had max prob for that voxel.
         # do this by setting the non-winning probabilities to zero.
@@ -374,22 +374,22 @@ class dpWatershedTypes(object):
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), data=labels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=self.subgroups+['with_background']+subgroups )
+                        attrs=d, strbits=self.outlabelsbits, subgroups=self.subgroups_out+['with_background']+subgroups )
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), data=wlabels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=self.subgroups+['zero_background']+subgroups )
+                        attrs=d, strbits=self.outlabelsbits, subgroups=self.subgroups_out+['zero_background']+subgroups )
                     d['type_nlabels'] = types_ucnlabels;
                     emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                         offset=self.offset_crop.tolist(), size=self.size_crop.tolist(), datasize=self.datasize.tolist(),
                         chunksize=self.chunksize.tolist(), data=uclabels, verbose=writeVerbose,
-                        attrs=d, strbits=self.outlabelsbits, subgroups=self.subgroups+['no_adjacencies']+subgroups )
+                        attrs=d, strbits=self.outlabelsbits, subgroups=self.subgroups_out+['no_adjacencies']+subgroups )
                     if self.skeletonize:
                         emLabels.writeLabels(outfile=self.outlabels, chunk=self.chunk.tolist(),
                             offset=self.offset_crop.tolist(), size=self.size_crop.tolist(),
                             datasize=self.datasize.tolist(), chunksize=self.chunksize.tolist(), data=sklabels,
                             verbose=writeVerbose, attrs=d, strbits=self.outlabelsbits,
-                            subgroups=self.subgroups+['skeletonized']+subgroups )
+                            subgroups=self.subgroups_out+['skeletonized']+subgroups )
 
     # This labeling method connects zslices layer-by-layer. This can be done by simply overlapping the eroded labeled
     #   regoins or by overlapping by using warped labels (with warps generated externally by some optic flow method).
