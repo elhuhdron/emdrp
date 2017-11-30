@@ -53,7 +53,7 @@ class dpWatershedTypes(object):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
             if type(v) is list and k not in ['ThrHi', 'ThrLo', 'fg_types_labels', 'ThrRngSave', 'ThrHiSave',
-                    'ThrLoSave', 'subgroups']:
+                    'ThrLoSave', 'subgroups', 'subgroups_out']:
                 # do not save items that are known to be lists (even if one element) as single elements
                 if len(v)==1 and k not in ['fg_types', 'Tmins']:
                     setattr(self,k,v[0])  # save single element lists as first element
@@ -517,7 +517,9 @@ class dpWatershedTypes(object):
         p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(5),
             help='Diamond radius of structuring element to try to fill in background (membrane) gaps')
         p.add_argument('--subgroups', nargs='*', type=str, default=[], metavar=('GRPS'),
-            help='List of groups to identify subgroup for the output dataset (empty for top level)')            
+            help='List of groups to identify subgroup for the input datasets (empty for top level)')            
+        p.add_argument('--subgroups-out', nargs='*', type=str, default=[], metavar=('GRPS'),
+            help='List of groups to identify subgroup for the output datasets (empty for top level)')            
         p.add_argument('--dpWatershedTypes-verbose', action='store_true',
             help='Debugging output for dpWatershedTypes')
 
