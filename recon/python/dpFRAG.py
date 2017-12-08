@@ -253,10 +253,12 @@ class dpFRAG(emLabels):
         # force to keep subgroups in output if the chunk subgroup mode is set.
         # this is if training cubes with context overlap each other so need to be stored in separate datasets.
         # NOTE: MUST do this here before most inits so that dataset properties are loaded properly
-        if self.chunk_subgroups: 
-            self.keep_subgroups = True
-            self.subgroups = ['chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())] + self.subgroups
-            self.inith5() # MUST so that dataset properties are loaded
+        # xxx - ugly, svox context was never helping, so instead only use this for probs
+        self.chunk_subgroups_txt = 'chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())
+        #if self.chunk_subgroups: 
+        #    self.keep_subgroups = True
+        #    self.subgroups = ['chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())] + self.subgroups
+        #    self.inith5() # MUST so that dataset properties are loaded
 
         # create features based on feature_set mode
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
@@ -371,7 +373,7 @@ class dpFRAG(emLabels):
             for i in range(self.nprob_types):
                 loadh5 = dpLoadh5.readData(srcfile=self.probfile, dataset=self.prob_types[i], chunk=self.chunk.tolist(),
                     offset=offset.tolist(), size=size.tolist(), data_type=emProbabilities.PROBS_STR_DTYPE,
-                    subgroups=[self.subgroups[0]] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                    subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
                 data = loadh5.data_cube
 
                 if self.pad_prob_perim:
@@ -385,7 +387,8 @@ class dpFRAG(emLabels):
                 for j in range(self.naugments):
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.prob_types[i]+self.augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        subgroups=[self.subgroups[0]] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                        subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [], 
+                        verbose=self.dpLoadh5_verbose)
                     data = loadh5.data_cube
 
                     if self.pad_prob_perim:
@@ -400,7 +403,8 @@ class dpFRAG(emLabels):
                 if self.static_augments[j][0] != '_':
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.static_augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        subgroups=[self.subgroups[0]] if self.chunk_subgroups else [], verbose=self.dpLoadh5_verbose)
+                        subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [], 
+                        verbose=self.dpLoadh5_verbose)
                     data = loadh5.data_cube
 
                     if self.pad_prob_perim:
@@ -1355,7 +1359,9 @@ class dpFRAG(emLabels):
         if not has_ECS: arg_str += ' --no-ECS '
         if chunk_subgroups: arg_str += ' --chunk-subgroups '
         if neighbor_only: arg_str += ' --neighbor-only '
+        # xxx - ugly, svox perim was never useful so disabling here
         if pad_prob_svox_perim: arg_str += ' --pad-prob-perim --pad-svox-perim '
+        else: arg_str += ' --pad-svox-perim '
         if no_agglo_ECS: arg_str += ' --no-agglo-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
@@ -1391,7 +1397,9 @@ class dpFRAG(emLabels):
         if not has_ECS: arg_str += ' --no-ECS '
         if chunk_subgroups: arg_str += ' --chunk-subgroups '
         if neighbor_only: arg_str += ' --neighbor-only '
+        # xxx - ugly, svox perim was never useful so disabling here
         if pad_prob_svox_perim: arg_str += ' --pad-prob-perim --pad-svox-perim '
+        else: arg_str += ' --pad-svox-perim '
         if no_agglo_ECS: arg_str += ' --no-agglo-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '
@@ -1428,7 +1436,9 @@ class dpFRAG(emLabels):
         if not has_ECS: arg_str += ' --no-ECS '
         if chunk_subgroups: arg_str += ' --chunk-subgroups '
         if neighbor_only: arg_str += ' --neighbor-only '
+        # xxx - ugly, svox perim was never useful so disabling here
         if pad_prob_svox_perim: arg_str += ' --pad-prob-perim --pad-svox-perim '
+        else: arg_str += ' --pad-svox-perim '
         if no_agglo_ECS: arg_str += ' --no-agglo-ECS '
 
         if verbose: arg_str += ' --dpFRAG-verbose '

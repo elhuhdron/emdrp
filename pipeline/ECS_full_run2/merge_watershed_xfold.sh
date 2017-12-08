@@ -40,7 +40,7 @@ do
 
     # create the subgroup name
     cchunk=($chunk)
-    fn=`printf 'x%d_y%d_z%d' ${cchunk[0]} ${cchunk[1]} ${cchunk[2]}`
+    fn=`printf 'x%04d_y%04d_z%04d' ${cchunk[0]} ${cchunk[1]} ${cchunk[2]}`
 
     time python -u dpMergeProbs.py --srcpath /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2 --srcfiles ${dataset}_xyz_test${count}_0.h5 ${dataset}_xyz_test${count}_1.h5 ${dataset}_xyz_test${count}_2.h5 ${dataset}_xyz_test${count}_3.h5 --dim-orderings xyz xyz xyz xyz --outprobs /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_probs.h5 --chunk $chunk --offset $ofst --size $sz --types ICS --ops mean min --dpM --subgroups-out chunk_$fn
     time python -u dpMergeProbs.py --srcpath /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2 --srcfiles ${dataset}_xyz_test${count}_0.h5 ${dataset}_xyz_test${count}_1.h5 ${dataset}_xyz_test${count}_2.h5 ${dataset}_xyz_test${count}_3.h5 --dim-orderings xyz xyz xyz xyz --outprobs /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_probs.h5 --chunk $chunk --offset $ofst --size $sz --types ECS MEM --ops mean max --dpM --subgroups-out chunk_$fn
@@ -56,7 +56,7 @@ do
 
     # create the subgroup name
     cchunk=($chunk)
-    fn=`printf 'x%d_y%d_z%d' ${cchunk[0]} ${cchunk[1]} ${cchunk[2]}`
+    fn=`printf 'x%04d_y%04d_z%04d' ${cchunk[0]} ${cchunk[1]} ${cchunk[2]}`
    
     time python -u dpWatershedTypes.py --probfile /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_probs.h5 --chunk $chunk --offset ${offsets[$count]} --size ${sizes[$count]} --outlabels /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_ECS_full_run2/${dataset}_supervoxels.h5 --ThrRng 0.5 0.999 0.1 --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW --subgroups chunk_$fn
 
