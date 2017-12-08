@@ -96,13 +96,33 @@ This step which creates the initial segmentations is a custom automatically-seed
 
 For example, for a single cross-validation:
 ```
-python -u dpWatershedTypes.py --probfile ~/Data/ECS_tutorial/xfold/M0007_probs.h5 --chunk 18 15 3 --offset 0 0 0 --size 128 128 128 --outlabels ~/Data/ECS_tutorial/xfold/M0007_supervoxels.h5 --ThrRng 0.5 0.999 0.1 --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 
+python -u dpWatershedTypes.py --probfile ~/Data/ECS_tutorial/xfold/M0007_probs.h5 --chunk 18 15 3 --offset 0 0 0 --size 128 128 128 --outlabels ~/Data/ECS_tutorial/xfold/M0007_supervoxels.h5 --ThrRng 0.5 0.999 0.1 --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975
 0.9999 0.99995 0.99999 --dpW
 ```
 
 ### Agglomerate
 
+The agglomeration step empirically gives the best results when trained on the test volumes from convnets trained using leave-one-out cross validation. To create a trained set of random forest classifiers with the emdrp agglomerator, modify paths appropriately in corresponding ini files, then run:
+
+```
+dpSupervoxelClassifier.py --cfgfile ~/gits/emdrp/pipeline/ECS_tutorial/classifier_M0007_train.ini --dpSupervoxelClassifier-verbose --classifierout ~/Data/ECS_tutorial/xfold/M0007_agglo_classifiers.dill --classifier rf --outfile '' --feature-set medium --neighbor-only --no-agglo-ECS --nthreads 16
+
+dpSupervoxelClassifier.py --cfgfile ~/gits/emdrp/pipeline/ECS_tutorial/classifier_M0027_train.ini --dpSupervoxelClassifier-verbose --classifierout ~/Data/ECS_tutorial/xfold/M0027_agglo_classifiers.dill --classifier rf --outfile '' --feature-set medium --neighbor-only --no-agglo-ECS --nthreads 16
+```
+
+The trained classifiers are then used to export agglomerations iteratively for the entire volumes. Paths in the ini files should be changed as to point to probabilities and watershed inputs that were exported over the entire volume and using all the training data (not the cross-validations). This is a "test-only" or export mode for the trained classifiers:
+
+```
+dpSupervoxelClassifier.py --cfgfile ~/gits/emdrp/pipeline/ECS_tutorial/classifier_M0007_export.ini --dpSupervoxelClassifier-verbose --classifierin ~/Data/ECS_tutorial/xfold/M0007_agglo_classifiers --classifier rf --outfile ~/Data/ECS_tutorial/M0007_supervoxels_agglo.h5 --classifierout '' --feature-set medium --neighbor-only --no-agglo-ECS --nthreads 16
+
+dpSupervoxelClassifier.py --cfgfile ~/gits/emdrp/pipeline/ECS_tutorial/classifier_M0027_export.ini --dpSupervoxelClassifier-verbose --classifierin ~/Data/ECS_tutorial/xfold/M0027_agglo_classifiers --classifier rf --outfile ~/Data/ECS_tutorial/M0007_supervoxels_agglo.h5 --classifierout '' --feature-set medium --neighbor-only --no-agglo-ECS --nthreads 16
+```
+
 ### Skeleton metrics
+
+The agglomerated supervoxels are then compared against skeletonized ground truth to arrive at a meaningful metric for EM data, error free path length (EFPL). Loosely EFPL is the distance that one can travel along a neurite before encountering either a split or merger error. The EFPL metrics for the emdrp are calculated with a matlab function and using supervoxels generated at each iterative step of the agglomeration (or without the agglomeration, each threshold of the watershed). An example top-level for calculating the emdrp EFPL metrics is given in `TODO: add top-level efpl`
+
+After generating the metrics, split-merger and total EFPL plots (amongst others) can be displayed with an example top-level plotting script, `TODO: add top-level efpl plotting`
 
 ## Legacy
 
