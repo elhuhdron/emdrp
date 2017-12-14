@@ -18,7 +18,7 @@ Full usage of the pipeline requires matlab installation with following toolboxes
 
 The emdrp utilizes [neon](https://github.com/NervanaSystems/neon) as the convnet implementation for machine voxel classification. Sync to the current [supported release](neon3/neon_version.txt), apply a small [patch](neon3/neon.patch) from the path where neon was cloned and install per their instructions (Anaconda install method recommended). Finally install a few additional [requirements](neon3/requirements.txt) in the neon environment.
 
-python C extensions were created for fast performance of some pipeline steps. Build these are built with a simple [Makefile](recon/python/utils/pyCext/Makefile) after modifying the appropriate paths to python and numpy install locations.
+python C extensions were created for fast performance of some pipeline steps. Build these with a simple [Makefile](recon/python/utils/pyCext/Makefile) after modifying the appropriate paths to python and numpy install locations.
 
 Currently the emdrp is more a collection of python, matlab and shell scripts than a toolbox or single install. Until this is remedied, the following need to be added to the respective paths (relative to emdrp clone path):
 
@@ -35,12 +35,13 @@ Currently the emdrp is more a collection of python, matlab and shell scripts tha
 ## Tutorial / Example Workflow
 
 Reset the repository to the [commit]() that works with the example.
+TODO: add commit or release after tutorial completed, for now reset to HEAD
 
 Download [datasets](https://elifesciences.org/articles/08206/figures#data-sets) and training and testing data (Figure 3—source data 1 to 4) generated for the [ECS preservation paper](https://elifesciences.org/articles/08206).
 
 Raw data for these test cases is two volumes of size 1024x1024x512 voxels with voxel resolution of 9.8x9.8x25 nm. The data are used for the 3D section of the ECS preservation paper; `M0027_11` is prepared using standard tissue preparation techniques for EM, while `M0007_33` preserves a large percentage of extracellular space.
 
-All scripts for running through this tutorial are located at `pipeline/ECS_tutorial`. Many scripts will require changing paths to the location data files were downloaded to.
+All scripts for running through this tutorial are located at `pipeline/ECS_tutorial`. Many scripts will require changing paths depending on the location that data files were downloaded to or written to at each pipeline step.
 
 ### Create data containers
 
@@ -66,7 +67,7 @@ Typically 4 independent convnets are trained on all training data. However, the 
 python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/ECS_tutorial/EMdata-3class-64x64out-rand-M0027.ini --image_in_size 128 --serialize 800 -s ~/Data/ECS_tutorial/convnet_out/M0027_test0_0.prm -o ~/Data/ECS_tutorial/convnet_out/M0027_test0_0.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i 0 --test_range 200001 200001 --chunk_skip_list 0 --eval 800
 ```
 
-A total of 28 trained convnets for each dataset should result, 4 each for the six leave-one-volume-out and for training on all volumes.
+This is repeated for each training volume, resulting in a total of 28 trained convnets for each dataset: 4 each for the six leave-one-volume-out runs and for the train-on-all-volumes runs.
 
 ### Export probabilities
 
@@ -118,11 +119,21 @@ dpSupervoxelClassifier.py --cfgfile ~/gits/emdrp/pipeline/ECS_tutorial/classifie
 dpSupervoxelClassifier.py --cfgfile ~/gits/emdrp/pipeline/ECS_tutorial/classifier_M0027_export.ini --dpSupervoxelClassifier-verbose --classifierin ~/Data/ECS_tutorial/xfold/M0027_agglo_classifiers --classifier rf --outfile ~/Data/ECS_tutorial/M0007_supervoxels_agglo.h5 --classifierout '' --feature-set medium --neighbor-only --no-agglo-ECS --nthreads 16
 ```
 
+A further step is necessary in order to calculate metrics for the agglomeration segmentation, that is to reclassify which supervoxels are ICS and which are ECS based on the maximum number of original voxels classifications within each agglomerated supervoxel. First the voxel types need to be copied from the watershed output and then another script that can perform several heuristical label "cleaning" steps re-sorts the supervoxels into ICS or ECS based on the winning contained type. For example:
+
+```
+dpWriteh5.py --dataset voxel_type --srcfile ~/Data/ECS_tutorial/M0007_supervoxels.h5 --outfile ~/Data/ECS_tutorial/M0007_supervoxels_agglo.h5 --chunk 16 17 0 --offset 0 0 32 --size 1024 1024 480 --dpW --dpL
+
+dpCleanLabels.py --dataset labels --subgroups agglomeration 2.00000000 --get-svox-type --ECS-label 0 --dpW --dpCl --srcfile ~/Data/ECS_tutorial/M0007_supervoxels_agglo.h5 --chunk 16 17 0 --offset 0 0 32 --size 1024 1024 480 --outfile ~/Data/ECS_tutorial/M0007_supervoxels_agglo.h5
+```
+
+The `dpCleanLabels.py` step needs to be repeated for each agglomeration iteration (identified by second `--subgroup` argument) that is to be analyzed (script recommended).
+
 ### Skeleton metrics
 
-The agglomerated supervoxels are then compared against skeletonized ground truth to arrive at a meaningful metric for EM data, error free path length (EFPL). Loosely EFPL is the distance that one can travel along a neurite before encountering either a split or merger error. The EFPL metrics for the emdrp are calculated with a matlab function and using supervoxels generated at each iterative step of the agglomeration (or without the agglomeration, each threshold of the watershed). An example top-level for calculating the emdrp EFPL metrics is given in `TODO: add top-level efpl`
+The agglomerated segmentation is then compared against skeletonized ground truth to arrive at a meaningful metric for EM data, error free path length (EFPL). Loosely EFPL is the distance that one can travel along a neurite before encountering either a split or merger error. The EFPL metrics for the emdrp are calculated with a matlab function and using supervoxels generated at each iterative step of the agglomeration (or without the agglomeration, each threshold of the watershed). An example top-level for calculating the emdrp EFPL metrics is given in `knossos_efpl_top.m`
 
-After generating the metrics, split-merger and total EFPL plots (amongst others) can be displayed with an example top-level plotting script, `TODO: add top-level efpl plotting`
+After generating the metrics, split-merger and total EFPL plots (amongst others) can be displayed with an example top-level plotting script, `knossos_efpl_plot_top.m`
 
 ## Legacy
 
