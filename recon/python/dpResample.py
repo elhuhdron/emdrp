@@ -107,7 +107,7 @@ class dpResample(dpWriteh5):
                         self.slices[i*ff + j*f + k] = np.s_[i::f,j::f,k::f]
 
     def iterResample(self):
-        assert( (self.cube_size % self.factor == 0).all() ) # xxx - this probably could be fixed
+        assert( (self.cube_size[self.resample_dims] % self.factor == 0).all() ) # xxx - this probably could be fixed
 
         # xxx - ahhhhhh, this has to be fixed somehow
         if self.chunksize is not None and (self.chunksize < 0).all(): self.chunksize = self.use_chunksize
@@ -141,11 +141,12 @@ class dpResample(dpWriteh5):
 
         f = self.factor
         if self.upsample:
-            if 'boundary' in new_attrs: # proxy for whether attrs is there at all
-                # update the scale and compute new chunk/size/offset
-                new_attrs['scale'][self.resample_dims] /= f
+            # update the scale and compute new chunk/size/offset
+            if 'boundary' in new_attrs: 
                 new_attrs['boundary'][self.resample_dims] *= f
                 new_attrs['nchunks'][self.resample_dims] *= f
+            if 'scale' in new_attrs: 
+                new_attrs['scale'][self.resample_dims] /= f
             # this attribute is saved as downsample factor
             new_attrs['factor'][self.resample_dims] /= f
             new_chunk[self.resample_dims] *= f
@@ -157,12 +158,13 @@ class dpResample(dpWriteh5):
             for i in range(self.nslices):
                 new_data[self.slices[i]] = self.data_cube
         else:
-            if 'boundary' in new_attrs: # proxy for whether attrs is there at all
-                # update the scale and compute new chunk/size/offset
-                new_attrs['scale'][self.resample_dims] *= f
+            # update the scale and compute new chunk/size/offset
+            if 'boundary' in new_attrs: 
                 new_attrs['boundary'][self.resample_dims] //= f
                 new_attrs['nchunks'][self.resample_dims] = \
                     np.ceil(new_attrs['nchunks'][self.resample_dims] / f).astype(np.int32)
+            if 'scale' in new_attrs: 
+                new_attrs['scale'][self.resample_dims] *= f
             # this attribute is saved as downsample factor
             new_attrs['factor'][self.resample_dims] *= f
             new_chunk[self.resample_dims] //= f
