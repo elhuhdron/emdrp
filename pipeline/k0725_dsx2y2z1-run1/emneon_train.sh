@@ -19,7 +19,6 @@ for i in ${!lips[@]}; do
        machine=${i}
    fi
 done
-machine=1
 cmachine_skip_inds=(${machine_skip_inds[$machine]})
 cmachine_orderings=(${machine_orderings[$machine]})
 
@@ -29,8 +28,8 @@ while [ ${cmachine_skip_inds[$iter]} -lt 0 ]
 do
      
      echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/k0725_dsx2y2z1-run1/EMdata-3class-64x64out-rand-${dataset}.ini --serialize 800 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i ${card[$cnt]} --dim_ordering ${cmachine_orderings[$iter]} >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
-    #./run_gpu_job.py -s run_tmp.sh
-    cat run_tmp.sh
+    ./run_gpu_job.py -s run_tmp.sh
+    #cat run_tmp.sh
     iter=`expr $iter + 1`
     cnt=`expr $cnt + 1`
 done
@@ -39,8 +38,8 @@ while [ $iter -lt ${#cmachine_skip_inds[@]} ]
 do
 
     echo "nohup time python -u ./emneon.py -e 1 --data_config ~/gits/emdrp/pipeline/k0725_dsx2y2z1-run1/EMdata-3class-64x64out-rand-${dataset}.ini --serialize 800 -s /home/$(whoami)/Data/convnet_out/test-model.prm -o /home/$(whoami)/Data/convnet_out/test-output.h5 --model_arch vgg3pool --train_range 100001 112800 --epoch_dstep 5600 4000 2400 --nbebuf 1 -i ${card[$cnt]} --dim_ordering ${cmachine_orderings[$iter]} --chunk_skip_list ${skip_lists[${cmachine_skip_inds[$iter]}]} --test_range 200001 200001 --eval 800 >& /home/$(whoami)/Data/convnet_out/test-emneon-out.txt &" > run_tmp.sh
-    #./run_gpu_job.py -s run_tmp.sh
-    cat run_tmp.sh
+    ./run_gpu_job.py -s run_tmp.sh
+    #cat run_tmp.sh
 
     iter=`expr $iter + 1`
     cnt=`expr $cnt + 1`
