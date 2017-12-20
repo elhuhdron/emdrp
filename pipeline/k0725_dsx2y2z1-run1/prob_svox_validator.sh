@@ -34,7 +34,7 @@ do
     ofst=$( IFS=' '; echo "${coffset[*]}" ); sz=$( IFS=' '; echo "${csize[*]}" )
 
     dpLoadh5.py --srcfile ${inprobs}_supervoxels.h5 --chunk $chunk --offset ${offsets[$count]} --size ${sizes[$count]} --dataset labels --subgroups with_background 0.99999000 --outraw $outpath/${dataset}_${sg}_supervoxels.nrrd --dpL 
-    dpLoadh5.py --srcfile ${inprobs}_probs.h5 --chunk $chunk --size $sz --offset $ofst --dataset OUT --outraw $outpath/${dataset}_${sg}_OUT.nrrd --dpL --subgroups chunk_$sg
+    dpLoadh5.py --srcfile ${inprobs}_probs.h5 --chunk $chunk --size $sz --offset $ofst --dataset MEM --outraw $outpath/${dataset}_${sg}_MEM.nrrd --dpL --subgroups chunk_$sg
 
     count=`expr $count + 1`
 done
