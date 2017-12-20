@@ -28,7 +28,7 @@ do
     testc=$( IFS=' '; echo "${atestc[*]}" )
 
     count=$iter
-    echo "python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/k0725_dsx2y2z1-run1/EMdata-3class-64x64out-rand-ctx-${dataset}.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/vgg3pool64_k0725_ds2_run1/${dataset}_${slices[$count]}_test${itestc}_${repeats[$count]}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_k0725_ds2_run1/${dataset}_${slices[$count]}_test${itestc}_${repeats[$count]}.h5 --test_range 200001 200001 --nbebuf 1 -i ${card[$totalc]} --chunk_skip_list $testc --dim_ordering ${slices[$count]}" > run_tmp.sh
+    echo "python -u ./emneon.py --data_config ~/gits/emdrp/pipeline/k0725_dsx2y2z1-run1/EMdata-3class-64x64out-rand-ctx-${dataset}.ini --model_file /mnt/syn2/watkinspv/convnet_out/neon_xfold/vgg3pool64_k0725_ds2_run1/${dataset}_${slices[$count]}_test${itestc}_${repeats[$count]}.prm --write_output /mnt/syn2/watkinspv/full_datasets/neon_xfold/vgg3pool64_k0725_ds2_run1/${dataset}_${slices[$count]}_test${itestc}_${repeats[$count]}.h5 --test_range 200001 200001 --nbebuf 1 -i ${card[$count]} --chunk_skip_list $testc --dim_ordering ${slices[$count]}" > run_tmp.sh
     #cat run_tmp.sh
     ./run_gpu_job.py -s run_tmp.sh
        
