@@ -23,7 +23,7 @@ for chunk in "${chunks[@]}";
 do
     # create the subgroup name
     cchunk=($chunk)
-    sg=`printf 'x%d_y%d_z%d' ${cchunk[0]} ${cchunk[1]} ${cchunk[2]}`
+    sg=`printf 'x%04d_y%04d_z%04d' ${cchunk[0]} ${cchunk[1]} ${cchunk[2]}`
 
     # subtract context offset from offset
     coffset=(${offsets[$count]}); csize=(${sizes[$count]}); cnt=0
