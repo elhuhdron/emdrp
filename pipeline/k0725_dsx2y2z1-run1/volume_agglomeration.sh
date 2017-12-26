@@ -26,5 +26,5 @@ python -u dpCubeIter.py --volume_range_beg $volume_range_beg --volume_range_end 
 paste -d';' $OUTD/20170902_k0725_run1_0.swarm $OUTD/20170902_k0725_run1_1.swarm $OUTD/20170902_k0725_run1_2.swarm $OUTD/20170902_k0725_run1_3.swarm > $OUTD/20170902_k0725_run1.swarm
 
 # run swarm on biowulf with:
-#swarm -f 20170902_k0725_run1.swarm -g 96 -t 16 -p 1 --sbatch " --gres=lscratch:100 " --time 72:00:00 --verbose 1
+#swarm -f 20170902_k0725_run1.swarm -g 96 -t 24 -p 1 --sbatch " --gres=lscratch:100 " --time 48:00:00 --verbose 1
 
