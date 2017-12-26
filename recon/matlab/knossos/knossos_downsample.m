@@ -38,9 +38,9 @@ node_meta.time = fix(now*24); % ???
 
 % read the nml file, script from Kevin
 [info, meta, ~] = knossos_read_nml(skelin);
-%scale = [meta.scale.x meta.scale.y meta.scale.z];
-%scale = scale .* p.ds_ratio;
-%meta.scale.x = scale(1); meta.scale.y = scale(2); meta.scale.z = scale(3);
+scale = [meta.scale.x meta.scale.y meta.scale.z];
+scale = scale .* p.ds_ratio;
+meta.scale.x = scale(1); meta.scale.y = scale(2); meta.scale.z = scale(3);
 meta.experiment.name = p.experiment;
 
 % convert to struct array for indexing, reorder by thingID

@@ -408,7 +408,10 @@ for prm=1:o.nparams
     if ~isempty(pdata.nlabels_attr)
       % get nlabels from attributes
       tmp = h5readatt(pdata.lblsh5,dset,pdata.nlabels_attr);
-      assert( ~p.remove_MEM_ECS_nodes || length(tmp) > 1 );   % need labels sorted by supervoxel type for this to work
+      % this is only used for this assert, verify that types_nlabels matches expected number of foreground types.
+      % to remove ECS nodes, we need labels sorted by supervoxel type (can be done with dpCleanLabels.py).
+      fg_types = h5readatt(pdata.lblsh5,dset,'fg_types');
+      assert( ~p.remove_MEM_ECS_nodes || length(tmp) == length(fg_types) ); 
       o.types_nlabels(prm,1:length(tmp)) = tmp;
       nlabels = double(sum(o.types_nlabels(prm,:))); % do not remove ECS components
       %nlabels = double(nlabels(1)); Vlbls(Vlbls > nlabels) = 0;  % remove ECS components
@@ -455,7 +458,8 @@ for prm=1:o.nparams
   % optionally completely remove nodes falling into ECS and MEM supervoxels from
   %   confusion matrix.
   if p.remove_MEM_ECS_nodes
-    m_ij = m_ij(:,2:o.types_nlabels(prm,1)+2);
+    % xxx - had a bug here before k0725 ds2 run1 where end index was +2 instead of matlab inclusive +1
+    m_ij = m_ij(:,2:o.types_nlabels(prm,1)+1);
   end
   
   fprintf(1,'\tcomputing rand error from confusion matrix\n');
