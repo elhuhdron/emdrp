@@ -14,9 +14,10 @@ declare -a thrs=(0 6 14 30 74)
 level=0
 while [ $level -lt ${#thrs[@]} ]
 do
-    echo processing ${thrs[$level]}
+    thr=`LANG=C printf '%.8f' ${thrs[$level]}`
+    echo processing $thr
 
-    python -u dpCubeIter.py --volume_range_beg $volume_range_beg --volume_range_end $volume_range_end --overlap 0 0 0 --cube_size 6 6 6 --cmd "python -u $HOME/gits/emdrp/recon/python/dpLabelMesher.py --dataset labels --subgroups agglomeration ${thrs[$level]}  --dpLabelMesher-verbose --set-voxel-scale --dataset-root $level --reduce-frac 0.02 --smooth 5 5 5" --fileflags mesh-outfile srcfile --filepaths '/lscratch/$SLURM_JOBID' '/lscratch/$SLURM_JOBID' --fileprefixes k0725_dsx2y2z1 k0725_dsx2y2z1_supervoxels_agglo_clean --filepostfixes .cleanA.$level.mesh.h5 .h5 > $OUTD/20170902_k0725_run1_level${level}_1.swarm
+    python -u dpCubeIter.py --volume_range_beg $volume_range_beg --volume_range_end $volume_range_end --overlap 0 0 0 --cube_size 6 6 6 --cmd "python -u $HOME/gits/emdrp/recon/python/dpLabelMesher.py --dataset labels --subgroups agglomeration ${thr}  --dpLabelMesher-verbose --set-voxel-scale --dataset-root $level --reduce-frac 0.02 --smooth 5 5 5" --fileflags mesh-outfile srcfile --filepaths '/lscratch/$SLURM_JOBID' '/lscratch/$SLURM_JOBID' --fileprefixes k0725_dsx2y2z1 k0725_dsx2y2z1_supervoxels_agglo_clean --filepostfixes .cleanA.$level.mesh.h5 .h5 > $OUTD/20170902_k0725_run1_level${level}_1.swarm
 
     # copy input supervoxels to lscratch
     python -u dpCubeIter.py --volume_range_beg $volume_range_beg --volume_range_end $volume_range_end --overlap 0 0 0 --cube_size 6 6 6 --cmd "cp -fp" --fileflags 0 0 --filepaths /data/CDCU/full_datasets/neon/vgg3pool64_k0725_ds2_run1/clean '/lscratch/$SLURM_JOBID' --fileprefixes k0725_dsx2y2z1_supervoxels_agglo_clean k0725_dsx2y2z1_supervoxels_agglo_clean --filepostfixes .h5 .h5 --no_volume_flags > $OUTD/20170902_k0725_run1_level${level}_0.swarm
