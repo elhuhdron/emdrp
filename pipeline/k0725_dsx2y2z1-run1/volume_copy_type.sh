@@ -1,6 +1,7 @@
 
 # run on biowulf in ~/gits/emdrp/recon/python
 # then start swarm in subdir out_batches/20171221_k0725_run1/clean
+# NOTE: also copy voxel type to clean (possibly need by some analysis scripts)
 
 # due to space on biowulf, had to run half at a time
 volume_range_beg='1 1 1'

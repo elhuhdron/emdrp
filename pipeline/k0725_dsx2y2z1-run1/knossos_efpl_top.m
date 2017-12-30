@@ -25,6 +25,16 @@ pdata(i).segparam_attr = '';
 pdata(i).segparams = 0:2:74;
 pdata(i).nlabels_attr = 'types_nlabels';
 
+i = 3;
+pdata(i).datah5 = '/Data/datasets/raw/k0725_dsx2y2z1.h5';
+pdata(i).chunk = [4 4 3];
+pdata(i).skelin = '/Data/datasets/skeletons/k0725_contourcube_cube_x4_y4o64_z3_dsx2y2z1.055.nml';
+pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool64_k0725_ds2_run1/clean/k0725_dsx2y2z1_supervoxels_agglo_clean_x0001_y0001_z0001.h5';
+pdata(i).name = 'k0725_agglo_clean';
+pdata(i).subgroups = {'agglomeration'};
+pdata(i).segparam_attr = '';
+pdata(i).segparams = [0 6 14 30 74];
+pdata(i).nlabels_attr = 'types_nlabels';
 
 
 
