@@ -135,13 +135,3 @@ The agglomerated segmentation is then compared against skeletonized ground truth
 
 After generating the metrics, split-merger and total EFPL plots (amongst others) can be displayed with an example top-level plotting script, `knossos_efpl_plot_top.m`
 
-## Legacy
-
-### Modified cuda-convnets2
-
-Sample run for training modified [cuda-convnet2](https://github.com/akrizhevsky/cuda-convnet2) for EM data:
-
-```
-python -u convnet.py --data-path=./emdrp-config/EMdata-3class-16x16out-ebal-huge-all-xyz.ini --save-path=../data --test-range=1-5 --train-range=1-200 --layer-def=./emdrp-config/layers-EM-3class-16x16out.cfg --layer-params=./emdrp-config/layer-params-EM-3class-16x16out.cfg --data-provider=emdata --test-freq=40 --epochs=10 --gpu=0
-```
-Works with cuda 7.5 and anaconda python2.7 plus additional conda [requirements](doc/setup/python2_conda_requirements.txt).
