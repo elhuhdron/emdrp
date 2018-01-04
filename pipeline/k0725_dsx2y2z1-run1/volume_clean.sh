@@ -2,6 +2,7 @@
 # run on biowulf in ~/gits/emdrp/recon/python
 # script automatically submits jobs with dependencies since all cleaned outputs are written to same hdf5 file.
 # NOTE: DO NOT use lscratch, as we want all the subgroups in the same hdf5 file.
+# NOTE: copied the thresholds to the segmentation levels backwards, fix on next run.
 
 OUTD=out_batches/20171221_k0725_run1/clean
 declare -a thrs=(0 6 14 30 74)

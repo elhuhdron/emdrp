@@ -1,6 +1,7 @@
 
 # run on biowulf in ~/gits/emdrp/recon/python
 # then start swarm in subdir out_batches/20171221_k0725_run1/mesh
+# NOTE: copied the thresholds to the segmentation levels backwards, fix on next run.
 
 OUTD=out_batches/20171221_k0725_run1/mesh
 

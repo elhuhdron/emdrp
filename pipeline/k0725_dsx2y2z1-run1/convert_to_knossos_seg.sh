@@ -3,11 +3,12 @@
 
 # due to space on biowulf, had to run half at a time
 volume_range_beg='1 1 1'
-volume_range_end='19 61 37'
+#volume_range_end='19 61 37'
 #volume_range_beg='1 1 37'
-#volume_range_end='19 61 73'
+volume_range_end='19 61 73'
 
-declare -a thrs=(0 6 14 30 74)
+#declare -a thrs=(0 6 14 30 74) # wrong!!
+declare -a thrs=(74 30 14 6 0)
 level=0
 while [ $level -lt ${#thrs[@]} ]
 do
