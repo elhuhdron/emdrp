@@ -22,7 +22,7 @@
 
 % modified version of KLEE_readKNOSSOS_v4.m from kb
 
-function [krk_output, meta, commentsString] = knossos_read_nml(krk_fname)
+function [krk_output, meta, commentsString, branchpointsString] = knossos_read_nml(krk_fname)
 % matches .nml format on Jan 21st 2009
 
 if nargin<1
@@ -62,6 +62,11 @@ if ~isempty(krk_fname)
     
     % load COMMENTS
     commentsString = regexp(krk_contents,'<comments>.*</comments>','match');
+    if ~isempty(commentsString), commentsString = commentsString{1}; end
+
+    % load branchpoints
+    branchpointsString = regexp(krk_contents,'<branchpoints>.*</branchpoints>','match');
+    if ~isempty(branchpointsString), branchpointsString = branchpointsString{1}; end
     
     % load THINGS
     
@@ -100,7 +105,7 @@ if ~isempty(krk_fname)
                 str2double(krk_thisEdge{2}(2:end-1))];
         end
         
-        %             krk_output{krk_tc}.edges = krk_output{krk_tc}.edges;
+        % krk_output{krk_tc}.edges = krk_output{krk_tc}.edges;
         if size(krk_output{krk_tc}.edges,1)>0
             krk_output{krk_tc}.edges = krk_nodeIDconversion(krk_output{krk_tc}.edges);
         else

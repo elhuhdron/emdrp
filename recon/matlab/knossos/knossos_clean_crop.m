@@ -36,7 +36,7 @@ o = struct;
 % p.nmlout
 
 % read the nml file, script originally from Kevin
-[info, meta] = knossos_read_nml(p.nmlin);
+[info, meta, ~, ~] = knossos_read_nml(p.nmlin);
 %scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % function removes empty skeletons and unconnected nodes and create logical edge_matrix.
@@ -101,4 +101,4 @@ end % for each new thing
 assert( nnodes == size(all_nodes,1) );
 assert( nedges == nnz(edge_matrix)/2 );
 
-knossos_write_nml(p.nmlout,outThings,meta,{});
+knossos_write_nml(p.nmlout,outThings,meta,{},{});

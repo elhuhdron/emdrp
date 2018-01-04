@@ -46,7 +46,7 @@ node_meta.time = fix(now*24); % ???
 useBGL = false;
 
 % read the nml file, script from Kevin
-[info, meta, ~] = knossos_read_nml(skelin);
+[info, meta, ~, ~] = knossos_read_nml(skelin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % convert to struct array for indexing, reorder by thingID
@@ -252,5 +252,5 @@ fprintf(1,'\norig %d thingIDs, got %d new thingIDs, %d branches, %d inflections,
 fprintf(1,'extrapolated %d nodes\n',sum(nextrap));
 
 if p.write_new_nml
-  knossos_write_nml(skelout,newThings,meta,{},node_meta);
+  knossos_write_nml(skelout,newThings,meta,{},{},node_meta);
 end

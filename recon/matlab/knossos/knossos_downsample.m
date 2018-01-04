@@ -37,14 +37,14 @@ node_meta.inMag = 1;
 node_meta.time = fix(now*24); % ???
 
 % read the nml file, script from Kevin
-[info, meta, ~] = knossos_read_nml(skelin);
+[info, meta, commentsString, branchpointsString] = knossos_read_nml(skelin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 scale = scale .* p.ds_ratio;
 meta.scale.x = scale(1); meta.scale.y = scale(2); meta.scale.z = scale(3);
 meta.experiment.name = p.experiment;
 
 % convert to struct array for indexing, reorder by thingID
-info = [info{:}]; [~,i] = sort([info.thingID]); info = info(i);
+info = [info{:}]; %[~,i] = sort([info.thingID]); info = info(i); % removed sorting so 1-1 match with originals
 
 % get number of edges and nodes and total skeleton count from nml data
 %nedges = cellfun('size',{info.edges},1); 
@@ -69,7 +69,10 @@ for n=1:nThings
   end    
   newThings{n}.edges = info(n).edges + cnnodes;
   newThings{n}.thingid = info(n).thingID;
+  newThings{n}.comment = info(n).comment;
   cnnodes = cnnodes + nnodes(n);
 end
 
-knossos_write_nml(skelout,newThings,meta,{},node_meta);
+% xxx - there is not necessarily a mapping with the newly numbered nodes.
+%   nml read needs to be modified to map the comments directly to nodes in each thing.
+knossos_write_nml(skelout,newThings,meta,{},{},node_meta);

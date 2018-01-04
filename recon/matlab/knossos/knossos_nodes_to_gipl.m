@@ -33,7 +33,7 @@ function rngnodes = knossos_nodes_to_gipl(nmlin, giplout, p)
 % p.strel_offs 
 
 % read the nml file, script originally from Kevin
-[info, meta] = knossos_read_nml(nmlin);
+[info, meta, ~, ~] = knossos_read_nml(nmlin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % convert to struct array for indexing, reorder by thingID

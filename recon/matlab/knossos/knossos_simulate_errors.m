@@ -43,7 +43,7 @@ o = struct;
 % p.params_meshed
 
 % read the nml file, script originally from Kevin
-[info, meta] = knossos_read_nml(p.nmlin);
+[info, meta, ~, ~] = knossos_read_nml(p.nmlin);
 scale = [meta.scale.x meta.scale.y meta.scale.z];
 
 % function removes empty skeletons and unconnected nodes and create logical edge_matrix.

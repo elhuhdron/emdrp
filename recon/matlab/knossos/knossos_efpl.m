@@ -129,7 +129,7 @@ end
 %% read nml skeleton inputs (this is ground truth for efpl metrics).
 
 fprintf(1,'reading nml file\n'); t = now;
-[o.info, meta, ~] = knossos_read_nml(pdata.skelin);
+[o.info, meta, ~, ~] = knossos_read_nml(pdata.skelin);
 display(sprintf('\tdone in %.3f s',(now-t)*86400));
 
 % voxel scale from Knossos file (should match hdf5)
@@ -349,7 +349,7 @@ if p.nmlout
   jnk = struct;
   [outThings, nOutNodes] = getOutThings(o, o.ds_ratio);
   jnk.fn = fullfile(p.outpath, [o.skelname '_use.nml']);
-  knossos_write_nml(jnk.fn,outThings,meta,{});
+  knossos_write_nml(jnk.fn,outThings,meta,{},{});
   display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
 end
 
@@ -729,7 +729,7 @@ for prm=1:o.nparams
     jnk.coutThings{nOutThings+1}.thingid = nOutThings+1;
     
     jnk.fn = fullfile(p.outpath, [o.skelname sprintf('_thr%.8f_use.nml',o.thresholds(thr))]);
-    knossos_write_nml(jnk.fn,jnk.coutThings,meta,{});
+    knossos_write_nml(jnk.fn,jnk.coutThings,meta,{},{});
     display(sprintf('\t\tdone in %.3f s',(now-t)*86400));
   end
   

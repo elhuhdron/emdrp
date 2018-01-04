@@ -21,7 +21,7 @@
 % SOFTWARE.
 
 % modified version of KnossosM_exportNML_v342_forGapJunctionAnalysis from kb
-function knossos_write_nml(nmlout,skels,pars,comments,node_meta)
+function knossos_write_nml(nmlout,skels,pars,comments,branches,node_meta)
 
 % default_dir = get_userdata(gcf,'default_dir');
 
@@ -34,8 +34,6 @@ if ~exist('node_meta','var') || isempty(node_meta)
   node_meta.inMag = 1;
   node_meta.time = fix(now*24); % ???
 end
-
-branches = [];
 
 fid = fopen(nmlout,'w');
 
@@ -101,8 +99,15 @@ fprintf(fid,'  </parameters>\n');
 for c = 1:length(skels)
   %     c = theseskels(c1);
   if(~isempty(skels{c}))
-    fprintf(fid,'  <thing id="%d" color.r="%0.6f" color.g="%0.6f" color.b="%0.6f" color.a="1.000000" comment="">\n',...
-      skels{c}.thingid,node_meta.color_r,node_meta.color_g,node_meta.color_b);
+    if isfield(skels{c}, 'comment')
+      fprintf(fid,...
+        '  <thing id="%d" color.r="%0.6f" color.g="%0.6f" color.b="%0.6f" color.a="1.000000" comment="%s">\n',...
+        skels{c}.thingid,node_meta.color_r,node_meta.color_g,node_meta.color_b,skels{c}.comment);
+    else
+      fprintf(fid,...
+        '  <thing id="%d" color.r="%0.6f" color.g="%0.6f" color.b="%0.6f" color.a="1.000000" comment="">\n',...
+        skels{c}.thingid,node_meta.color_r,node_meta.color_g,node_meta.color_b);
+    end
     fprintf(fid,'    <nodes>\n');
     for n = 1:size(skels{c}.nodes,1)
       a1 = skels{c}.nodes(n,1);
@@ -139,18 +144,25 @@ for c = 1:length(skels)
   end
 end
 
-%length(comments)
-fprintf(fid,'  <comments>\n');
-for n = 1:length(comments)
-  fprintf(fid,'    <comment node="%d" content="%s"/>\n',comments{n}.node,comments{n}.content);
+if iscell(comments)
+  fprintf(fid,'  <comments>\n');
+  for n = 1:length(comments)
+    fprintf(fid,'    <comment node="%d" content="%s"/>\n',comments{n}.node,comments{n}.content);
+  end
+  fprintf(fid,'  </comments>\n');
+else
+  fprintf(fid, comments); fprintf(fid, '\n');
 end
-fprintf(fid,'  </comments>\n');
 
-fprintf(fid,'  <branchpoints>\n');
-for n = 1:length(branches)
-  fprintf(fid,'    <branchpoint id="%d"/>\n',branches{n}.id);
+if iscell(branches)
+  fprintf(fid,'  <branchpoints>\n');
+  for n = 1:length(branches)
+    fprintf(fid,'    <branchpoint id="%d"/>\n',branches{n}.id);
+  end
+  fprintf(fid,'  </branchpoints>\n');
+else
+  fprintf(fid, branches); fprintf(fid, '\n');
 end
-fprintf(fid,'  </branchpoints>\n');
 
 fprintf(fid,'</things>\n');
 
