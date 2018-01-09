@@ -3,13 +3,64 @@
 
 import numpy as np
 import time
-import sys
+#import sys
 import argparse
 import scipy
+from scipy import ndimage as nd
 
 #from dpLoadh5 import dpLoadh5
 from dpFRAG import dpFRAG
 import _FRAG_extension as FRAG_extension
+
+# python wrapper for new RAG building routine
+def build_frag_new(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=None, max_step=None, nalloc=50):
+    dtype=np.uint32; test=np.zeros((2,2),dtype=dtype)
+    if type(supervoxels) != type(test):
+        raise Exception( 'In build_frag, supervoxels is not *NumPy* array')
+    if len(supervoxels.shape) != 3:
+        raise Exception( 'In build_frag, supervoxels shape not 3 dimensional')
+    if not supervoxels.flags.contiguous or np.isfortran(supervoxels):
+        raise Exception( 'In build_frag, supervoxels not C-order contiguous')
+    if supervoxels.dtype != dtype:
+        raise Exception( 'In build_frag, supervoxels wrong datatype')
+    if type(nsupervoxels) != type(1):
+        raise Exception( 'In build_frag, nsupervoxels argument is not a integer')
+    if type(nbhd) != type(1):
+        raise Exception( 'In build_frag, nbhd argument is not a integer')
+    if type(conn) != type(1):
+        raise Exception( 'In build_frag, conn argument is not a integer')
+
+    if pad:
+        sz =  [x+nbhd*2 for x in supervoxels.shape]
+        svox = np.zeros(sz, dtype=dtype); svox[nbhd:-nbhd,nbhd:-nbhd,nbhd:-nbhd] = supervoxels
+    else:
+        svox = supervoxels; sz = supervoxels.shape
+
+    return_steps = (steps is None)
+    if return_steps:
+        bwconn = nd.morphology.generate_binary_structure(supervoxels.ndim, conn)
+
+        neigh_sel_size = 2*nbhd + 1
+        dilate_array = np.zeros((neigh_sel_size,neigh_sel_size,neigh_sel_size), dtype=np.bool)
+        dilate_array[neigh_sel_size//2,neigh_sel_size//2,neigh_sel_size//2] = 1;
+        neigh_sel = scipy.ndimage.morphology.binary_dilation(dilate_array, bwconn, nbhd)
+        neigh_sel_indices = np.transpose(np.nonzero(neigh_sel)) - (neigh_sel_size//2)
+
+        #calculate indices for 1X dilation - C-order!
+        steps = np.array([(x[0]*sz[1]*sz[2] + x[1]*sz[2] + x[2]) for x in neigh_sel_indices], dtype=np.int32)
+        
+        # remove double checking of edges between voxels by removing symmetrical negative steps
+        steps = steps[steps > 0]
+        
+        # max_step used in Cpp-code so that we don't look out-of-bounds
+        max_step = steps.max()
+
+    list_of_edges = FRAG_extension.build_frag_new(svox, nsupervoxels, steps, max_step, nalloc)
+
+    if return_steps:
+        return list_of_edges, steps, max_step
+    else:
+        return list_of_edges
 
 #read the input arguments
 parser = argparse.ArgumentParser()
@@ -43,8 +94,9 @@ tmp_edge_size = args.tmp_edge_size
 # labeled chunks
 chunk = [16,17,0]
 #size = [1024,1024,480]
-size = [128, 128, 128]
+#size = [128, 128, 128]
 #size = [384, 384, 384]
+size = [512, 512, 480]
 offset = [0,0,32]#32
 has_ECS = True
 
@@ -121,7 +173,7 @@ binary_struct=scipy.ndimage.morphology.generate_binary_structure(frag.supervoxel
 neigh_sel = scipy.ndimage.morphology.binary_dilation(dilate_array, binary_struct, frag.neighbor_perim)
 neigh_sel_indices = np.transpose(np.nonzero(neigh_sel))
 neigh_sel_indices = neigh_sel_indices - (neigh_sel_size//2)
-print(neigh_sel_indices.shape)
+#print(neigh_sel_indices.shape)
 
 #calculate the jump steps required for 2X dilation to check for borders. Always look two times the actual dilation to
 # calculate the borders
@@ -141,7 +193,6 @@ compliment_index = list(compliment_indices)
 #calculate indices for 1X dilation
 steps = np.array([(x[0]*frag.supervoxels.shape[1]*frag.supervoxels.shape[2] + x[1]*frag.supervoxels.shape[2] + x[2]) \
                   for x in neigh_sel_indices])
-print(steps)
 
 #calculate indices for 2X dilation
 steps_border = np.array([(y[0]*frag.supervoxels.shape[1]*frag.supervoxels.shape[2] + y[1]*frag.supervoxels.shape[2] \
@@ -150,10 +201,17 @@ steps_border = np.array([(y[0]*frag.supervoxels.shape[1]*frag.supervoxels.shape[
 
 # build the rag
 print('\nCpp serial generation of rag'); t=time.time()
-print(frag.supervoxels.shape)
+#print(frag.supervoxels.shape)
 FRAG_extension.build_frag(frag.supervoxels, frag.nsupervox, frag.connectivity, np.uint32(size_of_edges), list_of_edges, 
                           bool(validate),steps, bool(adjacencyMatrix), np.uint32(label_count), count, hybrid_adjacency)
 print('done in %.4f s'%  (time.time() - t))
+
+# new build the rag
+print('\nCpp new serial generation of rag'); t=time.time()
+list_of_edges,steps_new,max_step = build_frag_new(frag.supervoxels, frag.nsupervox, pad=False, 
+                                                      conn=frag.connectivity, nbhd=frag.neighbor_perim)
+print('\tdone in %.4f s'%  (time.time() - t))
+print('Found %d edges' %  (list_of_edges.shape[0],))
 
 #allocate space for frag border data structure
 list_of_borders = np.zeros((count[0], size_of_borders), dtype=np.uint32)

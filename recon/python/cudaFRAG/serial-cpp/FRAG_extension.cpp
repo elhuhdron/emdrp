@@ -202,12 +202,14 @@ static PyObject *build_frag(PyObject *self, PyObject *args){
     
 }
 
-// Method to create RAG 
+// new Method to create RAG 
 static PyObject *build_frag_new(PyObject *self, PyObject *args){
 
     PyArrayObject *input_watershed, *input_steps;
-    npy_uint32 n_supervoxels, *watershed, max_step, label, edge_value, nalloc;
-    npy_intp *shp, n_voxels, *steps, n_steps, edge_count=0;
+    npy_uint32 n_supervoxels, *watershed, max_step, label, edge_value, nalloc, cvalue;
+    npy_intp *shp, n_voxels, n_steps, edge_count=0;
+    npy_int32 *steps;
+    std::vector<npy_uint32> *cedges; 
    
     // parse arguments
     if (!PyArg_ParseTuple(args, "O!iO!ii", &PyArray_Type, &input_watershed, &n_supervoxels, 
@@ -222,33 +224,38 @@ static PyObject *build_frag_new(PyObject *self, PyObject *args){
 
     // integers specifying where to look relative to current voxel    
     n_steps = PyArray_SIZE(input_steps);
-    steps = (npy_intp *) PyArray_DATA(input_steps);
+    steps = (npy_int32 *) PyArray_DATA(input_steps);
 
-    // data structure for storing edges
-    std::vector<npy_uint32> *sparse_edges = new std::vector<npy_uint32> [n_supervoxels];
-    for( npy_uint32 i=0; i < n_supervoxels; i++ ) sparse_edges[i].reserve(nalloc);
+    // allocate data structure for storing edges
+    std::vector<npy_uint32> **sparse_edges = new std::vector<npy_uint32>* [n_supervoxels];
+    for( npy_uint32 i=0; i < n_supervoxels; i++ ) {
+        sparse_edges[i] = new std::vector<npy_uint32>; //sparse_edges[i]->reserve(nalloc);
+    }
     
     // creation of rag
-    for( npy_intp vox = max_step; vox < n_voxels - max_step; vox++ ) {
+    for( npy_int64 vox = max_step; vox < n_voxels - max_step; vox++ ) {
         label = watershed[vox];
         if( label != 0 ) { 
-            std::vector<npy_uint32> cedges = sparse_edges[label-1];
-            
             // iterate "steps" which is a list of relative indices (C-order) where to search for neighbors
-            for(npy_intp step = 0; step < n_steps; step++){
+            for(int step = 0; step < n_steps; step++) {
                 edge_value = watershed[vox + steps[step]];
-                if( edge_value != 0 ) {
+                if( edge_value != 0 && edge_value != label ) { // do not add any self-directed edges
+                    // only store "triangular" matrix so edges are not duplicated (RAG is not directed)
+                    if( edge_value > label ) {
+                        cedges = sparse_edges[label-1]; cvalue = edge_value;
+                    } else {
+                        cedges = sparse_edges[edge_value-1]; cvalue = label;
+                    }
 
                     // search for the edge
                     std::vector<npy_uint32>::iterator it;
-                    for( it = cedges.begin(); it != cedges.end(); it++ ) 
-                        if( *it >= edge_value ) break;
-                    
+                    for( it = cedges->begin(); it != cedges->end(); it++ ) 
+                        if( *it >= cvalue ) break;
+                        
                     // store the edge if not already there
-                    if( *it != edge_value ) {
-                        cedges.insert(it, edge_value);
-                        edge_count++;
-                    }
+                    if( it == cedges->end() || *it != cvalue ) {
+                        cedges->insert(it, cvalue); edge_count++;
+                    } 
                 }
             }
         }
@@ -256,18 +263,23 @@ static PyObject *build_frag_new(PyObject *self, PyObject *args){
 
     // create a list of edges to return in numpy array format
     npy_intp eshp[2]; eshp[0] = edge_count; eshp[1] = 2;
-    PyArrayObject *list_of_edges = (PyArrayObject *) PyArray_SimpleNew(2, eshp, NPY_UINT32);
+    PyArrayObject *list_of_edges = (PyArrayObject *) PyArray_Empty(2, eshp, PyArray_DescrFromType(NPY_UINT32), 0);
     npy_uint32 *edges = (npy_uint32 *) PyArray_DATA(list_of_edges);
     npy_intp cnt=0;
 
     // copy the generated edges into the numpy array
     for( npy_uint32 i=0; i < n_supervoxels; i++ ) {
-        std::vector<npy_uint32> cedges = sparse_edges[i];
-        for( std::vector<npy_uint32>::iterator it = cedges.begin(); it != cedges.end(); it++ ) {
-            edges[2*cnt] = i; edges[2*cnt+1] = *it; cnt++;
+        std::vector<npy_uint32> *cedges = sparse_edges[i];
+        for( std::vector<npy_uint32>::iterator it = cedges->begin(); it != cedges->end(); it++ ) {
+            edges[2*cnt] = i+1; edges[2*cnt+1] = *it; cnt++;
         }
     }
-    assert( cnt == edge_count );
+    //assert( cnt == edge_count );
+
+    // free memory
+    for( npy_uint32 i=0; i < n_supervoxels; i++ )
+        delete sparse_edges[i];
+    delete sparse_edges;
     
     return (PyObject *) list_of_edges;
 }
