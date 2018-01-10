@@ -31,6 +31,8 @@ import os
 import snappy
 import zipfile
 
+from scipy import ndimage as nd
+
 # run connected components, but using affinities to assess connectedness instead of pixel connectivity.
 # this function is only for a weighted undirected affinity graph in 3d.
 def label_affinities(affinities, labels, nextlabel, threshold):
@@ -301,6 +303,58 @@ def type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_typ
         raise Exception( 'In type_components, num_types < 2, need at least two types')
 
     return _pyCext.type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_types)
+
+def frag_with_borders(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=None, min_step=None, max_step=None, 
+                      nalloc_rag=50, nalloc_borders=1000):
+    dtype=np.uint32; test=np.zeros((2,2),dtype=dtype)
+    if type(supervoxels) != type(test):
+        raise Exception( 'In frag_with_borders, supervoxels is not *NumPy* array')
+    if len(supervoxels.shape) != 3:
+        raise Exception( 'In frag_with_borders, supervoxels shape not 3 dimensional')
+    if not supervoxels.flags.contiguous or np.isfortran(supervoxels):
+        raise Exception( 'In frag_with_borders, supervoxels not C-order contiguous')
+    if supervoxels.dtype != dtype:
+        raise Exception( 'In frag_with_borders, supervoxels wrong datatype')
+    #if type(nsupervoxels) != type(1):
+    #    raise Exception( 'In frag_with_borders, nsupervoxels argument is not a integer')
+    #if type(nbhd) != type(1):
+    #    raise Exception( 'In frag_with_borders, nbhd argument is not a integer')
+    #if type(conn) != type(1):
+    #    raise Exception( 'In frag_with_borders, conn argument is not a integer')
+
+    if pad:
+        sz =  [x+nbhd*2 for x in supervoxels.shape]
+        svox = np.zeros(sz, dtype=dtype); svox[nbhd:-nbhd,nbhd:-nbhd,nbhd:-nbhd] = supervoxels
+    else:
+        svox = supervoxels; sz = supervoxels.shape
+
+    return_steps = (steps is None)
+    if return_steps:
+        bwconn = nd.morphology.generate_binary_structure(supervoxels.ndim, conn)
+
+        neigh_sel_size = 2*nbhd + 1
+        dilate_array = np.zeros((neigh_sel_size,neigh_sel_size,neigh_sel_size), dtype=np.bool)
+        dilate_array[neigh_sel_size//2,neigh_sel_size//2,neigh_sel_size//2] = 1;
+        neigh_sel = nd.morphology.binary_dilation(dilate_array, bwconn, nbhd)
+        neigh_sel_indices = np.transpose(np.nonzero(neigh_sel)) - (neigh_sel_size//2)
+
+        #calculate steps based on neighborhood size - C-order!
+        steps = np.array([(x[0]*sz[1]*sz[2] + x[1]*sz[2] + x[2]) for x in neigh_sel_indices], dtype=np.int32)
+        
+        # remove double checking of edges between voxels by removing symmetrical negative steps
+        # NOTE: the cpp code is optimized assuming that steps is positive, so removing this requires cpp code mods.
+        steps = steps[steps > 0]
+        
+        # steps range used in Cpp-code so that we don't look out-of-bounds
+        min_step = steps.min(); max_step = steps.max()
+
+    list_of_edges, list_of_borders = _pyCext.frag_with_borders(svox, nsupervoxels, steps, min_step, max_step, 
+                                                               nalloc_rag, nalloc_borders)
+
+    if return_steps:
+        return list_of_edges, list_of_borders, steps, min_step, max_step
+    else:
+        return list_of_edges, list_of_borders
 
 # xxx - not validated
 # calculate percentage overlap "sparse matrices" as lists for comparing two different labels
