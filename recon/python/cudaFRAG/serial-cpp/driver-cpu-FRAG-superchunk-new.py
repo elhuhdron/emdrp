@@ -13,7 +13,8 @@ from dpFRAG import dpFRAG
 import _FRAG_extension as FRAG_extension
 
 # python wrapper for new RAG building routine
-def build_frag_new(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=None, max_step=None, nalloc=50):
+def build_frag_new(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=None, max_step=None, nalloc_rag=50,
+                   nalloc_borders=1000):
     dtype=np.uint32; test=np.zeros((2,2),dtype=dtype)
     if type(supervoxels) != type(test):
         raise Exception( 'In build_frag, supervoxels is not *NumPy* array')
@@ -50,17 +51,19 @@ def build_frag_new(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=No
         steps = np.array([(x[0]*sz[1]*sz[2] + x[1]*sz[2] + x[2]) for x in neigh_sel_indices], dtype=np.int32)
         
         # remove double checking of edges between voxels by removing symmetrical negative steps
+        # NOTE: the cpp code is optimized assuming that steps is positive, so removing this requires cpp code mods.
         steps = steps[steps > 0]
         
-        # max_step used in Cpp-code so that we don't look out-of-bounds
-        max_step = steps.max()
+        # steps range used in Cpp-code so that we don't look out-of-bounds
+        min_step = steps.min(); max_step = steps.max()
 
-    list_of_edges = FRAG_extension.build_frag_new(svox, nsupervoxels, steps, max_step, nalloc)
+    list_of_edges, list_of_borders = FRAG_extension.build_frag_new(svox, nsupervoxels, steps, min_step, max_step, 
+                                                                   nalloc_rag, nalloc_borders)
 
     if return_steps:
-        return list_of_edges, steps, max_step
+        return list_of_edges, list_of_borders, steps, max_step
     else:
-        return list_of_edges
+        return list_of_edges, list_of_borders
 
 #read the input arguments
 parser = argparse.ArgumentParser()
@@ -94,9 +97,9 @@ tmp_edge_size = args.tmp_edge_size
 # labeled chunks
 chunk = [16,17,0]
 #size = [1024,1024,480]
-#size = [128, 128, 128]
+size = [128, 128, 128]
 #size = [384, 384, 384]
-size = [512, 512, 480]
+#size = [512, 512, 480]
 offset = [0,0,32]#32
 has_ECS = True
 
@@ -208,10 +211,23 @@ print('done in %.4f s'%  (time.time() - t))
 
 # new build the rag
 print('\nCpp new serial generation of rag'); t=time.time()
-list_of_edges,steps_new,max_step = build_frag_new(frag.supervoxels, frag.nsupervox, pad=False, 
+list_of_edges_new,list_of_borders_new,steps_new,max_step = build_frag_new(frag.supervoxels, frag.nsupervox, pad=False, 
                                                       conn=frag.connectivity, nbhd=frag.neighbor_perim)
+print(len(list_of_borders_new),sum([x.size for x in list_of_borders_new]))
+
+#fout = open("tmp-boundary_pixel_indices-serial-new.txt","w")
+#edges = [tuple(x) for x in list_of_edges_new]
+##edges.sort()
+#for edge,i in zip(edges,range(list_of_edges_new.shape[0])):
+#    fout.write("(%d, %d): "%(edge[0],edge[1]))
+#    for b in list_of_borders_new[i]:
+#      fout.write("%d "%b)
+#    fout.write("\n")
+#fout.close()
+
+#print(list_of_edges_new)
 print('\tdone in %.4f s'%  (time.time() - t))
-print('Found %d edges' %  (list_of_edges.shape[0],))
+print('Found %d edges' %  (list_of_edges_new.shape[0],))
 
 #allocate space for frag border data structure
 list_of_borders = np.zeros((count[0], size_of_borders), dtype=np.uint32)
@@ -238,8 +254,7 @@ if no_dilation:
 else:
     print('\nCpp serial generation of borders for rag using dilation'); t=time.time()
     FRAG_extension.build_frag_borders(frag.supervoxels, frag.nsupervox, tmp_edges, list_of_borders, count, 
-                                      bool(validate), steps, 
-    steps_border  )
+                                      bool(validate), steps, steps_border  )
     print('border calculation done in %.4f s'% (time.time() - t))
 
 
@@ -302,25 +317,25 @@ if validate:
       print(false_positives)
       print(false_negatives)
 
-    if getFeatures:
-        fn = 'tmp-boundary_pixel_indices-cpu.txt'
-        ref = []
-        all_pass = True
-        import re
-        for line in open(fn, 'r'):
-            ref.append(np.uint32(re.findall('\d+', line))) 
-    
-        reference_borders = [x_r for x_r in ref]
-        generated_borders = [np.concatenate((x_g[0:2], x_g[3:x_g[2]])) for x_g in list_of_borders]
-        for i in range(0,count[0]):
-              if(np.all(generated_borders[i] == reference_borders[i])):
-                  pass
-              else:
-                  all_pass = False
-                  print(generated_borders[i])
-                  print(reference_borders[i])
-                
-        if all_pass:
-            print("the borders match for this dataset")
-        else:
-            print("mismatch")
+    fn = 'tmp-boundary_pixel_indices-cpu.txt'
+    ref = []
+    all_pass = True
+    import re
+    for line in open(fn, 'r'):
+        ref.append(np.uint32(re.findall('\d+', line))) 
+
+    reference_borders = [x_r for x_r in ref]
+    print(len(reference_borders),sum([x.size for x in reference_borders]))
+    generated_borders = [np.concatenate((x_g[0:2], x_g[3:x_g[2]])) for x_g in list_of_borders]
+    for i in range(0,count[0]):
+          if(np.all(generated_borders[i] == reference_borders[i])):
+              pass
+          else:
+              all_pass = False
+              print(generated_borders[i])
+              print(reference_borders[i])
+            
+    if all_pass:
+        print("the borders match for this dataset")
+    else:
+        print("mismatch")
