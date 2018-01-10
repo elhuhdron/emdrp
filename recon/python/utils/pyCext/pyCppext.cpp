@@ -179,7 +179,7 @@ static PyObject *frag_with_borders(PyObject *self, PyObject *args) {
         }
         delete sparse_edges[i];
     }
-    delete sparse_edges;
+    delete[] sparse_edges;
     //assert( cnt == edge_count );
 
     //return (PyObject *) list_of_edges; // to return single object
