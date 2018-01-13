@@ -36,6 +36,7 @@ import time
 import argparse
 import os
 #import sys
+import importlib
 from io import BytesIO
 
 from configobj import ConfigObj, flatten_errors
@@ -62,7 +63,8 @@ from matplotlib import pyplot as plt
 #from cycler import cycler
 
 from dpLoadh5 import dpLoadh5
-from dpFRAG import dpFRAG
+# made dpFRAG import dynamic in init
+#from dpFRAG import dpFRAG
 #from dpFRAGc import dpFRAG
 from metrics import pixel_error_fscore
 from utils import print_cpu_info_linux
@@ -115,6 +117,10 @@ class dpSupervoxelClassifier():
         self.ini_str = out.getvalue(); out.close()
 
         # Options / Inits
+
+        # dynamic imports
+        dpFRAGl = importlib.import_module('dpFRAGc') if self.useFRAGc else importlib.import_module('dpFRAG')
+        globals().update({'dpFRAG':dpFRAGl.dpFRAG})
 
         # these are so standard cubeIter inputs can be used from command line to override from .ini
         if (self.chunk >= 0).all():
@@ -826,6 +832,7 @@ class dpSupervoxelClassifier():
         p.add_argument('--prob-svox-context', dest='prob_svox_context', action='store_true',
             help='Use context for loading probs and supervoxels along edge faces')
         p.add_argument('--no-agglo-ECS', action='store_true', help='Do not agglomerate ECS supervoxels')
+        p.add_argument('--useFRAGc', action='store_true', help='Use the C-optimized version of FRAG')
         
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
             help='Debugging output for dpSupervoxelClassifier')
