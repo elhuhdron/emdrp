@@ -52,7 +52,7 @@ class dpWriteh5(dpLoadh5):
             self.fillvalue = np.asscalar(np.fromstring(self.fillvalue, dtype=self.data_type_out, sep=' '))
 
         if data is None:
-            data = self.data_cube
+            data = self.data_cube.astype(self.data_type_out)
         else:
             #assert(data.dtype == self.data_type)    # xxx - probably revisit this, this was original
             # xxx - is there a problem with fillvalue now?

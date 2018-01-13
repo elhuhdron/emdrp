@@ -16,17 +16,17 @@ PYTHON_LIBRARY_PATH = $(HOME)/anaconda3/lib
 PYTHON_VERSION = 3.6m
 
 # ---- Link --------------------------- 
-_pyCext.so:  pyCext.o pyCppext.o
-	$(CPPC) -L$(PYTHON_LIBRARY_PATH) -shared pyCext.o pyCppext.o -o _pyCext.so -lpython$(PYTHON_VERSION)
-	#install_name_tool -change libpython$(PYTHON_VERSION).dylib $(PYTHON_LIBRARY_PATH)/libpython$(PYTHON_VERSION).dylib _pyCext.so
+_pyCext.so _pyCppext.so:  pyCext.o pyCppext.o
+	$(CC) -L$(PYTHON_LIBRARY_PATH) -shared pyCext.o -o _pyCext.so -lpython$(PYTHON_VERSION)
+	$(CPPC) -L$(PYTHON_LIBRARY_PATH) -shared pyCppext.o -o _pyCppext.so -lpython$(PYTHON_VERSION)
 
 # ---- Compile ------------------
 pyCext.o:  pyCext.c pyCext.h
 	$(CC) $(CFLAGS) -c pyCext.c -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH)
 
-pyCppext.o:  pyCppext.cpp pyCext.h
+pyCppext.o:  pyCppext.cpp pyCppext.h
 	$(CPPC) $(CPPFLAGS) -c pyCppext.cpp -I$(PYTHON_INCLUDE_PATH) -I$(NUMPY_INCLUDE_PATH)
 
 clean:
-	rm -rf *.o *.so *.pyc
+	rm -rf *.o *.so *.pyc __pycache__
 

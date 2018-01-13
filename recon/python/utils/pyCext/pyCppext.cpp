@@ -27,18 +27,64 @@
 #include "Python.h"
 #define NPY_NO_DEPRECATED_API NPY_1_11_API_VERSION
 #include "arrayobject.h"
-#include "pyCext.h"
+#include "pyCppext.h"
 
 #include <iostream>
-#include <vector>
 #include <assert.h>
 
-// a RAG graph element, using the "array-of-lists" method for storing the RAG.
-typedef struct {
-        npy_uint32 value;
-        std::vector<npy_uint64> *border_voxels;
-        npy_intp last_border;
-    } RAG;
+/* #### Globals #################################### */
+
+/* ==== Set up the methods table ====================== */
+static PyMethodDef _pyCppextMethods[] = {
+    // EM data extensions
+    {"frag_with_borders", frag_with_borders, METH_VARARGS},
+
+    {NULL, NULL}     /* Sentinel - marks the end of this structure */
+};
+
+
+/* ==== Initialize the C_test functions ====================== */
+// Module name must be _pyCppext in compile and linked
+
+// https://docs.python.org/3.3/howto/cporting.html
+// http://python3porting.com/cextensions.html
+
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "_pyCppext",           /* m_name */
+        NULL,                /* m_doc */
+        -1,                  /* m_size */
+        _pyCppextMethods,      /* m_methods */
+        NULL,                /* m_reload */
+        NULL,                /* m_traverse */
+        NULL,                /* m_clear */
+        NULL                 /* m_free */
+};
+
+extern "C" {
+PyObject* PyInit__pyCppext(void)
+#else
+void init_pyCppext()
+#endif
+{
+
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&moduledef);
+#else
+    (void) Py_InitModule("_pyCppext", _pyCppextMethods);
+    //PyObject *module = Py_InitModule("myextension", myextension_methods);
+#endif
+
+    import_array();  // Must be present for NumPy.  Called first after above line.
+
+#if PY_MAJOR_VERSION >= 3
+    return module;
+#endif
+}
+}
+
+/* #### Extended modules for EM #################################### */
 
 // new Method to create RAG.
 // method is a bit faster than adjacency matrix because the RAGs are always very sparse.
@@ -81,11 +127,11 @@ static PyObject *frag_with_borders(PyObject *self, PyObject *args) {
     min_step = (min_step < 0 ? -min_step : 0); max_step = (max_step > 0 ? max_step : 0);
     for( npy_int64 vox = min_step, cvox; vox < n_voxels - max_step; vox++ ) {
         label = watershed[vox];
-        if( label != 0 ) { 
+        if( label != 0 && label <= n_supervoxels ) { 
             // iterate "steps" which is a list of relative indices (C-order) where to search for neighbors
             for(int step = 0; step < n_steps; step++) {
                 cvox = vox + steps[step]; edge_value = watershed[cvox];
-                if( edge_value != 0 && edge_value != label ) { // do not add any self-directed edges
+                if( edge_value != 0 && edge_value != label && edge_value <= n_supervoxels ) { // no self-directed edges
                         
                     // only store "triangular" matrix so edges are not duplicated (RAG is not directed)
                     if( edge_value < label ) {

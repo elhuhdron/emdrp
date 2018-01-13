@@ -25,6 +25,7 @@
 #      http://wiki.scipy.org/Cookbook/C_Extensions/NumPy_arrays
 
 import _pyCext
+import _pyCppext
 import numpy as np
 import os
 #import sys
@@ -348,8 +349,8 @@ def frag_with_borders(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps
         # steps range used in Cpp-code so that we don't look out-of-bounds
         min_step = steps.min(); max_step = steps.max()
 
-    list_of_edges, list_of_borders = _pyCext.frag_with_borders(svox, nsupervoxels, steps, min_step, max_step, 
-                                                               nalloc_rag, nalloc_borders)
+    list_of_edges, list_of_borders = _pyCppext.frag_with_borders(svox, nsupervoxels, steps, min_step, max_step, 
+                                                                 nalloc_rag, nalloc_borders)
 
     if return_steps:
         return list_of_edges, list_of_borders, steps, min_step, max_step
