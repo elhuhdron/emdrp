@@ -44,6 +44,7 @@ from validate import Validator, ValidateError
 import dill
 from io import StringIO
 from sklearn.preprocessing import scale
+from sklearn.utils import shuffle
 from scipy import ndimage as nd
 
 from sklearn.neighbors import KNeighborsClassifier
@@ -66,6 +67,7 @@ from dpLoadh5 import dpLoadh5
 # made dpFRAG import dynamic in init
 #from dpFRAG import dpFRAG
 #from dpFRAGc import dpFRAG
+dpFRAG = []
 from metrics import pixel_error_fscore
 from utils import print_cpu_info_linux
 
@@ -338,6 +340,8 @@ class dpSupervoxelClassifier():
         if not self.classifierin or self.doplots:
             # everyone wants to be norml
             sdata = scale(fdata)   # normalize for the classifiers
+            # shuffle data for training as well
+            target, sdata = shuffle(target, sdata)
 
         if self.classifierin:
             if self.dpSupervoxelClassifier_verbose:
