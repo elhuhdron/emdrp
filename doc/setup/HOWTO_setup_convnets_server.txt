@@ -213,6 +213,9 @@ One liner to kill jobs from ps:
 List all rules set with firewall-cmd:
     > sudo firewall-cmd --list-all
 
+To clear history fully:
+    > cat /dev/null > ~/.bash_history && history -c && exit
+
 
 
 
