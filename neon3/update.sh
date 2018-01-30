@@ -7,7 +7,7 @@ conda remove --name neon --all
 conda info --envs
 cd ~/gits/neon
 git pull
-conda create --name neon pip matplotlib
+conda create --name neon pip matplotlib virtualenv
 source activate neon
 make sysinstall -e VIS=true
 cd ../emdrp/neon3/

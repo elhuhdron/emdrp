@@ -52,3 +52,6 @@ git push -u origin 3D_meshes --tags
 git push --delete origin v5.0-3D_meshes
 git tag --delete v5.0-3D_meshes
 
+for checking out a specific release:
+git fetch origin; git reset --hard v2.6.0
+

@@ -1,8 +1,8 @@
-diff --git neon/layers/layer.py neon/layers/layer.py
-index ceb316f..4e161e8 100644
---- neon/layers/layer.py
-+++ neon/layers/layer.py
-@@ -743,13 +743,14 @@ class Convolution(ParameterLayer):
+diff --git a/neon/layers/layer.py b/neon/layers/layer.py
+index 247b41a..06360da 100644
+--- a/neon/layers/layer.py
++++ b/neon/layers/layer.py
+@@ -831,13 +831,14 @@ class Convolution(ParameterLayer):
          pad_tuple = tuple(self.convparams[k] for k in ['pad_' + d for d in padstr_dim])
          str_tuple = tuple(self.convparams[k] for k in ['str_' + d for d in padstr_dim])
          dil_tuple = tuple(self.convparams[k] for k in ['dil_' + d for d in padstr_dim])
@@ -19,22 +19,22 @@ index ceb316f..4e161e8 100644
  
          return ((fmt_string % fmt_tuple))
  
-diff --git neon/models/model.py neon/models/model.py
-index 92934b5..bfc494d 100644
---- neon/models/model.py
-+++ neon/models/model.py
-@@ -383,6 +383,10 @@ class Model(NervanaObject):
+diff --git a/neon/models/model.py b/neon/models/model.py
+index 04eb7e1..c61fc4c 100644
+--- a/neon/models/model.py
++++ b/neon/models/model.py
+@@ -388,6 +388,10 @@ class Model(NervanaObject):
  
          pdict['model'] = self.layers.get_description(get_weights=get_weights,
                                                       keep_states=keep_states)
-+
++        
 +        # xxx - watkinspv, hack to save some data meta
 +        if hasattr(self, 'batch_meta'): pdict['batch_meta'] = self.batch_meta
-+
++        
          return pdict
  
      def save_params(self, param_path, keep_states=True):
-@@ -480,6 +484,9 @@ class Model(NervanaObject):
+@@ -485,6 +489,9 @@ class Model(NervanaObject):
                  # could come about when switching backend types (ex GPU to CPU)
                  logger.warning("Problems restoring existing RNG state: %s", str(e))
  

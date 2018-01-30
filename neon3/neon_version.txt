@@ -1,2 +1,2 @@
 >>> print(neon.__version__)
-1.8.2+0d643dd
+2.6.0+f9d771b

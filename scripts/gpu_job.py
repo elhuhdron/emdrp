@@ -27,14 +27,14 @@ import random
 
 NUM_GPUS, GPU_JOB_SUBDIR, GPU_PREFIX = 10, 'gpu_jobs', 'gpu' # init NUM_GPUS as max gpus, set in get_paths
 GPU_STATUS, GPU_STARTED = 'gpu%d_status.log', 'gpu%d_last_started.log'
-CONVNET_OUT_DIR = os.path.join('Data','convnet_out')
+CONVNET_OUT_DIR = os.path.join('data','convnet_out')
 #CONVNET_DIR = os.path.join('workspace_eclipse','ctome_server','cuda-convnet-EM-alpha')
 #CONVNET_DIR = os.path.join('workspace_eclipse','ctome_server','cuda-convnet2')
 CONVNET_DIR = os.path.join('gits','emdrp','cuda-convnet2')
 #NEON_DIR = os.path.join('gits','emdrp','neon')
 #PYTHON_INIT_CMD = 'export PATH="/home/watkinspv/anaconda2/bin:$PATH"'
 NEON_DIR = os.path.join('gits','emdrp','neon3')
-PYTHON_INIT_CMD = 'export PATH="/home/watkinspv/anaconda3/bin:$PATH"'
+PYTHON_INIT_CMD = 'export PATH="/home/pwatkins/anaconda3/bin:$PATH"'
 
 def run_next_jobs(force=False):
     job_path, convnet_out_path, convnet_paths = get_paths()
@@ -119,15 +119,20 @@ def run_next_jobs(force=False):
         #   the next job. hang problem was persistent to moved to a randomized pause time.
         if started_job: time.sleep(random.randrange(17,31))
         else: started_job = True
-        os.system(cmd_to_start)
+        # xxx - for some reason had given up on subprocess call despite loud calls against os.system on the intranets
+        #   was used to centos where sh just points to bash, needed to force bash on ubuntu.
+        #   revisit this if this script continues to live on.
+        #os.system(cmd_to_start)
         #subprocess.call(cmd_to_start)
+        os.system("/bin/bash -c '" + cmd_to_start + "'")
         os.remove(job_script)
         
         # xxx - this is a hack to get around nvidia-smi not working
         #  pause for a few seconds, then use lsof to get process id of python process associated with the job
         #  write this pid to a lock file for this gpu
         time.sleep(2)
-        cmd_to_start = ['/usr/sbin/lsof', convnet_out]
+        #cmd_to_start = ['/usr/sbin/lsof', convnet_out]
+        cmd_to_start = ['/usr/bin/lsof', convnet_out]
         p = subprocess.Popen(cmd_to_start, stdout=subprocess.PIPE); out, err = p.communicate()
         if err is not None:
             outfile.write('GPU %d error invoking lsof "' % (gpu,) + cmd_to_start + '"\n'); outfile.close(); continue
