@@ -1,7 +1,7 @@
 
 # compilers and flags
-CC=gcc
-CPPC=g++
+CC=gcc-6
+CPPC=g++-6
 CFLAGS=-fPIC -g -O3
 CPPFLAGS=-fPIC -g -std=c++11 -O3
 

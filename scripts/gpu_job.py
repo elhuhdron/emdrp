@@ -34,7 +34,7 @@ CONVNET_DIR = os.path.join('gits','emdrp','cuda-convnet2')
 #NEON_DIR = os.path.join('gits','emdrp','neon')
 #PYTHON_INIT_CMD = 'export PATH="/home/watkinspv/anaconda2/bin:$PATH"'
 NEON_DIR = os.path.join('gits','emdrp','neon3')
-PYTHON_INIT_CMD = 'export PATH="/home/pwatkins/anaconda3/bin:$PATH"'
+PYTHON_INIT_CMD = '#!/bin/bash\nsource /home/pwatkins/.bash_aliases; '
 
 def run_next_jobs(force=False):
     job_path, convnet_out_path, convnet_paths = get_paths()
@@ -101,7 +101,7 @@ def run_next_jobs(force=False):
         if cmd_type=='cc2':
             python_init = PYTHON_INIT_CMD
         elif cmd_type=='neon':
-            python_init = PYTHON_INIT_CMD + '; source activate neon'
+            python_init = PYTHON_INIT_CMD + 'source activate neon'
             cmd_to_start += (' -s %s ' % (os.path.join(convnet_out_path, convnet_out_name + '-model.prm'),))
             #cmd_to_start += (' --save_best_path %s ' % (os.path.join(convnet_out_path, 
             #                                                         convnet_out_name + '-model-best.prm'),))
