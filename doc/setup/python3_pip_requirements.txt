@@ -1,3 +1,4 @@
 progressbar33 
 python-snappy 
 scikit-fmm
+tifffile

@@ -2,8 +2,8 @@
 # compilers and flags
 CC=gcc-6
 CPPC=g++-6
-CFLAGS=-fPIC -g -O3
-CPPFLAGS=-fPIC -g -std=c++11 -O3
+CFLAGS=-fPIC -O3
+CPPFLAGS=-fPIC -std=c++11 -O3
 
 # Python include directory. This should contain the file Python.h, among others.
 PYTHON_INCLUDE_PATH = $(HOME)/anaconda3/include/python3.6m
