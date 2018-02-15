@@ -1,4 +1,7 @@
 
+# First spin on reading a single-scene from multiscene light microscope Zeiss czi data.
+# Display (optionally downsampled) scene and plots section and ROI polygons over top.
+
 import numpy as np
 import scipy.spatial.distance as scidist
 from czifile import CziFile
@@ -6,6 +9,11 @@ from matplotlib import pylab as pl
 import matplotlib.patches as patches
 from lxml import etree as etree
 import time
+
+#import numpy.linalg as lin
+
+
+
 
 ### options
 
@@ -39,14 +47,19 @@ xml_paths = {
     'SelectionBox':"/ImageDocument/Metadata/MetadataNodes/MetadataNode/Layers/Layer[@Name = \"Cat_Ribbon\"]"+\
         '/Elements/Rectangle/Geometry',
     'SectionPoints':\
-        '/ImageDocument/Metadata/MetadataNodes/MetadataNode/Layers/Layer[2]/Elements/Polygon',
+        "/ImageDocument/Metadata/MetadataNodes/MetadataNode/Layers/Layer[@Name = \"CAT_Section\"]/Elements/Polygon",
+    'ROIPoints':\
+        "/ImageDocument/Metadata/MetadataNodes/MetadataNode/Layers/Layer[@Name = \"CAT_ROI\"]/Elements/Polygon",
     }
 
 # how many calibration markers to read in, this should essentially be a constant
 nmarkers = 3
 
-# xxx - likely this is a Zeiss bug, units for the scale in the xml file are not correct
+# xxx - likely this is a Zeiss bug, units for the scale in the xml file are not correct (says microns, given in meters)
 scale_units = 1e6
+
+
+
 
 ### load czi file and extract metadata
 
@@ -70,7 +83,6 @@ if metafnout or print_meta:
 #a = root.findall('.//Rectangle'); print('\n'.join([str(root.getpath(x)) for x in a]))
 
 # get the pixel size
-# xxx - scale is given in meters but units say microns, this is a Zeiss bug??? convert to microns
 scale = np.zeros((2,), dtype=np.double)
 scale[0] = float(root.xpath(xml_paths['ScaleX'])[0].text)*scale_units
 scale[1] = float(root.xpath(xml_paths['ScaleY'])[0].text)*scale_units
@@ -106,15 +118,33 @@ box_corner = np.zeros((2,),dtype=np.double); box_size = np.zeros((2,),dtype=np.d
 box_corner[0] = float(box.findall('.//Left')[0].text); box_corner[1] = float(box.findall('.//Top')[0].text)
 box_size[0] = float(box.findall('.//Width')[0].text); box_size[1] = float(box.findall('.//Height')[0].text)
                   
-# get the first slice polygon
+# get the section polygons
 polygons = root.xpath(xml_paths['SectionPoints'])
 npolygons = len(polygons) if npolygons > len(polygons) else npolygons
 polygons_points = [None]*npolygons
 polygons_rotation = np.zeros((npolygons,),dtype=np.double)
+#polygons_text_pos = np.zeros((npolygons,2),dtype=np.double)
 for polygon,i in zip(polygons,range(npolygons)):
     polygons_points[i] = np.array([[float(y) for y in x.split(',')] \
                    for x in polygon.findall('.//Points')[0].text.split(' ')])
     polygons_rotation[i] = float(polygon.findall('.//Rotation')[0].text)/180*np.pi # convert to radians
+    #polygons_text_pos[i,:] = np.array([float(y) for y in polygon.findall('.//Position')[0].text.split(',')])
+
+# get the ROI polygons
+polygons = root.xpath(xml_paths['ROIPoints'])
+#npolygons = len(polygons) if npolygons > len(polygons) else npolygons
+assert(len(polygons) == npolygons) # different number of section and ROI polygons defined?
+rois_points = [None]*npolygons
+rois_rotation = np.zeros((npolygons,),dtype=np.double)
+#rois_text_pos = np.zeros((npolygons,2),dtype=np.double)
+for polygon,i in zip(polygons,range(npolygons)):
+    rois_points[i] = np.array([[float(y) for y in x.split(',')] \
+                   for x in polygon.findall('.//Points')[0].text.split(' ')])
+    rois_rotation[i] = float(polygon.findall('.//Rotation')[0].text)/180*np.pi # convert to radians
+    #rois_text_pos[i,:] = np.array([float(y) for y in polygon.findall('.//Position')[0].text.split(',')])
+
+
+
 
 ### calculate coordinate transformations and transform points to image coordinates
 
@@ -156,32 +186,50 @@ scene_size_pix = (contour_size/scale).astype(np.int64)
 box_corner_pix = box_corner - scene_corner_pix
 box_size_pix = box_size
 
-# http://paulbourke.net/geometry/polygonmesh/
-def PolyCentroid(x,y):
-    xn = np.roll(x,1); yn = np.roll(y,1)
-    coeff = 1/3.0/(np.dot(x,yn)-np.dot(xn,y))
-    common = x*yn - xn*y
-    return coeff*np.dot( x+np.roll(x,1), common ), coeff*np.dot( y+np.roll(y,1), common )
+## Zeiss is not using this for anything, but keeping here for reference.
+## http://paulbourke.net/geometry/polygonmesh/
+## validated against prettier python code at:
+##   https://github.com/pwcazenave/pml-git/blob/master/python/centroids.py
+## and also against matlab 'centroid' function for polygons.
+#def PolyCentroid(x,y):
+#    xn = np.roll(x,1); yn = np.roll(y,1)
+#    coeff = 1/3.0/(np.dot(x,yn)-np.dot(xn,y))
+#    common = x*yn - xn*y
+#    return coeff*np.dot( x+xn, common ), coeff*np.dot( y+yn, common )
 
-# points are defined same as the selection bounding box, polygons are rotated about ???.
-#   keep ROI points as floating point.
+# points are are also relative to the scene bounding box, also get center of bounding box arond points.
+# polygons are rotated around the center of the bounding box of the polygon points.
 for i in range(npolygons):
-    c, s = np.cos(polygons_rotation[i]), np.sin(polygons_rotation[i]); R = np.array([[c, -s], [s, c]])
-    
-    # xxx - what point is Zeiss rotating about??? 
-    #ctr = polygons_points[i].mean(0)
-    #ctr = np.median(polygons_points[i], axis=0)
-    #ctr = polygons_points[i].max(0)
-    #ctr = polygons_points[i].min(0)
-    #ctr = np.array(PolyCentroid(polygons_points[i][:,0], polygons_points[i][:,1]))
-    #tmp = np.vstack((polygons_points[i], polygons_points[i][0,:]))
-    #ctr = np.array(PolyCentroid(tmp[:,0], tmp[:,1]))
+    # correct for scene bounding box so points are relative to the scene itself
+    polygons_points[i] -= scene_corner_pix; rois_points[i] -= scene_corner_pix
 
-    # fudge factor for iron-k0100-20 and 12-dab-serial_50nm_w sections-rois.czi
-    ctr = polygons_points[i].mean(0) + np.array([45,70],dtype=np.double)
+    # rotation matrices
+    c, s = np.cos(polygons_rotation[i]), np.sin(polygons_rotation[i]); Rp = np.array([[c, -s], [s, c]])
+    c, s = np.cos(rois_rotation[i]), np.sin(rois_rotation[i]); Rr = np.array([[c, -s], [s, c]])
     
-    polygons_points[i] = np.dot(R, (polygons_points[i] - ctr).T).T + ctr - scene_corner_pix
+    ## geometric center, rotation invariant - these are not used, kept for reference
+    #ctrp = np.array(PolyCentroid(polygons_points[i][:,0], polygons_points[i][:,1]))
+    #ctrr = np.array(PolyCentroid(rois_points[i][:,0], rois_points[i][:,1]))
 
+    # rotation centers calculated using the bounding boxes
+    m = polygons_points[i].min(0); ctrp = m + (polygons_points[i].max(0) - m)/2
+    m = rois_points[i].min(0); ctrr = m + (rois_points[i].max(0) - m)/2
+    
+    # center, rotate, then move back to center
+    polygons_points[i] = np.dot(Rp, (polygons_points[i] - ctrp).T).T + ctrp
+    rois_points[i] = np.dot(Rr, (rois_points[i] - ctrr).T).T + ctrr
+    
+    ## this doesn't work for obvious reasons. kept here for reference.
+    ##   it was an attempt to figure out zeiss center based trial-and-error obtained center (fudge-factor).
+    ## code that solves for the rotation point, assuming the fudge factor is correct (i.e. polygons_points is correct)
+    #C = np.dot(lin.inv(R-np.eye(2, dtype=np.double)), np.dot(R, orig_points.T) - polygons_points[i].T)
+    ##V = np.dot(R, orig_points.T - C2) + C2 # to verify that V matches the transformed points (polygons_points)
+    ## now solve for transformation from original points to the solved center    
+    #U = lin.lstsq(orig_points.T, C[:,0])[0]
+    
+
+
+    
 ### load the image data and crop to specified scene
 
 # xxx - is there a way to just read one "scene" without importing all the data?
@@ -205,6 +253,9 @@ if doplots:
     pl.title('Scene %d' % (load_scene,))
     for i in range(npolygons):
         poly = patches.Polygon(polygons_points[i]/doplots_ds,linewidth=1,edgecolor='r',facecolor='none')
+        ax.add_patch(poly)    
+    for i in range(npolygons):
+        poly = patches.Polygon(rois_points[i]/doplots_ds,linewidth=1,edgecolor='c',facecolor='none')
         ax.add_patch(poly)    
     cnr = box_corner_pix/doplots_ds; sz = box_size_pix/doplots_ds
     rect = patches.Rectangle(cnr,sz[0],sz[1],linewidth=1,edgecolor='b',facecolor='none')
