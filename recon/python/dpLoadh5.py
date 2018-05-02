@@ -333,6 +333,14 @@ class dpLoadh5(object):
             #nrrd.write(self.outraw, data)
         elif ext == 'gipl':
             dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
+        elif ext == 'tiff' or ext == 'tif':
+            # write out as tiff series instead of tiff stacks
+            import tifffile
+            dn = os.path.splitext(self.outraw)[0]; os.makedirs(dn, exist_ok=True)
+            bfn = os.path.splitext(os.path.basename(self.outraw))[0]
+            for z in range(shape[2]):
+                fn = os.path.join(dn, bfn + ('_%06d' % (z,)) + '.' + ext)
+                tifffile.imsave(fn, data[z,:,:], imagej=True)
         else:
             if not hasattr(self, 'data_cube_max'): self.data_cube_max = data.max()
             # this is just to avoid writing all zero data to knossos cubes
