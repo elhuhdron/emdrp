@@ -333,14 +333,27 @@ class dpLoadh5(object):
             #nrrd.write(self.outraw, data)
         elif ext == 'gipl':
             dpLoadh5.gipl_write_volume(data, shape, self.outraw, tuple(self.sampling))
-        elif ext == 'tiff' or ext == 'tif':
-            # write out as tiff series instead of tiff stacks
+        elif ext == 'tiff' or ext == 'tif' or ext == 'png':
+            # write out as an image series
             import tifffile
+            import glob
+            from PIL import Image
             dn = os.path.splitext(self.outraw)[0]; os.makedirs(dn, exist_ok=True)
             bfn = os.path.splitext(os.path.basename(self.outraw))[0]
+            # append onto any previous files in this directory
+            startno = 0; files = [os.path.basename(x) for x in glob.glob(os.path.join(dn,'*.' + ext))]
+            if len(files) > 0:
+                files = [x for x in files if x.find('_') != -1]
+                filenos = [os.path.splitext(y.split('_')[-1])[0] for y in files]
+                if len(filenos) > 0:
+                    startno = np.array([int(x) for x in filenos]).max() + 1
             for z in range(shape[2]):
-                fn = os.path.join(dn, bfn + ('_%06d' % (z,)) + '.' + ext)
-                tifffile.imsave(fn, data[z,:,:], imagej=True)
+                fn = os.path.join(dn, bfn + ('_%06d' % (z + startno,)) + '.' + ext)
+                if ext == 'tiff' or ext == 'tif':
+                    tifffile.imsave(fn, data[z,:,:], imagej=True)
+                else:
+                    imgdata = Image.fromarray(data[z,:,:])
+                    imgdata.save(fn, format='PNG')
         else:
             if not hasattr(self, 'data_cube_max'): self.data_cube_max = data.max()
             # this is just to avoid writing all zero data to knossos cubes
