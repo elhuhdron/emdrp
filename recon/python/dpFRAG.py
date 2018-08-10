@@ -1278,6 +1278,7 @@ class dpFRAG(emLabels):
 
             # rigid transform rotation decomposed to Euler angles.
             # xxx - this method did not work as well for classification. look at this again in the future?
+            #   later found a bug in the rigid body function, maybe try this again?
             #R, t = dpFRAG.rigid_transform_3D(V, Vother); angles = dpFRAG.decompose_rotation(R)
 
         # save the variables in dict to return
@@ -1321,8 +1322,8 @@ class dpFRAG(emLabels):
 
         R = np.dot(V,U.T)
         if nla.det(R) < 0:
-            V[:,2] = -V[:,2]; R = np.dot(V,U.T)
-        t = -R*cA.T + cB.T
+            V[:,-1] = -V[:,-1]; R = np.dot(V,U.T)
+        t = -np.dot(R, cA.T) + cB.T
         return R, t
 
     # modified from http://nghiaho.com/uploads/code/rotation_matrix_demo.m
