@@ -55,3 +55,12 @@ git tag --delete v5.0-3D_meshes
 for checking out a specific release:
 git fetch origin; git reset --hard v2.6.0
 
+example on how to merge with another branch/fork:
+  git clone https://github.com/elhuhdron/emalign.git
+  cd emalign/
+  git remote add upstream https://github.com/drrudolph/emalign.git
+  git remote -v
+  git fetch upstream
+  git merge upstream/metrics
+  git mergetool
+

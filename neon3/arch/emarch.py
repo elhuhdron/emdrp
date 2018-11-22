@@ -1,17 +1,17 @@
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -47,26 +47,26 @@ class fergus(EMModelArchitecture):
     @property
     def layers(self):
         return [
-            Conv((7, 7, 96), init=Gaussian(scale=0.0001), bias=Constant(0), activation=Rectlin(), 
+            Conv((7, 7, 96), init=Gaussian(scale=0.0001), bias=Constant(0), activation=Rectlin(),
                  padding=3, strides=1),
             LRN(31, ascale=0.001, bpower=0.75),
             Pooling(3, strides=2, padding=1),
-            Conv((5, 5, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((5, 5, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(),
                  padding=2, strides=1),
             LRN(31, ascale=0.001, bpower=0.75),
             Pooling(3, strides=2, padding=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(),
                  padding=1, strides=1),
-            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 384), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(),
                  padding=1, strides=1),
-            Conv((3, 3, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(), 
+            Conv((3, 3, 256), init=Gaussian(scale=0.01), bias=Constant(0), activation=Rectlin(),
                  padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Identity()),
             Dropout(keep=0.5),
             Affine(nout=4096, init=Gaussian(scale=0.01), bias=Constant(0), activation=Identity()),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Gaussian(scale=0.01), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -79,10 +79,10 @@ class nfergus(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn,
                     padding=3, strides=1)\
                 if self.bn_first_layer else\
-                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), 
+                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(),
                     padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
@@ -94,7 +94,7 @@ class nfergus(EMModelArchitecture):
             Pooling(3, strides=2, padding=1),
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -107,10 +107,10 @@ class nbfergus(EMModelArchitecture):
     def layers(self):
         bn = True
         return [
-            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, 
+            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn,
                     padding=3, strides=1)\
                 if self.bn_first_layer else\
-                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), 
+                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(),
                     padding=3, strides=1),
             Pooling(3, strides=2, padding=1),
             Conv((5, 5, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
@@ -123,7 +123,7 @@ class nbfergus(EMModelArchitecture):
             Dropout(keep=0.5),
             Affine(nout=4096, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Dropout(keep=0.5),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -152,7 +152,61 @@ class mfergus(EMModelArchitecture):
             Pooling(3, strides=2, padding=1, op='avg'),
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+
+# these are mostly meant as a convolution speed test cases.
+class bigcfergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(bigcfergus, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            Conv((9, 9, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=4, strides=1)\
+                if self.bn_first_layer else\
+                Conv((9, 9, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=4, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((9, 9, 128), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=4, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((7, 7, 256), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((5, 5, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Conv((5, 5, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Conv((5, 5, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Pooling(3, strides=2, padding=1, op='avg'),
+            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
+                   activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
+        ]
+class bigsfergus(EMModelArchitecture):
+    def __init__(self, noutputs, use_softmax=False, bn_first_layer=False):
+        super(bigsfergus, self).__init__(noutputs, use_softmax)
+        self.bn_first_layer = bn_first_layer
+
+    @property
+    def layers(self):
+        bn = True
+        return [
+            Conv((7, 7, 96), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1)\
+                if self.bn_first_layer else\
+                Conv((7, 7, 96), init=Kaiming(), bias=Constant(0), activation=Explin(), padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((7, 7, 192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=3, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((5, 5, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=2, strides=1),
+            Pooling(3, strides=2, padding=1),
+            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 768), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Pooling(3, strides=2, padding=1, op='avg'),
+            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -184,7 +238,7 @@ class h3vgg(EMModelArchitecture):
             # 8
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
             Affine(nout=self.noutputs, init=Kaiming(), activation=Explin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -216,9 +270,10 @@ class vgg3pool(EMModelArchitecture):
             #Conv((3, 3, 384), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling(3, strides=2, padding=1),
             # 8
-            Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            #Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
+            Conv((3, 3, 12288), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -251,7 +306,7 @@ class vgg4pool(EMModelArchitecture):
             # 8
             Conv((3, 3, 9216), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -281,7 +336,7 @@ class vgg5pool(EMModelArchitecture):
             # 8
             Conv((3, 3, 8192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -313,7 +368,7 @@ class pfergus(EMModelArchitecture):
             # 8
             Conv((3, 3, 6144), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -342,7 +397,7 @@ class p2fergus(EMModelArchitecture):
             # 8
             Conv((3, 3, 10240), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -371,7 +426,7 @@ class p3fergus(EMModelArchitecture):
             # 8
             Conv((3, 3, 8192), init=Kaiming(), activation=Explin(), batch_norm=bn, padding=1, strides=1),
             Pooling('all', op='avg'),
-            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0), 
+            Affine(nout=self.noutputs, init=Kaiming(), bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -389,7 +444,7 @@ class cifar10(EMModelArchitecture):
             Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=init_uni, bias=Constant(0), 
+            Affine(nout=self.noutputs, init=init_uni, bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
 
@@ -408,6 +463,6 @@ class DOG_cifar10(EMModelArchitecture):
             Conv((5, 5, 32), init=init_uni, activation=Rectlin(), batch_norm=bn),
             Pooling((2, 2)),
             Affine(nout=500, init=init_uni, activation=Rectlin(), batch_norm=bn),
-            Affine(nout=self.noutputs, init=init_uni, bias=Constant(0), 
+            Affine(nout=self.noutputs, init=init_uni, bias=Constant(0),
                    activation=Softmax() if self.use_softmax else Logistic(shortcut=True))
         ]
