@@ -83,7 +83,7 @@ class dpLabelMerger(emLabels):
         W = np.ones(self.smooth, dtype=self.PDTYPE) / self.smooth.prod() # smoothing kernel
         for s in range(self.segmentation_levels):
             self.cubeIter = dpCubeIter.cubeIterGen(self.volume_range_beg,self.volume_range_end,self.overlap,
-                    self.cube_size, chunksize=self.chunksize, left_remainder_size=self.left_remainder_size, 
+                    self.cube_size, chunksize=self.chunksize, left_remainder_size=self.left_remainder_size,
                     right_remainder_size=self.right_remainder_size, leave_edge=self.leave_edge)
             self.subgroups[-1] = self.segmentation_values[s]
             cur_volume[3] = s
@@ -92,18 +92,20 @@ class dpLabelMerger(emLabels):
                 cur_volume[:3], self.size, self.chunk, self.offset, suffixes, _, _, _, _ = self.volume_info
                 self.srcfile = os.path.join(self.filepaths[0], self.fileprefixes[0] + suffixes[0] + '.h5')
                 self.inith5()
-    
+
                 # only load superchunks that contain some object supervoxels
                 ind = np.ravel_multi_index(cur_volume, self.volume_step_seg)
                 if len(self.sc_to_objs[ind]) < 1: continue
-    
+
                 if self.dpLabelMerger_verbose:
                     print('Merge in chunk %d %d %d, seglevel %d' % tuple(self.chunk.tolist() + [s])); t = time.time()
                 self.readCubeToBuffers()
                 cube = self.data_cube; cur_ncomps = self.data_attrs['types_nlabels'].sum()
 
-                if self.dsfactor > 1:
-                    if not volume_init:
+                # xxx - writing to an hdf5 file in chunks or as a single volume from memory does not necessarily
+                #   need to be tied to dsfactor==1, can add another command-line option for this.
+                if not volume_init:
+                    if self.dsfactor > 1:
                         volume_init=True; f = self.dsfactor
                         new_attrs = self.data_attrs
                         # changed this to be added when raw hdf5 is created
@@ -116,10 +118,20 @@ class dpLabelMerger(emLabels):
                             new_attrs['nchunks'] = np.ceil(new_attrs['nchunks'] / f).astype(np.int32)
                         # this attribute is saved as downsample factor
                         new_attrs['factor'] *= f; new_datasize //= f
-    
+
                         new_data = np.zeros(new_datasize, dtype=self.data_type_out)
-                else:
-                    assert(False) # xxx - implement me
+                    else:
+                        # initialize by just writing a small chunk of zeros
+                        self.inith5()
+                        self.data_attrs['types_nlabels'] = [self.nobjects]
+                        self.fillvalue = 0 # non-zero fill value not useful for merged "neurons"
+                        # xxx - this probably should be cleaned up, see comments in dpWriteh5.py
+                        orig_dataset = self.dataset; orig_subgroups = self.subgroups; orig_offset = self.offset
+                        self.writeCube(data=np.zeros((32,32,32), dtype=self.data_type_out))
+                        # reopen the dataset and write to it dynamically below
+                        dset, group, h5file = self.createh5(self.outfile)
+                        # xxx - this probably should be cleaned up, see comments in dpWriteh5.py
+                        self.dataset = orig_dataset; self.subgroups = orig_subgroups; self.offset = orig_offset
 
                 # much of this code copied from the label mesher, extract supervoxel and smooth
                 # Pad data with zeros so that meshes are closed on the edges
@@ -136,15 +148,15 @@ class dpLabelMerger(emLabels):
                         cid = self.mergelists[cobj]['ids'][j]
                         cur_bnd = svox_bnd[cid-1]
                         imin = np.array([x.start for x in cur_bnd]); imax = np.array([x.stop-1 for x in cur_bnd])
-            
+
                         # min and max coordinates of this seed within zero padded cube
                         pmin = imin - r; pmax = imax + r;
                         # min coordinates of this seed relative to original (non-padded cube)
                         mins = pmin - r; rngs = pmax - pmin + 1
-            
+
                         crpdpls = (dataPad[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,
                                            pmin[2]:pmax[2]+1] == cid).astype(self.PDTYPE)
-            
+
                         crpdplsSm = filters.convolve(crpdpls, W, mode='reflect', cval=0.0, origin=0)
                         # if smoothing results in nothing above contour level, use original without smoothing
                         if (crpdplsSm > self.contour_lvl).any():
@@ -162,7 +174,12 @@ class dpLabelMerger(emLabels):
                             e = b + (bounds_end-bounds_beg)//f + ((bounds_end-bounds_beg)%f != 0)
                             new_data[b[0]:e[0],b[1]:e[1],b[2]:e[2]][crpdpls[self.slices[0]] > self.contour_lvl] = cobj
                         else:
-                            assert(False) # xxx - implement me
+                            # write non-downsampled directly to h5 output file
+                            b = bounds_beg; e = b + (bounds_end-bounds_beg)
+                            # this is hard-coded to write the dataset in F-order (normal convention).
+                            tmp = np.transpose(dset[b[2]:e[2],b[1]:e[1],b[0]:e[0]], (2,1,0))
+                            tmp[crpdpls > self.contour_lvl] = cobj
+                            dset[b[2]:e[2],b[1]:e[1],b[0]:e[0]] = np.transpose(tmp, (2,1,0))
 
                 del self.data_cube # xxx - have to reallocate since view changes remove C-order contiguous
                 if self.dpLabelMerger_verbose:
@@ -182,9 +199,9 @@ class dpLabelMerger(emLabels):
             if self.dpLabelMerger_verbose:
                 print('\tdone in %.4f s' % (time.time() - t, ))
         else:
-            assert(False) # xxx - implement me
+            h5file.close()
 
-    
+
     # first pass over annotation files creates a mapping from superchunks to objects.
     # this allows second pass to only have to load each superchunk only once, instead of potentially having to reload
     #   for different objects (as in a single pass).
@@ -203,10 +220,10 @@ class dpLabelMerger(emLabels):
         self.volume_step_seg = np.zeros((4,),dtype=np.uint32)
         self.volume_step_seg[:3] = self.cubeIter.volume_step; self.volume_step_seg[3] = self.segmentation_levels
         self.volume_size_seg = np.prod(self.volume_step_seg)
-        
+
         loadfiles = glob.glob(self.annotation_file_glob); nFiles = len(loadfiles);
         assert( nFiles > 0 ) # empty glob for knossos annotation files
-        self.mergelists = {}; self.nobjects = 0; self.sc_to_objs = [set() for x in range(self.volume_size_seg)]; 
+        self.mergelists = {}; self.nobjects = 0; self.sc_to_objs = [set() for x in range(self.volume_size_seg)];
         for j in range(nFiles):
             # get the mergelist out of the zipped knossos annotation file
             zf = zipfile.ZipFile(loadfiles[j], mode='r');
@@ -238,9 +255,9 @@ class dpLabelMerger(emLabels):
     def addArgs(p):
         dpWriteh5.addArgs(p)
         dpCubeIter.addArgs(p)
-        p.add_argument('--annotation-file-glob', nargs=1, type=str, default='', 
+        p.add_argument('--annotation-file-glob', nargs=1, type=str, default='',
                        help='Glob for a list of input annotation files from knossos')
-        p.add_argument('--labels-path', nargs=1, type=str, default='', 
+        p.add_argument('--labels-path', nargs=1, type=str, default='',
                        help='Input path for superchunked supervoxel label files (to merge)')
         p.add_argument('--dsfactor', nargs=1, type=int, default=[1], metavar=('F'),
                        help='Downsample factor, mode to write out a single label file')
