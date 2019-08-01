@@ -75,6 +75,8 @@ class dpLabelMerger(emLabels):
                 for k in range(f):
                     self.slices[i*ff + j*f + k] = np.s_[i::f,j::f,k::f]
 
+        assert(self.contour_lvl >= 0 and self.contour_lvl < 1) # bad choice 
+
 
     def doMerging(self):
 
@@ -157,7 +159,10 @@ class dpLabelMerger(emLabels):
                         crpdpls = (dataPad[pmin[0]:pmax[0]+1,pmin[1]:pmax[1]+1,
                                            pmin[2]:pmax[2]+1] == cid).astype(self.PDTYPE)
 
-                        crpdplsSm = filters.convolve(crpdpls, W, mode='reflect', cval=0.0, origin=0)
+                        if W.size==0 or (W==1).all():
+                            crpdplsSm = crpdpls
+                        else:
+                            crpdplsSm = filters.convolve(crpdpls, W, mode='reflect', cval=0.0, origin=0)
                         # if smoothing results in nothing above contour level, use original without smoothing
                         if (crpdplsSm > self.contour_lvl).any():
                             del crpdpls; crpdpls = crpdplsSm
