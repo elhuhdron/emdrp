@@ -1,2 +1,10 @@
+This was the version as of the discontinuation of Nervana Neon, verified working with emdrp.
 >>> print(neon.__version__)
 2.6.0+f9d771b
+
+NOTE: created own fork and verified head works with emdrp at the point of neon discontinuation.
+git clone https://github.com/elhuhdron/neon.git
+
+NOTE: neon mostly only works on the Maxwell (980) and Pascal (1080) architectures.
+  It can also run on Kepler (880), but not optimized.
+  It was discontinued before support for Turing or any later architectures was added.

@@ -1,11 +1,11 @@
 
-# this is for installed emdrp neon using anaconda python, have to paste into command line.
-# running as a bash script does not work because conda activate
+# this is for installing emdrp version of neon using anaconda python, have to paste into command line.
+# xxx - running as a bash script does not work because conda activate
 #   does not work from bash script for some reason.
 
 # IMPORTANT: python version is important
 #   (3.x version) needs to match that of neon release
-#   this was python 3.6 as of the discontinuation of neon
+#   this was python 3.6(.10) as of the discontinuation of neon (HEAD or v2.6.0)
 # cuda version works up to:
 #     nvcc: NVIDIA (R) Cuda compiler driver
 #     Copyright (c) 2005-2018 NVIDIA Corporation
@@ -41,19 +41,21 @@ rm -rf neon
 # new method, checkout forked version
 git clone https://github.com/elhuhdron/neon.git
 cd neon
-# to apply the patch, xxx - check in the patch
-patch -p1 < ../emdrp/neon3/neon.patch
 
 # build and install neon into a conda environment
 conda create -y --name neon python=3.6 pip matplotlib virtualenv
 conda activate neon
 make sysinstall -e VIS=true
+# build the docs, they are no longer hosted on any nervana (intel) site
+make doc
+
+# install the neon emdrp specific python requirements
 cd ${REPODIR}/emdrp/neon3/
 pip install -r requirements.txt
 
 # remove the neon cache
 rm -rf ~/.cache/neon
-# possibly clear pycuda cache?
+# remove the pycuda cache
 rm -rf ~/.cache/pycuda
 
 # try to run the mnist example with gpu
