@@ -2,6 +2,8 @@
 http://gitref.org/basic/
 https://www.atlassian.com/git/tutorials/what-is-version-control
 
+https://github.com/edx/edx-platform/wiki/How-to-Rebase-a-Pull-Request
+
 just replace everything, somehow this is a hard answer to find:
 git fetch origin; git reset --hard origin/master
 
