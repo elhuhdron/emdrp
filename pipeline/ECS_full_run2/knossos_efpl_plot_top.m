@@ -3,10 +3,10 @@
 name_suffixes = {};
 
 load_files = {
-  '~/Data/efpl/vgg3pool64_ECS_full_run2_crop_interp.mat'
-  '~/Data/efpl/vgg3pool64_ECS_full_run2_crop_interp.mat'
-  '~/Data/efpl/vgg3pool64_ECS_full_run2_crop_interp.mat'
-  '~/Data/efpl/vgg3pool64_ECS_full_run2_crop_interp.mat'
+  'vgg3pool64_ECS_full_run2_crop_interp.mat'
+  'vgg3pool64_ECS_full_run2_crop_interp.mat'
+  'vgg3pool64_ECS_full_run2_crop_interp.mat'
+  'vgg3pool64_ECS_full_run2_crop_interp.mat'
 };
 load_indices = [3 4 1 2];
 

@@ -66,3 +66,9 @@ example on how to merge with another branch/fork:
   git merge upstream/metrics
   git mergetool
 
+if you checked in but did not push changes and ran into a merge problem
+    (i.e., merge conflict during git pull, but after commit, and you want to back out):
+  git merge --abort
+  git reset --soft HEAD~1
+  git reset
+

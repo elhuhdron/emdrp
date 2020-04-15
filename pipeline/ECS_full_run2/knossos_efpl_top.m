@@ -3,34 +3,33 @@
 
 pdata = struct;  % input parameters depending on dataset
 
+rootdir = '/mnt/soma_cifs/pwatkins/cne_nas_bkp/from_externals/ECS_paper';
+
 i = 1;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+pdata(i).datah5 = fullfile(rootdir, 'M0007_33_39x35x7chunks_Forder.h5');
 pdata(i).chunk = [16 17 0];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool64_ECS_full_run2/M0007_supervoxels.h5';
+pdata(i).skelin = fullfile(rootdir, 'skeletons/M0007_33_dense_skels.152.crop.interp.nml');
+pdata(i).lblsh5 = fullfile(rootdir, 'vgg3pool64_ECS_full_run2/M0007_supervoxels.h5');
 pdata(i).name = 'M0007_wtsh';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
 i = 2;
-pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).datah5 = fullfile(rootdir, 'M0027_11_33x37x7chunks_Forder.h5');
 pdata(i).chunk = [12 14 2];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool64_ECS_full_run2/M0027_supervoxels.h5';
+pdata(i).skelin = fullfile(rootdir, 'skeletons/M0027_11_dense_skels.186.crop.interp.nml');
+pdata(i).lblsh5 = fullfile(rootdir, 'vgg3pool64_ECS_full_run2/M0027_supervoxels.h5');
 pdata(i).name = 'M0027_wtsh';
 pdata(i).subgroups = {'with_background'};
 pdata(i).segparam_attr = 'thresholds';
 pdata(i).nlabels_attr = 'types_nlabels';
 
 i = 3;
-pdata(i).datah5 = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
+pdata(i).datah5 = fullfile(rootdir, 'M0007_33_39x35x7chunks_Forder.h5');
 pdata(i).chunk = [16 17 0];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0007_33_dense_skels.152.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool64_ECS_full_run2/M0007_supervoxels_agglo.h5';
+pdata(i).skelin = fullfile(rootdir, 'skeletons/M0007_33_dense_skels.152.crop.interp.nml');
+pdata(i).lblsh5 = fullfile(rootdir, 'vgg3pool64_ECS_full_run2/M0007_supervoxels_agglo.h5');
 pdata(i).name = 'M0007_agglo';
 pdata(i).subgroups = {'agglomeration'};
 pdata(i).segparam_attr = '';
@@ -38,11 +37,10 @@ pdata(i).segparams = 0:2:100;
 pdata(i).nlabels_attr = 'types_nlabels';
 
 i = 4;
-pdata(i).datah5 = '/Data/datasets/raw/M0027_11_33x37x7chunks_Forder.h5';
+pdata(i).datah5 = fullfile(rootdir, 'M0027_11_33x37x7chunks_Forder.h5');
 pdata(i).chunk = [12 14 2];
-%pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.nml';
-pdata(i).skelin = '/Data/datasets/skeletons/M0027_11_dense_skels.186.crop.interp.nml';
-pdata(i).lblsh5 = '/Data/watkinspv/full_datasets/neon/vgg3pool64_ECS_full_run2/M0027_supervoxels_agglo.h5';
+pdata(i).skelin = fullfile(rootdir, 'skeletons/M0027_11_dense_skels.186.crop.interp.nml');
+pdata(i).lblsh5 = fullfile(rootdir, 'vgg3pool64_ECS_full_run2/M0027_supervoxels_agglo.h5');
 pdata(i).name = 'M0027_agglo';
 pdata(i).subgroups = {'agglomeration'};
 pdata(i).segparam_attr = '';
@@ -104,7 +102,7 @@ p.dataset_lbls = 'labels';
 
 % optional outputs for debug / validation
 p.rawout = false;
-p.outpath = '/home/watkinspv/Downloads';
+p.outpath = '';
 p.outdata = 'outdata.gipl';
 p.outlbls = 'outlbls.gipl';
 p.outprobs = 'outprobs.raw';
@@ -120,4 +118,4 @@ for i = 1:length(pdata)
 end
 
 % save the results
-save('~/Data/efpl/vgg3pool64_ECS_full_run2_crop_interp','p','pdata','o');
+save('vgg3pool64_ECS_full_run2_crop_interp','p','pdata','o');
