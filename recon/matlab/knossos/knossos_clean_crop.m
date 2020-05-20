@@ -28,12 +28,13 @@ function o = knossos_clean_crop(p)
 o = struct;
 
 % inputs 
-% p.raw_size
-% p.offset_ind
-% p.ncubes_raw
+% p.chunk
+% p.nchunks
 % p.offset
+% p.chunksize
 % p.nmlin
 % p.nmlout
+% p.crop_conncomp
 
 % read the nml file, script originally from Kevin
 [info, meta, ~, ~] = knossos_read_nml(p.nmlin);
@@ -58,8 +59,17 @@ all_nodes = knossos_info_graph.all_nodes;
 %tnnodes = knossos_info_graph.tnnodes;
 
 % get the specified cropped area
-minv = p.offset_ind*p.raw_size + p.offset;
-total_size = p.ncubes_raw*p.raw_size - p.offset;
+if isfield(p, 'size')
+  total_size = p.size;
+  minv = p.chunk*p.chunksize + p.offset;
+else
+  % xxx - messy, support legacy version which only had nchunks, no size and offset interpreted as "skip"
+  total_size = p.nchunks*p.chunksize - p.offset;
+  minv = p.chunk*p.chunksize + p.offset;
+end
+
+% for the option to keep the original components
+ci_orig = conncomp(graph(edge_matrix));
 
 % one-based, this appears to be correct for nml data
 crop_nodes = bsxfun(@minus, all_nodes(:,1:3), minv);
@@ -70,6 +80,8 @@ keep_nodes = ~remove_nodes;
 edge_matrix = edge_matrix(keep_nodes, keep_nodes);
 % remove the nodes from all_nodes
 all_nodes = all_nodes(keep_nodes, :);
+% remove the nodes from the original connected components
+ci_orig = ci_orig(keep_nodes);
 
 % get the components of the edge matrix (the skeletons)
 ci = conncomp(graph(edge_matrix)); sizes = hist(ci,1:double(max(ci)));
@@ -81,16 +93,27 @@ keep_nodes = ~remove_nodes;
 edge_matrix = edge_matrix(keep_nodes, keep_nodes);
 % remove the nodes from all_nodes
 all_nodes = all_nodes(keep_nodes, :);
+% remove the nodes from the original connected components
+ci_orig = ci_orig(keep_nodes);
 
-% get the components of the edge matrix (the skeletons)
-ci = conncomp(graph(edge_matrix)); %sizes = hist(ci,1:double(max(ci)));
+if p.crop_conncomp
+    % get the components of the edge matrix (the skeletons)
+    ci = conncomp(graph(edge_matrix));
+    nThings = max(ci);
+    inds_things = 1:nThings;
+else
+    ci = ci_orig;
+    sizes = hist(ci,1:double(max(ci)));
+    inds_things = find(sizes > 0);
+    nThings = length(inds_things);
+end
 
 % create a new array of node / edge info based on new components (should be splits only)
-nThings = max(ci); outThings = cell(1,nThings); nnodes = 0; nedges = 0;
+outThings = cell(1,nThings); nnodes = 0; nedges = 0;
 for n=1:nThings
     outThings{n}.thingid = n;
     
-    sel_nodes = (ci == n); cnodes = sum(sel_nodes);
+    sel_nodes = (ci == inds_things(n)); cnodes = sum(sel_nodes);
     outThings{n}.nodes = [(1:cnodes)'+nnodes all_nodes(sel_nodes, 1:3)];
     [i,j] = find(triu(edge_matrix(sel_nodes, sel_nodes)));
     outThings{n}.edges = [i j] + nnodes;
