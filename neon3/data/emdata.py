@@ -52,6 +52,7 @@ class DummyEMDataParser():
         self.noutputs = self.nIndepLabels*self.image_out_size**2
         self.nclass = self.noutputs if self.independent_labels else self.nIndepLabels
         self.oshape = (self.image_out_size,self.image_out_size,self.nIndepLabels)
+        self.batch_meta = {}
 
 class NervanaEMDataIterator(ArrayIterator):
 
@@ -84,7 +85,7 @@ class NervanaEMDataIterator(ArrayIterator):
         pass
 
 class RandomEMDataIterator(NervanaEMDataIterator):
-    def __init__(self, nexamples=256, image_in_size=64, nchan=1, image_out_size=16, nclass=3,
+    def __init__(self, nexamples=1024, image_in_size=64, nchan=1, image_out_size=16, nclass=3,
                  independent_labels=False, name=None):
         self.parser = DummyEMDataParser(nexamples, image_in_size, nchan, image_out_size, nclass, independent_labels)
         super(RandomEMDataIterator, self).__init__(name=name)

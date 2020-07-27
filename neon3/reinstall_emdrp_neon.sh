@@ -61,4 +61,8 @@ rm -rf ~/.cache/pycuda
 # try to run the mnist example with gpu
 cd ${REPODIR}/neon/
 python examples/mnist_mlp.py -b gpu -e 10
+# and the random em data iterator
+cd ${REPODIR}/emdrp/neon3
+./emneon.py
+
 conda deactivate
