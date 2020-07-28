@@ -33,7 +33,7 @@ class EMModelArchitecture(object):
 
     @property
     def layers(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     @staticmethod
     def init_model_arch(name, noutputs, use_softmax):

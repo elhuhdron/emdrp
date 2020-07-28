@@ -1,17 +1,17 @@
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -72,13 +72,13 @@ class NervanaEMDataIterator(ArrayIterator):
             else:
                 y = np.random.randint(self.parser.noutputs,size=osize).astype(np.int32)
         #print(X.dtype,y.dtype,X.shape,y.shape,X.flags,y.flags)
-        
-        super(NervanaEMDataIterator, self).__init__(X, y, nclass=self.parser.nclass, lshape=lshape, 
+
+        super(NervanaEMDataIterator, self).__init__(X, y, nclass=self.parser.nclass, lshape=lshape,
             make_onehot=self.make_onehot, name=name)
 
     @property
     def nmacrobatches(self):
-        raise NotImplemented()
+        raise NotImplementedError()
 
     # implement this if specifically need to stop threads or cleanup
     def stop(self):
@@ -96,7 +96,7 @@ class RandomEMDataIterator(NervanaEMDataIterator):
 
 class EMDataIterator(NervanaEMDataIterator, Thread):
 
-    def __init__(self, cfg_file, write_output=None, chunk_skip_list=[], dim_ordering='', batch_range=[1,10], 
+    def __init__(self, cfg_file, write_output=None, chunk_skip_list=[], dim_ordering='', batch_range=[1,10],
                  name='emdata', isTest=False, concatenate_batches=False, NBUF=2, image_in_size=None):
         Thread.__init__(self)
         self.name = name
@@ -123,7 +123,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             append_features = (ext == '.h5' or ext == '.hdf5' or ext == '.conf')
             write_outputs = not append_features
         # instantiate the actual em data parser, code shared with cuda-convnets2 em data parser
-        self.parser = EMDataParser(cfg_file, write_outputs=write_outputs, append_features=append_features, 
+        self.parser = EMDataParser(cfg_file, write_outputs=write_outputs, append_features=append_features,
                                     chunk_skip_list=chunk_skip_list, dim_ordering=dim_ordering, isTest=self.isTest,
                                     image_in_size=image_in_size)
         if write_outputs or append_features:
@@ -132,7 +132,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.parser.outpath = write_output
             self.parser.no_label_lookup = True
             self.parser.append_features_knossos = append_features and (ext == '.conf')
-            if self.parser.append_features_knossos: 
+            if self.parser.append_features_knossos:
                 self.parser.outpath, fn = os.path.split(fn); self.parser.strnetid = re.findall(r'\d+', fn)[0]
         # parser relies on having initBatches called right away, xxx - could revisit this?
         self.parser.initBatches()
@@ -159,7 +159,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             #self.stream = self.drv.Stream() # xxx - for other synchonize method??? see below
         else:
             self.drv = None
-            
+
         # start the thread and wait for initialization to complete.
         # initialization of backend memory has to occur within the thread.
         self.daemon = True  # so that stop event is not necessary to terminate threads when process completes.
@@ -203,13 +203,13 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             if self.NBUF > 1:
                 # immediately push the data into the current lbuf
                 self._push_be_buffer()
-                
+
                 # advance the load buffer pointer
                 self.lbuf_lock.acquire()
                 self.lbuf = (self.lbuf + 1) % self.NBUF
                 self.lbuf_event.set()
                 self.lbuf_lock.release()
-                
+
                 # wait until the next load buffer is free
                 self.cbuf_lock.acquire()
                 wait = ((self.cbuf - 1) % self.NBUF == self.lbuf)
@@ -253,7 +253,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             #end.record(self.stream)
             #end.synchronize()
             self.ctx.synchronize()
-            
+
     def _get_next_EMbatch(self):
         p = self.parser
         nextdata = p.getBatch(self.batchnum)
@@ -271,7 +271,7 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             # xxx - decided above was a poor choice, transpose should not matter as long as input/ouput are in same
             #   orientation relative to each other. swap the image and samples dimensions only
             self.nextdata[i] = nextdata[i].T.copy(order='C')
-                
+
         if self.num_labels > 0:
             # convert labels that are not onehot (independent_labels) to int
             if self.make_onehot:
@@ -312,4 +312,3 @@ class EMDataIterator(NervanaEMDataIterator, Thread):
             self.cbuf_lock.release()
 
         return _iter
-        
