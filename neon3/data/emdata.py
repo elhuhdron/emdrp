@@ -49,8 +49,12 @@ class DummyEMDataParser():
 
         self.pixels_per_image = self.nzslices*self.image_size**2
         self.pixels_per_out_image = self.image_out_size**2
-        self.noutputs = self.nIndepLabels*self.image_out_size**2
-        self.nclass = self.noutputs if self.independent_labels else self.nIndepLabels
+        if self.independent_labels:
+            self.noutputs = self.nIndepLabels*self.image_out_size**2
+            self.nclass = self.noutputs
+        else:
+            self.noutputs = self.image_out_size**2 # ==1, image_out_size is 1 in this case
+            self.nclass = self.nIndepLabels
         self.oshape = (self.image_out_size,self.image_out_size,self.nIndepLabels)
         self.batch_meta = {}
 

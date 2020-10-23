@@ -719,7 +719,7 @@ class EMDataParser():
             self.getAllDataAtPoint(inds[imgi,:],data,aug_data,imgi,augs[imgi],chunk=chunks[imgi])
             if not self.no_labels:
                 self.getLblDataAtPoint(inds[imgi,:],labels[:,imgi],seglabels[:,imgi],augs[imgi],chunk=chunks[imgi])
-        if not self.no_labels: self.tallyTrainingPrior(labels)
+        if not self.no_labels and not self.zero_labels: self.tallyTrainingPrior(labels)
 
         return augs
 
@@ -1743,4 +1743,3 @@ if __name__ == '__main__':
     # test tiled batches
     batchOffset = 0;
     for i in range(dp.FIRST_TILED_BATCH+batchOffset,dp.FIRST_TILED_BATCH+batchOffset+nBatches): dp.getBatch(i,True,16)
-
