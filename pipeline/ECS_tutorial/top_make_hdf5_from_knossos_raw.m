@@ -1,9 +1,9 @@
 
 % Change paths appropriately.
-basepath = '/home/watkinspv/Data/ECS_tutorial';
+basepath = '/axon/scratch/erjelli/ECS_tutorial/download';
 
 p = struct;
-datasets = {'M0027_11' 'M0007_33'};
+datasets = {'M0027_11_mag1_subvol' 'M0007_33_mag1_subvol'};
 chunk_sels = {[12 14 2] [16 17 0]};
 
 for i=1:length(datasets)
