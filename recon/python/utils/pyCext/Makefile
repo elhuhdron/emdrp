@@ -1,19 +1,19 @@
 
 # compilers and flags
-CC=gcc-6
-CPPC=g++-6
+CC=gcc
+CPPC=g++
 CFLAGS=-fPIC -O3
 CPPFLAGS=-fPIC -std=c++11 -O3
 
 # Python include directory. This should contain the file Python.h, among others.
-PYTHON_INCLUDE_PATH = $(HOME)/anaconda3/include/python3.7m
+PYTHON_INCLUDE_PATH = $(HOME)/conda-envs/emdrp/include/python3.9
 
 # Numpy include directory. This should contain the file arrayobject.h, among others.
-NUMPY_INCLUDE_PATH = $(HOME)/anaconda3/lib/python3.7/site-packages/numpy/core/include/numpy
+NUMPY_INCLUDE_PATH = $(HOME)/conda-envs/emdrp/lib/python3.9/site-packages/numpy/core/include/numpy
 
 # Python library directory and link version. This should contain libpythonx.x, among others.
-PYTHON_LIBRARY_PATH = $(HOME)/anaconda3/lib
-PYTHON_VERSION = 3.7m
+PYTHON_LIBRARY_PATH = $(HOME)/conda-envs/emdrp/lib
+PYTHON_VERSION = 3.9
 
 # ---- Link --------------------------- 
 _pyCext.so _pyCppext.so:  pyCext.o pyCppext.o
