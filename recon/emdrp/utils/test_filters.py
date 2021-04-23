@@ -3,15 +3,17 @@ import numpy as np
 from scipy import ndimage as nd
 
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 
 from Kuwahara import Kuwahara
 from KuwaharaFourier import KuwaharaFourier
 
 import time
 
-I=mpimg.imread('/usr/local/MATLAB/R2016a/toolbox/images/imdata/cameraman.tif')
-Id=mpimg.imread('/usr/local/MATLAB/R2016a/toolbox/images/imdata/cameraman.tif').astype(np.double)/255
+from scipy.misc import face
+
+
+I=face(gray=True)
+Id=face(gray=True).astype(np.double)/255
 
 t = time.time();
 I2 = nd.gaussian_filter(I, [5.0, 5.0], mode='constant');

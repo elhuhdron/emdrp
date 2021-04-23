@@ -30,7 +30,7 @@ import re
 import argparse
 import time
 import os
-from dpLoadh5 import dpLoadh5
+from .dpLoadh5 import dpLoadh5
 
 class dpWriteh5(dpLoadh5):
 

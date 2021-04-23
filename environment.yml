@@ -5,5 +5,11 @@ dependencies:
   - h5py
   - numpy
   - pip
+  - scipy
+  - pytest
+  - hypothesis
+  - networkx
+  - matplotlib
   - pip:
+    - czifile
     - --editable ../../recon # is executed in ./.snakemake/conda
