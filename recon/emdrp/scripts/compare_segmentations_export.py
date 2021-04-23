@@ -7,7 +7,7 @@ import numpy.ma as ma
 import tifffile
 
 from dpLoadh5 import dpLoadh5
-from typesh5 import emLabels, emProbabilities, emVoxelType
+from emdrp.utils.typesh5 import emLabels, emProbabilities, emVoxelType
 
 params = {
     'segpaths' : [

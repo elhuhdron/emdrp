@@ -36,7 +36,7 @@ from metrics import adapted_rand_error
 
 from dpLoadh5 import dpLoadh5
 #from metrics import warping_error, adapted_rand_error
-from typesh5 import emLabels, emProbabilities, emVoxelType
+from emdrp.utils.typesh5 import emLabels, emProbabilities, emVoxelType
 
 params = {
     'gt_ECS_label' : 1,

@@ -8,7 +8,7 @@ from scipy import io as sio
 
 #from dpLoadh5 import dpLoadh5
 #from dpWriteh5 import dpWriteh5
-#from typesh5 import emLabels
+#from emdrp.utils.typesh5 import emLabels
 
 from scipy import linalg as sla
 from scipy import optimize as opt

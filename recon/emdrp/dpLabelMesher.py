@@ -48,7 +48,7 @@ from skimage.measure import mesh_surface_area
 
 #from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-from typesh5 import emLabels
+from utils.typesh5 import emLabels
 from utils import showImgData, knossos_read_nml
 
 class dpLabelMesher(emLabels):

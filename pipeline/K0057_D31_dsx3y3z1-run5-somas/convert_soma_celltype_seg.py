@@ -12,8 +12,8 @@ from scipy import ndimage as nd
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-#from typesh5 import emLabels, emProbabilities, emVoxelType
-#from typesh5 import emLabels
+#from emdrp.utils.typesh5 import emLabels, emProbabilities, emVoxelType
+#from emdrp.utils.typesh5 import emLabels
 from pyCext import binary_warping
 
 overlay_in='/home/watkinspv/Downloads/K0057_soma_annotation/affine_2Pstack/K0057_D31_soma_seg_overlays_v3.gipl'

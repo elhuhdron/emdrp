@@ -47,7 +47,7 @@ from collections import OrderedDict
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-from typesh5 import emLabels, emProbabilities
+from utils.typesh5 import emLabels, emProbabilities
 from Kuwahara import Kuwahara
 
 try:

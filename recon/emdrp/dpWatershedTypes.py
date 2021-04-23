@@ -43,7 +43,7 @@ from skimage import morphology as morph
 import networkx as nx
 
 from dpLoadh5 import dpLoadh5
-from typesh5 import emLabels, emProbabilities, emVoxelType
+from utils.typesh5 import emLabels, emProbabilities, emVoxelType
 from pyCext import binary_warping
 from utils import print_cpu_info_linux
 

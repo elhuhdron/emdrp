@@ -34,7 +34,7 @@ import os
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-from typesh5 import emProbabilities, emVoxelType
+from utils.typesh5 import emProbabilities, emVoxelType
 
 class dpVolumeXcorr(dpWriteh5):
 

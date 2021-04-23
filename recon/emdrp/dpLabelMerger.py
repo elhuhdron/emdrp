@@ -37,7 +37,7 @@ from scipy import ndimage as nd
 import scipy.ndimage.filters as filters
 
 from dpCubeIter import dpCubeIter
-from typesh5 import emLabels
+from utils.typesh5 import emLabels
 from dpWriteh5 import dpWriteh5
 from dpLoadh5 import dpLoadh5
 

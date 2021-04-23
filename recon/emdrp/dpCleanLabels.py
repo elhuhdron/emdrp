@@ -44,7 +44,7 @@ from scipy import ndimage as nd
 
 from dpLoadh5 import dpLoadh5
 from dpWriteh5 import dpWriteh5
-from typesh5 import emLabels, emVoxelType
+from utils.typesh5 import emLabels, emVoxelType
 
 class dpCleanLabels(emLabels):
 

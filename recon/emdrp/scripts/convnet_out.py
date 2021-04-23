@@ -41,7 +41,7 @@ from scipy.stats import mstats
 from dpLoadh5 import dpLoadh5
 from metrics import warping_error, adapted_rand_error
 from metrics import adapted_rand_error_resample_objects_points, adapted_rand_error_resample_objects
-from typesh5 import emLabels, emProbabilities, emVoxelType
+from emdrp.utils.typesh5 import emLabels, emProbabilities, emVoxelType
 
 '''
 # 2d tiles input parameters
