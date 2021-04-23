@@ -183,3 +183,8 @@ slprj/
 # Session info
 octave-workspace
 
+# Snakemake
+.snakemake
+
+# Visual studio code
+.vscode
