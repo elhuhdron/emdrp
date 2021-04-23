@@ -8,7 +8,7 @@ from pathlib import Path
 
 rule all:
     input:
-        expand( root + '/data_out/tutorial_ECS/xfold/{ident}_probs.h5', 
+        expand( root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5', 
             ident=['M0007', 'M0027']),
 
 rule merge_predicted_probabilities:
@@ -30,8 +30,23 @@ rule merge_predicted_probabilities:
         'environment.yml'
     shell:
         'python -u recon/emdrp/dpMergeProbs.py' +
-        ' --srcpath {params.src_path}'
-        ' --srcfiles {params.srcfiles}'
-        ' --dim-orderings {params.dim_order}'
-        ' --outprobs {output}'
-        ' --chunk 18 15 3 --size 128 128 128 --types ICS --ops mean min --dpM'
+        ' --srcpath {params.src_path}' +
+        ' --srcfiles {params.srcfiles}' +
+        ' --dim-orderings {params.dim_order}' +
+        ' --outprobs {output}' +
+        ' --chunk 18 15 3 --size 128 128 128 --types ICS ECS MEM --ops mean min --dpM'
+
+rule apply_watershed_on_ICS_probability:
+    output:
+         root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5',
+    input:
+        root + '/data_out/tutorial_ECS/xfold/{ident}_probs.h5'
+    conda:
+        'environment.yml'
+    shell:
+        'python -u recon/emdrp/dpWatershedTypes.py' +
+        ' --probfile {input}' +
+        ' --chunk 18 15 3 --offset 0 0 0 --size 128 128 128' +
+        ' --outlabels {output}' +
+        ' --ThrRng 0.5 0.999 0.1' +
+        ' --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW'
