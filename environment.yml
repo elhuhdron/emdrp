@@ -10,6 +10,8 @@ dependencies:
   - hypothesis
   - networkx
   - matplotlib
+  - scikit-image
+  - python-snappy
   - pip:
     - czifile
     - --editable ../../recon # is executed in ./.snakemake/conda
