@@ -1,4 +1,4 @@
-from emdrp import dpWriteh5
+from emdrp.dpWriteh5 import dpWriteh5
 
 def test_imports():
     pass
