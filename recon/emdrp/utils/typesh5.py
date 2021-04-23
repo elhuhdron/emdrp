@@ -32,11 +32,11 @@ from scipy import ndimage as nd
 import argparse
 #import time
 import networkx as nx
-from utils import optimal_color
+from emdrp.utils.utils import optimal_color
 #import sys
 
-from ..dpLoadh5 import dpLoadh5
-from ..dpWriteh5 import dpWriteh5
+from emdrp.dpLoadh5 import dpLoadh5
+from emdrp.dpWriteh5 import dpWriteh5
 
 class emVoxelType(dpWriteh5):
     VOXTYPE_DTYPE = np.uint8
