@@ -1,0 +1,9 @@
+name: emasm
+channels:
+  - defaults
+dependencies:
+  - h5py
+  - numpy
+  - pip
+  - pip:
+    - --editable ../../recon # is executed in ./.snakemake/conda
