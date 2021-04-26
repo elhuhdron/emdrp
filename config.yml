@@ -1,1 +1,9 @@
  local_data_path: /u/erjelli/link_scratch/2021-04-20_emasm
+
+ datasets:
+    M0007:
+      size: [1024, 1024, 512]
+      chunk: [16, 17, 0]
+    M0027:
+      size: [1024, 1024, 512]
+      chunk: [12, 14, 2]
