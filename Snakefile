@@ -8,9 +8,10 @@ from pathlib import Path
 
 rule all:
     input:
-        expand( root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5', 
-            ident=['M0007', 'M0027']),
+        #expand( root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5', 
+        #    ident=['M0007', 'M0027']),
         #    ident=['M0007']),
+        'matlab_script.chkpt',
 
 rule merge_predicted_probabilities:
     output:
@@ -63,3 +64,12 @@ rule apply_watershed_on_ICS_probability:
         ' --outlabels {output}' +
         ' --ThrRng 0.5 0.999 0.1' +
         ' --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW'
+
+rule produce_metrics:
+    output:
+        touch('matlab_script.chkpt')
+    envmodules:
+        'matlab/R2019b'
+    shell:
+        """matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake()" """
+
