@@ -12,6 +12,8 @@ rule all:
         #    ident=['M0007', 'M0027']),
         #    ident=['M0007']),
         root + '/data_out/tutorial_ECS/xfold/M0007_output.mat',
+        'plot_metrics.chpt'
+
 
 rule merge_predicted_probabilities:
     output:
@@ -77,5 +79,14 @@ rule produce_metrics:
     envmodules:
         'matlab/R2019b'
     shell:
-        """echo "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', '[{params.chunk}]')" """ +
-        """&& matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', [{params.chunk}])" """
+        """matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', [{params.chunk}])" """
+
+rule plot_metrics:
+    output:
+        touch('plot_metrics.chpt')
+    input:
+    params:
+    envmodules:
+        'matlab/R2019b'
+    shell:
+        """matlab -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_plot_top_snakemake()" """

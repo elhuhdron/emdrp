@@ -34,7 +34,6 @@ function knossos_efpl_top_snakemake(output_file_path, lblsh5, h5_raw_data_path, 
   pdata = struct;  % input parameters depending on dataset
 
 
-  % K0057 watershed somas clean
   i = 1;
   pdata(i).datah5 = h5_raw_data_path;
   pdata(i).chunk = chunk;
@@ -46,6 +45,18 @@ function knossos_efpl_top_snakemake(output_file_path, lblsh5, h5_raw_data_path, 
   pdata(i).segparams = [0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999];
   pdata(i).nlabels_attr = 'types_nlabels';
   pdata(i).node_radius = 20;
+
+  i = 2;
+  pdata(i).datah5 = h5_raw_data_path;
+  pdata(i).chunk = chunk;
+  pdata(i).skelin = skelin;
+  pdata(i).lblsh5 = lblsh5;
+  pdata(i).name = name;
+  pdata(i).subgroups = {'with_background'};
+  pdata(i).segparam_attr = '';
+  pdata(i).segparams = [0.7 0.8 0.9 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999];
+  pdata(i).nlabels_attr = 'types_nlabels';
+  pdata(i).node_radius = 120;
 
   p = struct;  % input parameters independent of dataset
 
