@@ -1,5 +1,10 @@
 
-function po = knossos_efpl_plot(pdata,o,p)
+function po = knossos_efpl_plot(output_path, pdata,o,p)
+
+if ~isfolder(output_path)
+    mkdir(output_path)
+end
+
 
 useColorOrder = ~verLessThan('matlab','8.4');
 
@@ -279,6 +284,9 @@ title(sprintf('none: %d skels, median %.2f (%.4f)\nhuge: %d skels, median %.2f (
   nskels(1),pl_actual_median(1),inpl_actual_median(1),nskels(2),pl_actual_median(2),inpl_actual_median(2),pt,pin,...
   pl_actual_iqr(1,1),pl_actual_iqr(1,2),pl_actual_iqr(2,1),pl_actual_iqr(2,2)));
 
+savefig(fullfile(output_path,'1000.fig'))
+exportgraphics(gcf(), fullfile(output_path,'1000.png'))
+
 % subplot(2,2,4);
 % plot(pl_cdf_roc(1,:),inpl_cdf_roc(1,:));
 % hold on; %if useColorOrder, set(gca, 'ColorOrderIndex', 1); end
@@ -376,6 +384,8 @@ set(gca,'ylim',[-0.025 0.8],'xlim',[-0.025 0.5]); box off
 title(sprintf('maxd=%g\n%g %g\n@merged nodes=%g %g',abs(m(2)-m(1)),m(1),m(2),...
   merge_fracnodes(1,mi(1)),merge_fracnodes(2,mi(2))));
 
+savefig(fullfile(output_path,sprintf('%d.fig', figno-1 +1000)))
+exportgraphics(gcf(), fullfile(output_path,sprintf('%d.png', figno-1+1000)))
 
 
 
@@ -580,6 +590,9 @@ else
   ylabel('ARE, [0,1], 1-Fscore');
 end
 
+savefig(fullfile(output_path,sprintf('%d.fig', figno-1+1000)))
+exportgraphics(gcf(), fullfile(output_path,sprintf('%d.png', figno-1+1000)))
+
 
 
 
@@ -666,6 +679,8 @@ plot(lnlabels(2,mi(2)),combined_eftpl(2,mi(2)),'x');
 title(sprintf('max tefpl=%g %g\n@nlabels=%g %g',m(1),m(2),...
   nlabels(1,mi(1)),nlabels(2,mi(2))));
 
+savefig(fullfile(output_path,sprintf('%d.fig', figno-1+1000)))
+exportgraphics(gcf(), fullfile(output_path,sprintf('%d.png', figno-1+1000)))
 
 
 if p.plot_efpl_diameters

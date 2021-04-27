@@ -11,8 +11,7 @@ rule all:
         #expand( root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5', 
         #    ident=['M0007', 'M0027']),
         #    ident=['M0007']),
-        root + '/data_out/tutorial_ECS/xfold/M0007_output.mat',
-        'plot_metrics.chpt'
+        root + '/data_out/tutorial_ECS/xfold/M0007_plots/1000.fig',
 
 
 rule merge_predicted_probabilities:
@@ -77,16 +76,21 @@ rule produce_metrics:
     params:
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     envmodules:
-        'matlab/R2019b'
+        'matlab/R2020b'
     shell:
         """matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', [{params.chunk}])" """
 
 rule plot_metrics:
     output:
-        touch('plot_metrics.chpt')
+        fig1000 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1000.fig',
+        fig1001 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1001.fig',
+        fig1002 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1002.fig',
+        fig1003 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1003.fig',
     input:
+        root + '/data_out/tutorial_ECS/xfold/{ident}_output.mat'
     params:
+        output_path = lambda wc: root + f'/data_out/tutorial_ECS/xfold/{wc.ident}_plots',
     envmodules:
-        'matlab/R2019b'
+        'matlab/R2020b'
     shell:
-        """matlab -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_plot_top_snakemake()" """
+        """matlab -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_plot_top_snakemake('{params.output_path}')" """
