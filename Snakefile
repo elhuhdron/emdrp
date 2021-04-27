@@ -50,7 +50,7 @@ rule apply_watershed_on_ICS_probability:
         size = lambda wc: config['datasets'][wc.ident]['size'],
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     resources:
-        time='24:00:00', # TODO: Change to realistic runtime
+        time='12:00:00',
         partition="p.axon",
         mem="32000",
         cpus_per_task="2",
