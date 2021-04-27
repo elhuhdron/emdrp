@@ -22,14 +22,12 @@
 
 % Top level script for calling knossos_efpl.m to calculate path lengths for different datasets.
 
-function knossos_efpl_top_snakemake()
+function knossos_efpl_top_snakemake(output_file_path, lblsh5, h5_raw_data_path, skelin, chunk)
 
-  h5_raw_data_path = '/axon/scratch/pwatkins/datasets/raw/M0007_33_39x35x7chunks_Forder.h5';
-  chunk =  [16 17 0];
-  skelin = '/soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/skeletons/M0007_33_dense_skels.152.nml';
-  lblsh5 = '/u/erjelli/link_scratch/2021-04-20_emasm/data_out/tutorial_ECS/xfold/M0007_supervoxels.h5'
-  outpath = '/u/erjelli/link_scratch/2021-04-20_emasm/data_out/tutorial_ECS/xfold/'
-  name = 'dummy';
+  [outpath, outfile, ~] = fileparts(output_file_path)
+  output_file_path = fullfile(outpath, outfile)
+
+  name = 'efpl_placeholder';
   skeleton_mode = true;
 
 
@@ -148,5 +146,6 @@ function knossos_efpl_top_snakemake()
   end
 
   % save the results
-  save(fullfile(outpath, 'output_stuff'),'p','pdata','o');
+  fprintf('Save output in: %s\n', output_file_path)
+  save(output_file_path,'p','pdata','o');
 end

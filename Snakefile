@@ -11,7 +11,7 @@ rule all:
         #expand( root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5', 
         #    ident=['M0007', 'M0027']),
         #    ident=['M0007']),
-        'matlab_script.chkpt',
+        root + '/data_out/tutorial_ECS/xfold/M0007_output.mat',
 
 rule merge_predicted_probabilities:
     output:
@@ -67,9 +67,15 @@ rule apply_watershed_on_ICS_probability:
 
 rule produce_metrics:
     output:
-        touch('matlab_script.chkpt')
+       root + '/data_out/tutorial_ECS/xfold/{ident}_output.mat'
+    input:
+        h5_raw_data_path = '/axon/scratch/pwatkins/datasets/raw/{ident}_33_39x35x7chunks_Forder.h5',
+        lblsh5 = root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5',
+        skelin = '/soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/skeletons/{ident}_33_dense_skels.152.nml',
+    params:
+        chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     envmodules:
         'matlab/R2019b'
     shell:
-        """matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake()" """
-
+        """echo "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', '[{params.chunk}]')" """ +
+        """&& matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', [{params.chunk}])" """
