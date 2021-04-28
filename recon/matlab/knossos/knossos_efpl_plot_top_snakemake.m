@@ -1,11 +1,11 @@
 
-function knossos_efpl_plot_top_snakemake(output_path)
+function knossos_efpl_plot_top_snakemake(output_path, input_mat)
 
 fprintf('Output path: %s\n', output_path)
 
 load_files = {
-  '/u/erjelli/link_scratch/2021-04-20_emasm/data_out/tutorial_ECS/xfold/M0007_output.mat',
-  '/u/erjelli/link_scratch/2021-04-20_emasm/data_out/tutorial_ECS/xfold/M0007_output.mat'
+  input_mat,
+  input_mat
 };
 
 % gets appended to legend names for each load_file/index, leave empty for none
@@ -19,10 +19,8 @@ for i = 1:nload
   if ~strcmp(cur_load,load_files{i})
     X = load(load_files{i});
   end
-  disp(X)
   
   o{i} = X.o{load_indices(i)};
-  disp(i)
   pdata{i} = X.pdata(load_indices(i));
   pefpl{i} = X.p;
   cur_load = load_files{i}; % avoid reloading the same mat file over and over if we don't need to
