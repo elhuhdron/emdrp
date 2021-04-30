@@ -9,13 +9,34 @@ from pathlib import Path
 localrules:
     merge_predicted_probabilities,
     produce_metrics,
-    plot_metrics
+    plot_metrics,
+    store_volume_in_correct_location,
 
 
 rule all:
     input:
-        expand(root + '/data_out/tutorial_ECS/xfold/M0007_plots/1000.fig',
-            ident=['M0007', 'M0027']),
+        #expand(root + '/data_out/tutorial_ECS/xfold/M0007_plots/1000.fig',
+        #    ident=['M0007', 'M0027']),
+        root + '/data_vols/M0007_random_test.h5',
+        root + '/data_vols/M0007_original_test.h5',
+
+
+rule store_volume_in_correct_location:
+    output:
+        root + '/data_vols/{ident}_{type}_{extra}.h5'
+    input:
+        root + '/data_restored/{ident}_{type}_{extra}.h5'
+    params:
+        original_volume = lambda wc: config['datasets'][wc.ident]['original_volume'],
+        chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
+        size = lambda wc: config['datasets'][wc.ident]['size'],
+        dataset_name = 'data_mag1',
+    conda:
+        'environment.yml'
+    shell:
+         "recon/emdrp/dpWriteh5.py --srcfile {params.original_volume} --outfile {output} " +
+         "--chunk {params.chunk} --size {params.size} " +
+         "--offset 0 0 0 --dataset {params.dataset_name} --inraw {input} --dpW"
 
 
 rule merge_predicted_probabilities:

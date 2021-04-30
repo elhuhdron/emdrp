@@ -216,6 +216,9 @@ class dpWriteh5(dpLoadh5):
             data, hdr, info = dpWriteh5.gipl_read_volume(self.inraw)
             if 'scale' not in self.data_attrs:
                 self.data_attrs['scale'] = hdr['scales'][:3]
+        elif ext == 'h5':
+            with h5py.File(self.inraw, 'r') as h5file:
+                data = h5file[self.dataset][:]
         else:
             if self.inraw_bigendian:
                 data = np.fromfile(self.inraw,dtype=self.data_type_out).byteswap(True)
