@@ -14,4 +14,4 @@ dependencies:
   - python-snappy
   - pip:
     - czifile
-    - --editable ../../recon # is executed in ./.snakemake/conda
+    - --editable ../../ # TODO: Create setup.py such that the file can debugged locally again ...

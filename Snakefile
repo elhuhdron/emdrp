@@ -4,6 +4,13 @@
 configfile: "config.yml"
 root = config['local_data_path']
 
+
+# Workaround for rest2skel; Better: add all shell scripts to PATH environment variable via setup tools ...
+if 'emdrp' in workflow.modules.keys():
+    cwd = str(Path(workflow.modules['emdrp'].snakefile).parent) 
+else:
+    cwd = '.'
+
 from pathlib import Path
 
 localrules:
@@ -34,7 +41,8 @@ rule store_volume_in_correct_location:
     conda:
         'environment.yml'
     shell:
-         "recon/emdrp/dpWriteh5.py --srcfile {params.original_volume} --outfile {output} " +
+         f"{cwd}/recon/emdrp/dpWriteh5.py" +
+         " --srcfile {params.original_volume} --outfile {output} " +
          "--chunk {params.chunk} --size {params.size} " +
          "--offset 0 0 0 --dataset {params.dataset_name} --inraw {input} --dpW"
 
@@ -58,7 +66,7 @@ rule merge_predicted_probabilities:
     conda:
         'environment.yml'
     shell:
-        'python -u recon/emdrp/dpMergeProbs.py' +
+        f'python -u {cwd}/recon/emdrp/dpMergeProbs.py' +
         ' --srcpath {params.src_path}' +
         ' --srcfiles {params.srcfiles}' +
         ' --dim-orderings {params.dim_order}' +
@@ -77,13 +85,13 @@ rule apply_watershed_on_ICS_probability:
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     resources:
         time='12:00:00',
-        partition="p.axon",
+        partition="p.gpu", # since cpu queue is full
         mem="32000",
         cpus_per_task="2",
     conda:
         'environment.yml'
     shell:
-        'python -u recon/emdrp/dpWatershedTypes.py' +
+        f'python -u {cwd}/recon/emdrp/dpWatershedTypes.py' +
         ' --probfile {input}' +
         ' --chunk {params.chunk} --offset 0 0 0 --size {params.size}' +
         ' --outlabels {output}' +
@@ -102,7 +110,7 @@ rule produce_metrics:
     envmodules:
         'matlab/R2020b'
     shell:
-        """matlab -nojvm -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', [{params.chunk}])" """
+        f"""matlab -nojvm -nosplash -batch "addpath(genpath('{cwd}/recon/matlab'));""" + """ knossos_efpl_top_snakemake('{output}', '{input.lblsh5}', '{input.h5_raw_data_path}', '{input.skelin}', [{params.chunk}])" """
 
 rule plot_metrics:
     output:
@@ -117,4 +125,4 @@ rule plot_metrics:
     envmodules:
         'matlab/R2020b'
     shell:
-        """matlab -nosplash -batch "addpath(genpath('recon/matlab')); knossos_efpl_plot_top_snakemake('{params.output_path}', '{input.input_mat}')" """
+        f"""matlab -nosplash -batch "addpath(genpath('{cwd}/recon/matlab'));""" + """ knossos_efpl_plot_top_snakemake('{params.output_path}', '{input.input_mat}')" """
