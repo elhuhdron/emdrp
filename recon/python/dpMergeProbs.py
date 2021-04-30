@@ -163,6 +163,8 @@ class dpMergeProbs(object):
                     probs[i][k] = cprobs.max(axis=3)
                 else:
                     assert(False) # bad op
+                if self.sigmoid:
+                    probs[i][k] = 1. / (1 + np.exp(-probs[i][k]))
         return probs
 
     @staticmethod
@@ -190,6 +192,7 @@ class dpMergeProbs(object):
             help='Size in voxels to read')
         p.add_argument('--subgroups-out', nargs='*', type=str, default=[], metavar=('GRPS'),
             help='List of groups to identify subgroup for the output dataset (empty for top level)')
+        p.add_argument('--sigmoid', action='store_true', help='apply sigmoid after merging probs')
 
         p.add_argument('--outprobs', nargs=1, type=str, default='', metavar='FILE',
             help='Voxel type probs h5 output file')
