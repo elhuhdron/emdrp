@@ -1,21 +1,24 @@
  local_data_path: /u/erjelli/link_scratch/2021-04-20_emasm
 
- datasets:
+datasets:
   M0007:
     size: [1024, 1024, 512] # xyz
     chunk: [16, 17, 0] # xyz
     EM_mean: 152
     EM_std: 60.5
     original_volume:  /soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/M0007_33_39x35x7chunks_Forder.h5
+    skeleton: /soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/skeletons/M0007_33_dense_skels.152.nml
   M0027:
     size: [1024, 1024, 512] #xyz
     chunk: [12, 14, 2] # xyz
     EM_mean: 159
     EM_std: 50
     original_volume:  /soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/M0027_11_33x37x7chunks_Forder.h5
+    skeleton: /soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/skeletons/M0027_11_dense_skels.186.nml
   test:
     size: [1024, 1024, 512] # xyz
     chunk: [0, 0, 0] #xyz
     EM_mean: 152
     EM_std: 60.5
     original_volume:  /soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/M0007_33_39x35x7chunks_Forder.h5
+    skeleton: /soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/skeletons/M0007_33_dense_skels.152.nml

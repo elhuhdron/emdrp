@@ -41,14 +41,18 @@ rule store_volume_in_correct_location:
 
 rule merge_predicted_probabilities:
     output:
-        root + '/data_out/tutorial_ECS/xfold/{ident}_probs.h5',
+        root + '/data_out/{ident}_{type}_{extra}_probs.h5',
     input:
-        expand(root + '/data_out/tutorial_ECS/xfold/{{ident}}_{replicate}.0_probs.h5',
-            replicate = glob_wildcards(root + '/data_out/tutorial_ECS/xfold/{{ident}}_{replicate}.0_probs.h5').replicate),
+        expand(root + '/data_out/{{ident}}_{{type}}_{{extra}}_{replicate}.0_probs.h5',
+            replicate =range(4)),
+    wildcard_constraints:
+        ident="(M0007)|(M0027)",
+        type="[^_]+",
+        extra="[^_]+",
     params:
-        src_path = root + '/data_out/tutorial_ECS/xfold/',
-        srcfiles = lambda wc: [p.name for p in Path(root + '/data_out/tutorial_ECS/xfold/').glob(f'{wc.ident}_*.0_probs.h5')],
-        dim_order = lambda wc: ['xyz' for p in Path(root + '/data_out/tutorial_ECS/xfold/').glob(f'{wc.ident}_*.0_probs.h5')],
+        src_path = root + '/data_out/',
+        srcfiles = lambda wc: [p.name for p in Path(root + '/data_out/').glob(f'{wc.ident}_{wc.type}_{wc.extra}_*.0_probs.h5')],
+        dim_order = lambda wc: ['xyz' for p in Path(root + '/data_out/').glob(f'{wc.ident}_{wc.type}_{wc.extra}_*.0_probs.h5')],
         size = lambda wc: config['datasets'][wc.ident]['size'],
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     conda:
@@ -65,9 +69,9 @@ rule merge_predicted_probabilities:
 
 rule apply_watershed_on_ICS_probability:
     output:
-         root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5',
+         root + '/data_out/{ident}_{type}_{extra}_supervoxels.h5',
     input:
-        root + '/data_out/tutorial_ECS/xfold/{ident}_probs.h5'
+        root + '/data_out/{ident}_{type}_{extra}_probs.h5'
     params:
         size = lambda wc: config['datasets'][wc.ident]['size'],
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
@@ -88,11 +92,11 @@ rule apply_watershed_on_ICS_probability:
 
 rule produce_metrics:
     output:
-       root + '/data_out/tutorial_ECS/xfold/{ident}_output.mat'
+       root + '/data_out/{ident}_{type}_{extra}_output.mat'
     input:
-        h5_raw_data_path = '/axon/scratch/pwatkins/datasets/raw/{ident}_33_39x35x7chunks_Forder.h5',
-        lblsh5 = root + '/data_out/tutorial_ECS/xfold/{ident}_supervoxels.h5',
-        skelin = '/soma/soma_fs/cne/pwatkins/cne_nas_bkp/from_externals/ECS_paper/skeletons/{ident}_33_dense_skels.152.nml',
+        h5_raw_data_path = lambda wc: config['datasets'][wc.ident]['original_volume'],
+        lblsh5 = root + '/data_out/{ident}_{type}_{extra}_supervoxels.h5',
+        skelin = lambda wc: config['datasets'][wc.ident]['skeleton'],
     params:
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     envmodules:
@@ -102,14 +106,14 @@ rule produce_metrics:
 
 rule plot_metrics:
     output:
-        fig1000 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1000.fig',
-        fig1001 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1001.fig',
-        fig1002 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1002.fig',
-        fig1003 = root + '/data_out/tutorial_ECS/xfold/{ident}_plots/1003.fig',
+        fig1000 = root + '/data_out/{ident}_{type}_{extra}_plots/1000.fig',
+        fig1001 = root + '/data_out/{ident}_{type}_{extra}_plots/1001.fig',
+        fig1002 = root + '/data_out/{ident}_{type}_{extra}_plots/1002.fig',
+        fig1003 = root + '/data_out/{ident}_{type}_{extra}_plots/1003.fig',
     input:
-        input_mat = root + '/data_out/tutorial_ECS/xfold/{ident}_output.mat'
+        input_mat = root + '/data_out/{ident}_{type}_{extra}_output.mat'
     params:
-        output_path = lambda wc: root + f'/data_out/tutorial_ECS/xfold/{wc.ident}_plots',
+        output_path = lambda wc: root + f'/data_out/{wc.ident}_{wc.type}_{wc.extra}_plots',
     envmodules:
         'matlab/R2020b'
     shell:
