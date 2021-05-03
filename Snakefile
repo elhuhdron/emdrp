@@ -84,7 +84,7 @@ rule apply_watershed_on_ICS_probability:
         size = lambda wc: config['datasets'][wc.ident]['size'],
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     resources:
-        time='12:00:00',
+        time='24:00:00', # the runtime depends on the number of labels
         partition="p.gpu", # since cpu queue is full
         mem="64000",
         cpus_per_task="2",
