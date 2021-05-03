@@ -86,7 +86,7 @@ rule apply_watershed_on_ICS_probability:
     resources:
         time='12:00:00',
         partition="p.gpu", # since cpu queue is full
-        mem="32000",
+        mem="64000",
         cpus_per_task="2",
     conda:
         'environment.yml'
