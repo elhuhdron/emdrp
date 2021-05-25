@@ -13,5 +13,7 @@ dependencies:
   - scikit-image
   - python-snappy
   - pip:
+    - vtk
     - czifile
-    - --editable ../../ # TODO: Create setup.py such that the file can debugged locally again ...
+    - wknml
+    - --editable ../../
