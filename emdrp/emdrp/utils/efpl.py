@@ -5,29 +5,36 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
     # rand_error_rate is optional, but if specified contains all non-negative entries,
     #   then make a pass for each rand error rate entry.
     if rand_error_rate is None:
-        rand_error_rate = -1
+        rand_error_rate = np.array([-1])
+    else:
+        rand_error_rate = np.array(rand_error_rate)
+
+    npasses = len(rand_error_rate)
 
     # if rand_error_rate is not specified or has negative entries then make four passes:
     #   (1) splits only (2) mergers only (3) split or merger errors (4) split and merger errors
-    if np.any(rand_error_rate < 0):
+    if np.any(np.array(rand_error_rate) < 0):
         npasses = p.npasses_edges
-        rand_error_rate = -np.ones((1,npasses))
+        rand_error_rate = -np.ones((npasses,))
 
     efpl = [np.zeros((p.nalloc,1)) for i in range(npasses)]
-    efpl_cnt = np.zeros((npasses, 1))
+    efpl_cnt = np.zeros((npasses,), dtype=int)
     # keep track of where each thing starts on the efpl lists
-    efpl_thing_ptr = np.zeros((o.nThings,npasses))
+    efpl_thing_ptr = np.zeros((o.nThings,npasses), dtype=int)
 
     # feature added after the paper, associated each edge with it's final efpl for it's "connected edges"
-    efpl_edges = []
+    efpl_edges = [[[] for n in range(o.nThings)] for pass_ in range(npasses) ]
 
-    randcnt = 1
-    rands = np.random.rand(1,p.nalloc);  # for rand_error_rate
+    randcnt = 0
+    rands = np.random.rand(p.nalloc);  # for rand_error_rate
     nalloc = 5000;   # local allocation max, just for node stacks
     # need to calculate split efpl and merger efpl separately
+   
+    if (nodes_to_labels is not None):
+        # Requirement: Node ids are continous and start from 0 so that they can be used as indices: 
+        for n in range(o.nThings):
+            assert(np.all(np.arange(len(nodes_to_labels[n]), dtype=int) == np.unique([id for edge in o.info[n].edges for id in edge])))
 
-    npasses = 3    
-    
     for pass_ in range(npasses):
         for n in range(o.nThings):
             if o.omit_things_use[n]:
@@ -36,12 +43,12 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
 
             # feature added after the paper, associated each edge with it's final efpl for it's "connected edges".
             # only do this for error free edges (as error edges either don't count, or count half on two different componets).
-            efpl_edges[pass_][n] = np.nan((2,o.nedges[n]))
+            efpl_edges[pass_][n] = np.full((2,o.nedges[n]), np.nan)
             edges_comps = np.zeros((2,o.nedges[n]))
             ncomps = 0
 
             # keep updated set of unvisited edges
-            edges_unvisited = o.edges_use[n]
+            edges_unvisited = o.edges_use[n].copy()
             cur_edges = o.info[n].edges[edges_unvisited, :]
             # stack to return to nodes when an error has occurred along the current path.
             # second index is to store the half path length of the edge on which the error ocurred.
@@ -53,7 +60,6 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
             cur_nodes = np.zeros((nalloc,1))
             cur_node_cnt = 0;   
             
-            
             while np.any(edges_unvisited):
                 # find an end point in the remaining edges
                 cur_nodes_hist = np.bincount([n  for e in cur_edges for n in e])
@@ -64,7 +70,7 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                 # just take any node with edges that have not been visited.
                 if end_node is None:
                     end_node = np.where(cur_nodes_hist > 0)[0][0]
-                    assert(end_node is not None)
+                    assert(len(end_node) > 0)
 
                 ncomps = ncomps + 1; # start new component (for current thing)
                 # push end node (or starting node) onto the next node stack with zero current path length
@@ -86,15 +92,15 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                     # if there are no remaining edges out of this node then 
                     #   we've reached an end point without any more nodes after the last error.
                     # save the half length of the previous edge that was stored on the next_nodes stack.
-                    if cur_node_edges is None:
+                    if len(cur_node_edges) == 0:
                         efpl_cnt[pass_] = efpl_cnt[pass_]+1
                         efpl[pass_][efpl_cnt[pass_]] = cur_efpl          
                         # associate this efpl with all edges that were involved in it.
                         # error edges will record the efpl for both components.
                         sel = edges_comps==cur_comp
                         efpl_edges[pass_][n][sel] = cur_efpl
-                        selcnt = np.sum(sel,2)
-                        assert( (selcnt(1)==1 and selcnt(2)==0) or (selcnt(1)==0 and selcnt(2)==1) )
+                        selcnt = np.sum(sel,1)
+                        assert( (selcnt[0]==1 and selcnt[0]==0) or (selcnt[0]==0 and selcnt[1]==1) )
                         continue
 
                     # push the onto current node stack with current path length
@@ -112,7 +118,7 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
 
                         # if there are no remaining edges out of this node, we've reached
                         #   the end of this path, continue to any remaining branch points
-                        if cur_node_edges is None:
+                        if len(cur_node_edges) == 0:
                             continue
 
                         # if this node has more than one edge remaining (branch), 
@@ -122,11 +128,13 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                             cur_nodes[cur_node_cnt] = cur_node
 
                         # take the first edge out of this node, get both nodes connected to this edge
+                        # Comment(erjel): n1 & n2 are nml ids and not list idcs!
                         n1 = cur_edges[cur_node_edges[0],0]
                         n2 = cur_edges[cur_node_edges[0],1]
                         # get the original edge number, should only be one edge
-                        e = np.where(np.all(o.info[n].edges == np.matlib.repmat([n1, n2],[o.nedges[n], 1])))[0]
+                        e = np.where(np.all(o.info[n].edges == np.array([n1, n2]), axis=1))[0]
                         assert( len(e) == 1 )
+                        e = e[0]
 
                         # figure out which is the other node connected to this edge
                         if cur_node == n1:
@@ -185,11 +193,11 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                     efpl_edges[pass_][n][sel] = cur_efpl
 
             # sanity check - verify that total efpl is equal to the path length for this thing
-            assert( not p.count_half_error_edges and
-            (abs(sum(efpl[pass_](range(efpl_thing_ptr[n,pass_],efpl_cnt[pass_])) - o.path_length_use[n])) < p.tol ))
+            assert( not p.count_half_error_edges or
+            (np.abs(np.sum(efpl[pass_][efpl_thing_ptr[n,pass_]:efpl_cnt[pass_]+1]) - o.path_length_use[n]) < p.tol ))
 
-        # prune down from allocated size to actual list of efpls
-        efpl[pass_] = efpl[pass_][np.arange(efpl_cnt[pass_], dtype=int)]
+        
+        efpl[pass_] = efpl[pass_][1:efpl_cnt[pass_]+1]
 
     return (efpl, efpl_thing_ptr, efpl_edges)
 
@@ -204,17 +212,17 @@ def checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_label
     n2lbl = nodes_to_labels[n][n2]
     assert( not (n1lbl == p.empty_label | n2lbl == p.empty_label) )
     # do not count a merger for nodes that fall into background areas, these are counted as splits
-    merge_error_occurred = ( ((n1lbl >= 0) & label_merged[n1lbl]) | ((n2lbl >= 0) & label_merged[n2lbl]) )
+    merge_error_occurred = ( ((n1lbl < 0) & label_merged[n1lbl]) | ((n2lbl < 0) & label_merged[n2lbl]) )
 
     # up to four passes over edges are defined as:
-    #   (1) splits only (2) mergers only (3) split or merger errors (4) split and merger errors
-    if pass_==1:
+    #   (0) splits only (1) mergers only (2) split or merger errors (3) split and merger errors
+    if pass_==0:
         error_occurred = split_error_occurred
-    elif pass_==2:
+    elif pass_==1:
         error_occurred = merge_error_occurred
-    elif pass_==3:
+    elif pass_==2:
         error_occurred = (split_error_occurred | merge_error_occurred)
-    elif pass_==4:
+    elif pass_==3:
         error_occurred = (split_error_occurred & merge_error_occurred)
     else:
         assert( False )
