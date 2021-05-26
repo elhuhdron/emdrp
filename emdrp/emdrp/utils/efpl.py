@@ -99,7 +99,7 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
 
                     # push the onto current node stack with current path length
                     cur_node_cnt = cur_node_cnt+1
-                    cur_nodes[cur_node_cnt] = cur_node;
+                    cur_nodes[cur_node_cnt] = cur_node
 
                     # error free path length accumulates while cur_nodes stack is not empty
                     while cur_node_cnt > 0:
@@ -123,9 +123,9 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
 
                         # take the first edge out of this node, get both nodes connected to this edge
                         n1 = cur_edges[cur_node_edges[0],0]
-                        n2 = cur_edges[cur_node_edges(0),1]
+                        n2 = cur_edges[cur_node_edges[0],1]
                         # get the original edge number, should only be one edge
-                        e = np.where(np.all(o.info[n].edges == np.matlib.repmat([n1, n2],[o.nedges[n], 1]),2))
+                        e = np.where(np.all(o.info[n].edges == np.matlib.repmat([n1, n2],[o.nedges[n], 1])))[0]
                         assert( len(e) == 1 )
 
                         # figure out which is the other node connected to this edge
@@ -141,7 +141,7 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                             error_occurred = (rands[randcnt] < rand_error_rate[pass_])
                             randcnt = randcnt+1
                         else:
-                            error_occurred = checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_labels);
+                            error_occurred = checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_labels)
 
                         if error_occurred:
                             # optionally add half edge length at error edge
@@ -185,7 +185,7 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                     efpl_edges[pass_][n][sel] = cur_efpl
 
             # sanity check - verify that total efpl is equal to the path length for this thing
-            assert( ~p.count_half_error_edges and
+            assert( not p.count_half_error_edges and
             (abs(sum(efpl[pass_](range(efpl_thing_ptr[n,pass_],efpl_cnt[pass_])) - o.path_length_use[n])) < p.tol ))
 
         # prune down from allocated size to actual list of efpls
@@ -202,9 +202,9 @@ def checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_label
     # a merge error has occurred on this path if either node is involved in a merger.
     n1lbl = nodes_to_labels[n][n1]
     n2lbl = nodes_to_labels[n][n2]
-    assert( ~(n1lbl == p.empty_label | n2lbl == p.empty_label) )
+    assert( not (n1lbl == p.empty_label | n2lbl == p.empty_label) )
     # do not count a merger for nodes that fall into background areas, these are counted as splits
-    merge_error_occurred = ( ((n1lbl > 0) & label_merged(n1lbl)) | ((n2lbl > 0) & label_merged(n2lbl)) )
+    merge_error_occurred = ( ((n1lbl >= 0) & label_merged[n1lbl]) | ((n2lbl >= 0) & label_merged[n2lbl]) )
 
     # up to four passes over edges are defined as:
     #   (1) splits only (2) mergers only (3) split or merger errors (4) split and merger errors

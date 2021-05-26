@@ -188,3 +188,6 @@ octave-workspace
 
 # Visual studio code
 .vscode
+
+# Jupyter
+.ipynb_checkpoints
