@@ -1,5 +1,6 @@
 # Python version of the knossos_efpl.m
 import numpy as np
+from scipy.sparse import coo_matrix 
 
 from typing import NamedTuple, Optional, List
 import numpy.typing as npt
@@ -13,9 +14,10 @@ class Info(NamedTuple):
 
     Attributes:
         edges: List(ArrayLike[int]): Nodes which mark endpoint of each edge.
+        nodes: List(ArrayLike[float]): Positions of nodes.
     """
     edges: List[npt.ArrayLike]
-
+    nodes: List[npt.ArrayLike]
 
 class Outputs(NamedTuple):
     """
@@ -26,19 +28,23 @@ class Outputs(NamedTuple):
         omit_things_use (ArrayLike[bool]): Indexes False if "tree" with index is not included
             in analysis.
         nedges (ArrayLike[int]): Number of "edges" for each "tree".
+        nnodes (ArrayLike[int]): Number of "nodes" for each "tree".
         edge_length (list(ArrayLike[float])): Contains physical length of each edge in each tree.
         edges_use (list(ArrayLike[bool])): Marks edges which are included in the analysis.
         info (Info): Low level information of the involved nodes for each edge.
         path_length_use (ArrayLike(float)): Total length of all usable (defines be "edge_use") edges.
+        loadcorner (ArrayLike(int)): Corner of the loaded volume.
     """
 
     nThings: int
     omit_things_use: List[npt.ArrayLike]
     nedges: npt.ArrayLike
+    nnodes: npt.ArrayLike
     edge_length: List[npt.ArrayLike]
     edges_use: List[npt.ArrayLike]
     info: Info
     path_length_use: npt.ArrayLike
+    loadcorner: npt.ArrayLike
 
     @classmethod
     def gen_from_nml(self, nml):
@@ -49,7 +55,8 @@ class Outputs(NamedTuple):
             o (Outputs): Outputs instance which match nml.
         """
         tree_infos = [Info(
-                    edges =  np.array([[e.source, e.target] for e in t.edges])
+                    edges = np.array([[e.source, e.target] for e in t.edges]),
+                    nodes = np.array([n.position for n in t.nodes])
                     ) for t in nml.trees]
 
         edge_lengths = []
@@ -66,11 +73,14 @@ class Outputs(NamedTuple):
 
         self.nThings = len(nml.trees)
         self.omit_things_use =  np.zeros((len(nml.trees), 1), dtype=bool)
-        self.nedges =  [len(t.edges) for t in nml.trees]
+        self.nedges = [len(t.edges) for t in nml.trees]
+        self.nnodes = [len(t.nodes) for t in nml.trees]
         self.edge_length  = edge_lengths
         self.edges_use =  [np.ones((len(t.edges),), dtype=bool) for t in nml.trees]
         self.info = tree_infos
         self.path_length_use =  [np.sum(edge_length) for edge_length in edge_lengths]
+        self.loadcorner = np.asarray(nml.comments[0]['loadcorner'])
+        self.loadsize = np.asarray(nml.comments[0]['loadsize'])
 
         return self
 
@@ -92,14 +102,131 @@ class Parameters(NamedTuple):
         count_half_error_edges (Optional[bool]): Controls the path length counting for edges with errors.
             (False) deletes path length completely. (True) splits the edge into halves
             and thus preserves the total path length.
+        knossos_base ArrayLike[int]: Start indices of knossos. 
         tol (Optional[float]): Tolerance threshold for assert sanity checks.
     """
 
     npasses_edges: int
+    m_ij_threshold: float
     nalloc: Optional[int] = int(1e6)
     empty_label: Optional[np.uint32] = np.uint(2**32-1)
     count_half_error_edges: Optional[bool] = True
     tol: Optional[float] = 1e-5
+    knossos_base = np.ones((1,3), dtype=int)
+    python_base = np.zeros((1,3), dtype=int)
+    
+
+def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
+
+    # if this is exactly one of each skeleton, add some optimizations and sanity checks
+    allThings = (len(thing_list)==o.nThings) and np.all(np.arange(1,o.nThings) == thing_list)
+    if allThings:
+        edge_split = [None]*o.nThings
+        nodes_to_labels = [None]*o.nThings
+        things_labels_cnt = 0
+        things_labels = np.zeros((nnodes,2))
+    else:
+        edge_split = [None]*p.nalloc
+        nodes_to_labels = [None]*p.nalloc
+        things_labels_cnt = 0
+        things_labels = np.zeros((p.nalloc,2))
+
+    print(allThings)
+
+    cnt = -1
+    for n in thing_list:
+        # for re-sampling, count duplicate skeletons as if they were new skeletons in confusion matrix
+        if o.omit_things_use[n]:
+            continue
+        if allThings:
+            cnt = n
+        else:
+            cnt = cnt + 1
+        
+        # iterate over edges
+        edge_split[cnt] = np.zeros((o.nedges[n],), dtype=bool)
+        nodes_to_labels[cnt] = float(p.empty_label)*np.ones((o.nnodes[n],1))
+        for e in range(o.nedges[n]):
+            if not o.edges_use[n][e]:
+                continue
+             # current nodes involved in this edge
+            n1 = o.info[n].edges[e, 0]
+            n2 = o.info[n].edges[e, 1]
+            
+            # get the supervoxel label at both node points
+            n1pt = np.round(o.info[n].nodes[n1, :] - p.knossos_base)
+            n2pt = np.round(o.info[n].nodes[n2, :] - p.knossos_base)
+
+            # edge should have already been excluded on first iteration if out of bounds
+            n1subs = n1pt-o.loadcorner+p.python_base
+            assert( not (np.any(n1subs < 0) or np.any(n1subs >= o.loadsize)) )
+
+            n1lbl = Vlbls[n1subs[:, 0], n1subs[:, 1], n1subs[:, 2]]
+            n2subs = n2pt-o.loadcorner+p.python_base
+            assert( not (np.any(n2subs < 0) or np.any(n2subs >= o.loadsize)) )
+            n2lbl =Vlbls[n2subs[:, 0], n2subs[:, 1], n2subs[:, 2]]
+            
+            # edge should have already been excluded on first iteration if unlabeled
+            assert( not (n1lbl == p.empty_label or n2lbl == p.empty_label) )
+
+            # add tally for the supervoxels that current thing's nodes are in. do not include the same node twice 
+            # still include if labels are background, handle these situations by slicing confusion matrix below.
+            assert( not allThings or (things_labels_cnt <= nnodes) )
+            if nodes_to_labels[cnt][n1] == p.empty_label:
+                things_labels[things_labels_cnt,0] = cnt
+                things_labels[things_labels_cnt,1] = n1lbl
+                things_labels_cnt = things_labels_cnt+1
+
+            if nodes_to_labels[cnt][n2] == p.empty_label:
+                things_labels[things_labels_cnt,0] = cnt
+                things_labels[things_labels_cnt,1] = n2lbl
+                things_labels_cnt = things_labels_cnt+1
+            
+            # save the labels at the nodes so we don't have to look them up again.
+            nodes_to_labels[cnt][n1] = n1lbl
+            nodes_to_labels[cnt][n2] = n2lbl
+            
+            # count this edge as split if supervoxel labels are not the same
+            # count every edge that contains a node in background as a split.
+            edge_split[cnt][e] = (n1lbl==0) | (n2lbl==0) | (n1lbl != n2lbl)
+
+    # sanity check - make sure each used node was tallied once in the things to labels mapping.
+    if allThings:
+        cnt = o.nThings
+        assert( things_labels_cnt == nnodes )
+        node_count_hist = np.bincount(things_labels[:,1])
+        assert( all(node_count_hist == o.nnodes_use) )
+    else:
+        things_labels = things_labels[0:things_labels_cnt,:]
+        edge_split = edge_split[0:cnt]
+        nodes_to_labels = nodes_to_labels[0:cnt]
+
+
+    [m_ij, m_ijl, label_merged] = thingsLabelsToConfusion(p, things_labels, cnt+1, nlabels)
+
+    return (edge_split, label_merged, nodes_to_labels, m_ij, m_ijl, things_labels_cnt)
+
+
+def thingsLabelsToConfusion(p, things_labels, nThings, nlabels):
+    # the full confusion matrix that counts duplicates and includes background
+    # also overlap matrix, contingency or confusion matrix
+    print(things_labels[:, 0])
+    print(nlabels)
+    print(things_labels)
+    print(nThings)
+    m_ij = coo_matrix((np.ones(len(things_labels[:, 0])), (things_labels[:,0], things_labels[:,1]+1)), (nThings, nlabels+1))
+
+    # the logical (binary) confusion matrix that does not count duplicates
+    # use specified threshold for binarizing.
+    m_ijl = (m_ij >= p.m_ij_threshold)
+
+    # get boolean of supervoxel labels that contain mergers.
+    # do not include background label, as these are counted as splits if either node is in background label.
+    label_merged = (m_ijl > 1).sum(0)
+    label_merged = label_merged[2:]
+    return  (m_ij, m_ijl, label_merged)
+
+
 
 
 def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_rate=None):

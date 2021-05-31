@@ -1,8 +1,53 @@
 from emdrp.utils.efpl import *
+from numpy import dtype
 import pytest
 
 def test_imports():
     pass
+
+def test_parameters_attributes():
+    p = Parameters(
+        npasses_edges=3,
+        nalloc=int(1e6),
+        empty_label=np.uint32(2^32-1),
+        count_half_error_edges=True,
+        m_ij_threshold=1,
+        tol = 1e-5,)
+
+    for attr in ['m_ij_threshold','knossos_base' ]:
+        assert(hasattr(p,attr ))
+
+def test_outputs_info():
+    nml = util_get_nml()
+    o = Outputs.gen_from_nml(nml)
+    assert(np.all([hasattr(i, 'nodes') for i in o.info]))
+
+def test_outputs_info_nodes_shape():
+    nml = util_get_nml()
+    o = Outputs.gen_from_nml(nml)
+    assert(len(o.info[0].nodes.shape) == 2)
+    assert(o.info[0].nodes.shape[1] == 3)
+
+def test_outputs():
+    nml = util_get_nml()
+    o = Outputs.gen_from_nml(nml)
+    for attr in ['nnodes', 'loadcorner']:
+        assert(hasattr(o, attr))
+    return
+
+
+def test_labelsPassEdges():
+    nml = util_get_nml()
+    p = util_get_params()
+    o = Outputs.gen_from_nml(nml)
+
+    Vlbls = np.ones((5, 5, 5))
+    nnodes = sum([len(t.nodes) for t in nml.trees])
+    nlabels = 2
+    thing_list = np.arange(len(nml.trees))
+
+    labelsPassEdges(o, p, Vlbls, nnodes, nlabels, thing_list)
+
 
 def test_Outputs_gen_from_nml():
     nml = util_get_nml()
@@ -15,7 +60,6 @@ def test_Outputs_gen_from_nml():
     return
 
 def test_simple_skeleton():
-    import wknml
     nml = util_get_nml()
     p = util_get_params()
     o = Outputs.gen_from_nml(nml)
@@ -26,7 +70,6 @@ def test_simple_skeleton():
 
 
 def test_checkErrorAtEdge_function():
-    import wknml
     nml = util_get_nml()
     p = util_get_params()
     o = Outputs.gen_from_nml(nml)
@@ -46,6 +89,7 @@ def test_checkErrorAtEdge_function():
 
     return
 
+
 def test_labelsWalkEdges_ids_continous():
     """ Test requirement that node ids can be used as index labels """
     import wknml
@@ -60,8 +104,8 @@ def test_labelsWalkEdges_ids_continous():
                 color=(255, 255, 0, 1),
                 name='',
                 nodes=[
-                    wknml.Node(id=4, position=(1, 0, 0), radius=1),
-                    wknml.Node(id=5, position=(2, 0, 0), radius=1)
+                    wknml.Node(id=4, position=(2, 1, 1), radius=1),
+                    wknml.Node(id=5, position=(3, 1, 1), radius=1)
                 ],
                 edges=[
                     wknml.Edge(source=4, target=5),
@@ -69,7 +113,7 @@ def test_labelsWalkEdges_ids_continous():
             ),
         ],
         branchpoints=[],
-        comments=[],
+        comments=[{'loadcorner':(0, 0, 0), 'loadsize':(5, 5,5)}],
         groups=[],
     )
     
@@ -82,7 +126,6 @@ def test_labelsWalkEdges_ids_continous():
 
     with pytest.raises(AssertionError):
         labelsWalkEdges(o, p, edge_split, label_merged, nodes_to_labels)
-
 
 
 def test_simple_skeleton_efpl():
@@ -110,6 +153,7 @@ def util_get_params():
         nalloc=int(1e6),
         empty_label=np.uint32(2^32-1),
         count_half_error_edges=True,
+        m_ij_threshold=1,
         tol = 1e-5,
     )
 
@@ -123,10 +167,10 @@ def util_get_nml():
             color=(255, 255, 0, 1),
             name="Synapse 1",
             nodes=[
-                wknml.Node(id=0, position=(0, 0, 0), radius=1),
-                wknml.Node(id=1, position=(0, 0, 1), radius=1),
-                wknml.Node(id=2, position=(0, 0, 2), radius=1),
-                wknml.Node(id=3, position=(0, 1, 1), radius=1)],
+                wknml.Node(id=0, position=(1, 1, 1), radius=1),
+                wknml.Node(id=1, position=(1, 1, 2), radius=1),
+                wknml.Node(id=2, position=(1, 1, 3), radius=1),
+                wknml.Node(id=3, position=(1, 2, 2), radius=1)],
             edges=[
                 wknml.Edge(source=0, target=1),
                 wknml.Edge(source=1, target=2),
@@ -139,9 +183,9 @@ def util_get_nml():
             color=(255, 0, 255, 1),
             name="Synapse 2",
             nodes=[
-                wknml.Node(id=0, position=(1, 0, 0), radius=1),
-                wknml.Node(id=1, position=(2, 0, 0), radius=1),
-                wknml.Node(id=2, position=(3, 0, 0), radius=1)
+                wknml.Node(id=0, position=(2, 1, 1), radius=1),
+                wknml.Node(id=1, position=(3, 1, 1), radius=1),
+                wknml.Node(id=2, position=(4, 1, 1), radius=1)
             ],
             edges=[
                 wknml.Edge(source=0, target=1),
@@ -158,7 +202,9 @@ def util_get_nml():
         ),
         trees=trees,
         branchpoints=[],
-        comments=[],
+        comments=[{'loadcorner':(0,0,0),
+            'loadsize':(5, 5, 5),
+            }],
         groups=[],
     )
     
