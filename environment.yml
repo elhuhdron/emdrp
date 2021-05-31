@@ -12,6 +12,7 @@ dependencies:
   - matplotlib
   - scikit-image
   - python-snappy
+  - python==3.8
   - pip:
     - vtk
     - czifile

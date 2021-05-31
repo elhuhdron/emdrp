@@ -4,11 +4,21 @@ import pytest
 def test_imports():
     pass
 
+def test_Outputs_gen_from_nml():
+    nml = util_get_nml()
+    o = Outputs.gen_from_nml(nml)
+
+    assert(o.nThings == 2)
+    assert(o.nedges[0] == 3)
+    assert(len(o.path_length_use) == o.nThings)
+
+    return
+
 def test_simple_skeleton():
     import wknml
     nml = util_get_nml()
     p = util_get_params()
-    o = util_get_outputs(nml)
+    o = Outputs.gen_from_nml(nml)
 
     labelsWalkEdges(o,p,None, None, None, rand_error_rate=[1])
 
@@ -19,7 +29,7 @@ def test_checkErrorAtEdge_function():
     import wknml
     nml = util_get_nml()
     p = util_get_params()
-    o = util_get_outputs(nml)
+    o = Outputs.gen_from_nml(nml)
 
     edge_split = [np.zeros((len(t.edges), 1), dtype=bool) for t in nml.trees]
     nodes_to_labels = [t.id*np.ones((len(t.nodes), 1), dtype=int) for t in nml.trees]
@@ -64,7 +74,7 @@ def test_labelsWalkEdges_ids_continous():
     )
     
     p = util_get_params()
-    o = util_get_outputs(nml)
+    o = Outputs.gen_from_nml(nml)
 
     edge_split = [np.zeros((len(t.edges), 1), dtype=bool) for t in nml.trees]
     nodes_to_labels = [t.id*np.ones((len(t.nodes), 1), dtype=int) for t in nml.trees]
@@ -79,7 +89,7 @@ def test_simple_skeleton_efpl():
     import wknml
     nml = util_get_nml()
     p = util_get_params()
-    o = util_get_outputs(nml)
+    o = Outputs.gen_from_nml(nml)
 
     edge_split = [np.zeros((len(t.edges), 1), dtype=bool) for t in nml.trees]
     nodes_to_labels = [t.id*np.ones((len(t.nodes), 1), dtype=int) for t in nml.trees]
@@ -95,9 +105,6 @@ def test_simple_skeleton_efpl():
     assert(efpl[2][1] == 2)
 
 def util_get_params():
-    from collections import namedtuple
-    Parameters = namedtuple('Parameters', [
-        'npasses_edges', 'nalloc', 'empty_label', 'count_half_error_edges', 'tol'])
     p = Parameters(
         npasses_edges=3,
         nalloc=int(1e6),
@@ -107,39 +114,6 @@ def util_get_params():
     )
 
     return p
-
-
-def util_get_outputs(nml):
-    from collections import namedtuple
-    Outputs = namedtuple('Outputs', [
-        'nThings', 'omit_things_use', 'nedges', 'edge_length', 'edges_use', 'info', 'path_length_use'])
-    Info = namedtuple('Info', ['edges'])
-
-
-    edge_lengths = []
-    for t in nml.trees:
-        tree_edge_lengths = []
-        node_ids = [n.id for n in t.nodes]
-        node_positions = np.array([n.position for n in t.nodes])
-        for edge in t.edges:
-            p1 = node_positions[node_ids.index(edge.source), :]
-            p2 = node_positions[node_ids.index(edge.target), :]
-            edge_length = np.linalg.norm((p1-p2) * nml.parameters.scale)
-            tree_edge_lengths.append(edge_length)
-        edge_lengths.append(tree_edge_lengths)
-
-    o = Outputs(
-            nThings = len(nml.trees),
-            omit_things_use =  np.zeros((len(nml.trees), 1), dtype=bool),
-            nedges =  [len(t.edges) for t in nml.trees], 
-            edge_length  = edge_lengths,
-            edges_use =  [np.ones((len(t.edges),), dtype=bool) for t in nml.trees],
-            info = [Info(
-                edges =  np.array([[e.source, e.target] for e in t.edges])
-                ) for t in nml.trees],
-            path_length_use =  [np.sum(edge_length) for edge_length in edge_lengths],
-    )
-    return o
 
 def util_get_nml():
     import wknml

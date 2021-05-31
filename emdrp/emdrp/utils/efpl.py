@@ -1,7 +1,111 @@
 # Python version of the knossos_efpl.m
 import numpy as np
 
+from typing import NamedTuple, Optional, List
+import numpy.typing as npt
+
+from numpy.ma import array, notmasked_edges
+
+class Info(NamedTuple):
+    """
+    Low-level structure which holds skeleton edge information. Leftover from Matlab 
+    implementation.
+
+    Attributes:
+        edges: List(ArrayLike[int]): Nodes which mark endpoint of each edge.
+    """
+    edges: List[npt.ArrayLike]
+
+
+class Outputs(NamedTuple):
+    """
+    A emdrp output structure. Leftover from Matlab implementation.
+    
+    Attributes:
+        nThings (int): A unique identifier
+        omit_things_use (ArrayLike[bool]): Indexes False if "tree" with index is not included
+            in analysis.
+        nedges (ArrayLike[int]): Number of "edges" for each "tree".
+        edge_length (list(ArrayLike[float])): Contains physical length of each edge in each tree.
+        edges_use (list(ArrayLike[bool])): Marks edges which are included in the analysis.
+        info (Info): Low level information of the involved nodes for each edge.
+        path_length_use (ArrayLike(float)): Total length of all usable (defines be "edge_use") edges.
+    """
+
+    nThings: int
+    omit_things_use: List[npt.ArrayLike]
+    nedges: npt.ArrayLike
+    edge_length: List[npt.ArrayLike]
+    edges_use: List[npt.ArrayLike]
+    info: Info
+    path_length_use: npt.ArrayLike
+
+    @classmethod
+    def gen_from_nml(self, nml):
+        """
+        Shortcut to create Outputs instance from nml.
+
+        Returns:
+            o (Outputs): Outputs instance which match nml.
+        """
+        tree_infos = [Info(
+                    edges =  np.array([[e.source, e.target] for e in t.edges])
+                    ) for t in nml.trees]
+
+        edge_lengths = []
+        for t in nml.trees:
+            tree_edge_lengths = []
+            node_ids = [n.id for n in t.nodes]
+            node_positions = np.array([n.position for n in t.nodes])
+            for edge in t.edges:
+                p1 = node_positions[node_ids.index(edge.source), :]
+                p2 = node_positions[node_ids.index(edge.target), :]
+                edge_length = np.linalg.norm((p1-p2) * nml.parameters.scale)
+                tree_edge_lengths.append(edge_length)
+            edge_lengths.append(tree_edge_lengths)
+
+        self.nThings = len(nml.trees)
+        self.omit_things_use =  np.zeros((len(nml.trees), 1), dtype=bool)
+        self.nedges =  [len(t.edges) for t in nml.trees]
+        self.edge_length  = edge_lengths
+        self.edges_use =  [np.ones((len(t.edges),), dtype=bool) for t in nml.trees]
+        self.info = tree_infos
+        self.path_length_use =  [np.sum(edge_length) for edge_length in edge_lengths]
+
+        return self
+
+
+class Parameters(NamedTuple):
+    """
+    A emdrp parameter object.
+
+    Defines the parameter for the error free path length calculation. The calculation
+    depends on the error definition. A for-loop over the different implementations is
+    controled by the `npasses_edge` attribute which defines the range for the loop.
+    In loop (0): only splits are considered as errors. (1): only mergers. (2): split or
+    merger errors, and (3) split and merger errors.
+
+    Attributes:
+        npasses_edges (int): Path length error definition.
+        nalloc (Optional[int]): number of initialized element for edge stack.
+        empty_label (Optional[int]): Label value which corresponds to background.
+        count_half_error_edges (Optional[bool]): Controls the path length counting for edges with errors.
+            (False) deletes path length completely. (True) splits the edge into halves
+            and thus preserves the total path length.
+        tol (Optional[float]): Tolerance threshold for assert sanity checks.
+    """
+
+    npasses_edges: int
+    nalloc: Optional[int] = int(1e6)
+    empty_label: Optional[np.uint32] = np.uint(2**32-1)
+    count_half_error_edges: Optional[bool] = True
+    tol: Optional[float] = 1e-5
+
+
 def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_rate=None):
+    """ Translated from MATLAB implementation:
+    https://github.com/elhuhdron/emdrp/blob/00fefd48b6610df721fb6197835d824e23bb10af/recon/matlab/knossos/knossos_efpl.m#L978
+    """
     # rand_error_rate is optional, but if specified contains all non-negative entries,
     #   then make a pass for each rand error rate entry.
     if rand_error_rate is None:
@@ -128,7 +232,6 @@ def labelsWalkEdges(o,p,edge_split, label_merged, nodes_to_labels, rand_error_ra
                             cur_nodes[cur_node_cnt] = cur_node
 
                         # take the first edge out of this node, get both nodes connected to this edge
-                        # Comment(erjel): n1 & n2 are nml ids and not list idcs!
                         n1 = cur_edges[cur_node_edges[0],0]
                         n2 = cur_edges[cur_node_edges[0],1]
                         # get the original edge number, should only be one edge
