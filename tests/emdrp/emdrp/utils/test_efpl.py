@@ -31,13 +31,49 @@ def test_outputs_info_nodes_shape():
 def test_outputs():
     nml = util_get_nml()
     o = Outputs.gen_from_nml(nml)
-    for attr in ['nnodes', 'loadcorner']:
+    for attr in ['nnodes', 'loadcorner', 'nnodes_use']:
         assert(hasattr(o, attr))
     return
 
 
 def test_labelsPassEdges():
     nml = util_get_nml()
+    p = util_get_params()
+    o = Outputs.gen_from_nml(nml)
+
+    Vlbls = np.ones((5, 5, 5))
+    nnodes = sum([len(t.nodes) for t in nml.trees])
+    nlabels = 2
+    thing_list = np.arange(len(nml.trees))
+
+    labelsPassEdges(o, p, Vlbls, nnodes, nlabels, thing_list)
+
+
+def test_labelsPassEdges_float_coords():
+    import wknml
+    nml = wknml.NML(
+        parameters=wknml.NMLParameters(
+            name='',
+            scale=(1, 1, 1),
+        ),
+        trees=[
+            wknml.Tree(
+                id=0,
+                color=(255, 255, 0, 1),
+                name='',
+                nodes=[
+                    wknml.Node(id=0, position=(2., 1., 1.), radius=1),
+                    wknml.Node(id=1, position=(3., 1., 1.), radius=1)
+                ],
+                edges=[
+                    wknml.Edge(source=0, target=1),
+                ],
+            ),
+        ],
+        branchpoints=[],
+        comments=[{'loadcorner':(0, 0, 0), 'loadsize':(5, 5,5)}],
+        groups=[],
+    )
     p = util_get_params()
     o = Outputs.gen_from_nml(nml)
 

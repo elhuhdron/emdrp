@@ -32,8 +32,9 @@ class Outputs(NamedTuple):
         edge_length (list(ArrayLike[float])): Contains physical length of each edge in each tree.
         edges_use (list(ArrayLike[bool])): Marks edges which are included in the analysis.
         info (Info): Low level information of the involved nodes for each edge.
-        path_length_use (ArrayLike(float)): Total length of all usable (defines be "edge_use") edges.
-        loadcorner (ArrayLike(int)): Corner of the loaded volume.
+        path_length_use (ArrayLike[float]): Total length of all usable (defines be "edge_use") edges.
+        loadcorner (ArrayLike[int]): Corner of the loaded volume.
+        nnodes_use (list(ArrayLike[int])):  Marks nodes which are included in the analysis.
     """
 
     nThings: int
@@ -45,6 +46,7 @@ class Outputs(NamedTuple):
     info: Info
     path_length_use: npt.ArrayLike
     loadcorner: npt.ArrayLike
+    nnodes_use: npt.ArrayLike
 
     @classmethod
     def gen_from_nml(self, nml):
@@ -73,10 +75,12 @@ class Outputs(NamedTuple):
 
         self.nThings = len(nml.trees)
         self.omit_things_use =  np.zeros((len(nml.trees), 1), dtype=bool)
-        self.nedges = [len(t.edges) for t in nml.trees]
-        self.nnodes = [len(t.nodes) for t in nml.trees]
         self.edge_length  = edge_lengths
         self.edges_use =  [np.ones((len(t.edges),), dtype=bool) for t in nml.trees]
+        self.nodes_use = [np.ones((len(t.nodes),), dtype=bool) for t in nml.trees] # wrong!
+        self.nnodes_use = np.asarray([np.sum(nnodes_use) for nnodes_use in self.nodes_use])
+        self.nedges = np.asarray([np.sum(nedges_use) for nedges_use in self.edges_use])
+        self.nnodes = np.asarray([len(t.nodes) for t in nml.trees])
         self.info = tree_infos
         self.path_length_use =  [np.sum(edge_length) for edge_length in edge_lengths]
         self.loadcorner = np.asarray(nml.comments[0]['loadcorner'])
@@ -124,20 +128,19 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
         edge_split = [None]*o.nThings
         nodes_to_labels = [None]*o.nThings
         things_labels_cnt = 0
-        things_labels = np.zeros((nnodes,2))
+        things_labels = np.zeros((nnodes,2), dtype=int)
     else:
         edge_split = [None]*p.nalloc
         nodes_to_labels = [None]*p.nalloc
         things_labels_cnt = 0
-        things_labels = np.zeros((p.nalloc,2))
-
-    print(allThings)
+        things_labels = np.zeros((p.nalloc,2), dtype=int)
 
     cnt = -1
     for n in thing_list:
         # for re-sampling, count duplicate skeletons as if they were new skeletons in confusion matrix
         if o.omit_things_use[n]:
             continue
+
         if allThings:
             cnt = n
         else:
@@ -154,8 +157,8 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
             n2 = o.info[n].edges[e, 1]
             
             # get the supervoxel label at both node points
-            n1pt = np.round(o.info[n].nodes[n1, :] - p.knossos_base)
-            n2pt = np.round(o.info[n].nodes[n2, :] - p.knossos_base)
+            n1pt = np.rint(o.info[n].nodes[n1, :] - p.knossos_base).astype(int)
+            n2pt = np.rint(o.info[n].nodes[n2, :] - p.knossos_base).astype(int)
 
             # edge should have already been excluded on first iteration if out of bounds
             n1subs = n1pt-o.loadcorner+p.python_base
@@ -168,7 +171,6 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
             
             # edge should have already been excluded on first iteration if unlabeled
             assert( not (n1lbl == p.empty_label or n2lbl == p.empty_label) )
-
             # add tally for the supervoxels that current thing's nodes are in. do not include the same node twice 
             # still include if labels are background, handle these situations by slicing confusion matrix below.
             assert( not allThings or (things_labels_cnt <= nnodes) )
@@ -181,7 +183,6 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
                 things_labels[things_labels_cnt,0] = cnt
                 things_labels[things_labels_cnt,1] = n2lbl
                 things_labels_cnt = things_labels_cnt+1
-            
             # save the labels at the nodes so we don't have to look them up again.
             nodes_to_labels[cnt][n1] = n1lbl
             nodes_to_labels[cnt][n2] = n2lbl
@@ -189,13 +190,13 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
             # count this edge as split if supervoxel labels are not the same
             # count every edge that contains a node in background as a split.
             edge_split[cnt][e] = (n1lbl==0) | (n2lbl==0) | (n1lbl != n2lbl)
-
+        
     # sanity check - make sure each used node was tallied once in the things to labels mapping.
     if allThings:
         cnt = o.nThings
         assert( things_labels_cnt == nnodes )
-        node_count_hist = np.bincount(things_labels[:,1])
-        assert( all(node_count_hist == o.nnodes_use) )
+        node_count_hist = np.bincount(things_labels[:,0])
+        assert( np.all(node_count_hist == o.nnodes_use) )
     else:
         things_labels = things_labels[0:things_labels_cnt,:]
         edge_split = edge_split[0:cnt]
