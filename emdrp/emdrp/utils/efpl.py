@@ -38,7 +38,7 @@ class Outputs(NamedTuple):
     """
 
     nThings: int
-    omit_things_use: List[npt.ArrayLike]
+    omit_things_use: npt.ArrayLike
     nedges: npt.ArrayLike
     nnodes: npt.ArrayLike
     edge_length: List[npt.ArrayLike]
@@ -56,10 +56,20 @@ class Outputs(NamedTuple):
         Returns:
             o (Outputs): Outputs instance which match nml.
         """
-        tree_infos = [Info(
-                    edges = np.array([[e.source, e.target] for e in t.edges]),
-                    nodes = np.array([n.position for n in t.nodes])
-                    ) for t in nml.trees]
+
+        tree_infos = []
+        for tree in nml.trees:
+            edges = np.array([[e.source, e.target] for e in tree.edges])
+            nodes = np.array([n.position for n in tree.nodes])
+
+            edge_nodes = np.unique(edges.flatten())
+
+            nodes_new = np.zeros(edge_nodes[-1]+1, dtype=int)
+            nodes_new[edge_nodes] = np.arange(len(edge_nodes), dtype=int)
+
+            edges = nodes_new[edges]
+
+            tree_infos.append(Info(edges = edges, nodes = nodes))
 
         edge_lengths = []
         for t in nml.trees:
@@ -211,10 +221,6 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
 def thingsLabelsToConfusion(p, things_labels, nThings, nlabels):
     # the full confusion matrix that counts duplicates and includes background
     # also overlap matrix, contingency or confusion matrix
-    print(things_labels[:, 0])
-    print(nlabels)
-    print(things_labels)
-    print(nThings)
     m_ij = coo_matrix((np.ones(len(things_labels[:, 0])), (things_labels[:,0], things_labels[:,1]+1)), (nThings, nlabels+1))
 
     # the logical (binary) confusion matrix that does not count duplicates

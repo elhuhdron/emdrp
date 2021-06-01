@@ -35,6 +35,76 @@ def test_outputs():
         assert(hasattr(o, attr))
     return
 
+def test_outputs_gen_from_nml():
+    import wknml
+    nml = wknml.NML(
+        parameters=wknml.NMLParameters(
+            name='',
+            scale=(1, 1, 1),
+        ),
+        trees=[
+            wknml.Tree(
+                id=0,
+                color=(255, 255, 0, 1),
+                name='',
+                nodes=[
+                    wknml.Node(id=4, position=(2, 1, 1), radius=1),
+                    wknml.Node(id=5, position=(3, 1, 1), radius=1)
+                ],
+                edges=[
+                    wknml.Edge(source=4, target=5),
+                ],
+            ),
+        ],
+        branchpoints=[],
+        comments=[{'loadcorner':(0, 0, 0), 'loadsize':(5, 5,5)}],
+        groups=[],
+    )
+    
+    o = Outputs.gen_from_nml(nml)
+    assert(np.all(np.unique(o.info[0].edges.flatten()) == np.arange(len(o.info[0].nodes))))
+
+
+def test_labelsPassEdges_ids_continous():
+    """ Test requirement that node ids can be used as index labels """
+    import wknml
+    nml = wknml.NML(
+        parameters=wknml.NMLParameters(
+            name='',
+            scale=(1, 1, 1),
+        ),
+        trees=[
+            wknml.Tree(
+                id=0,
+                color=(255, 255, 0, 1),
+                name='',
+                nodes=[
+                    wknml.Node(id=4, position=(2, 1, 1), radius=1),
+                    wknml.Node(id=5, position=(3, 1, 1), radius=1)
+                ],
+                edges=[
+                    wknml.Edge(source=4, target=5),
+                ],
+            ),
+        ],
+        branchpoints=[],
+        comments=[{'loadcorner':(0, 0, 0), 'loadsize':(5, 5,5)}],
+        groups=[],
+    )
+    
+    p = util_get_params()
+    o = Outputs.gen_from_nml(nml)
+
+    Vlbls = np.ones((5, 5, 5))
+    nnodes = sum([len(t.nodes) for t in nml.trees])
+    nlabels = 2
+    thing_list = np.arange(len(nml.trees))
+
+    labelsPassEdges(o, p, Vlbls, nnodes, nlabels, thing_list)
+
+    #with pytest.raises(AssertionError):
+    labelsPassEdges(o, p, Vlbls, nnodes, nlabels, thing_list)
+
 
 def test_labelsPassEdges():
     nml = util_get_nml()
@@ -127,7 +197,6 @@ def test_checkErrorAtEdge_function():
 
 
 def test_labelsWalkEdges_ids_continous():
-    """ Test requirement that node ids can be used as index labels """
     import wknml
     nml = wknml.NML(
         parameters=wknml.NMLParameters(
@@ -160,8 +229,8 @@ def test_labelsWalkEdges_ids_continous():
     nodes_to_labels = [t.id*np.ones((len(t.nodes), 1), dtype=int) for t in nml.trees]
     label_merged = np.zeros((len(nml.trees), 1), dtype=bool)
 
-    with pytest.raises(AssertionError):
-        labelsWalkEdges(o, p, edge_split, label_merged, nodes_to_labels)
+    
+    labelsWalkEdges(o, p, edge_split, label_merged, nodes_to_labels)
 
 
 def test_simple_skeleton_efpl():
