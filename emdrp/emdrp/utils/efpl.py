@@ -467,3 +467,88 @@ def checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_label
         assert( False )
 
     return error_occurred
+
+import numpy as np
+import pandas as pd
+
+def calc_eftpl_pandas(nml, Vlbls, dataset_start):
+    
+    knossos_idx_start =  np.ones((1, 3), dtype=int)
+    
+    nodes = pd.DataFrame([n for t in nml.trees for n in t.nodes])
+
+    new_col_list = ['idx_x','idx_y','idx_z']
+    for n ,col in enumerate(new_col_list):
+        nodes[col] = nodes['position'].apply(lambda location: location[n])
+
+    nodes = nodes.drop(columns=['position', 'radius', 'rotation', 'inVp', 'inMag', 'bitDepth', 'interpolation', 'time'])
+
+    nodes = nodes.astype({c:int for c in nodes.columns})
+
+    nodes[['idx_x', 'idx_y', 'idx_z']] -= (dataset_start + knossos_idx_start)
+
+    nodes['label'] = Vlbls[nodes['idx_z'], nodes['idx_y'], nodes['idx_x']]
+
+    nodes[['position_x', 'position_y', 'position_z']] = nodes[['idx_x', 'idx_y', 'idx_z']] * np.array(nml.parameters.scale)
+
+    ### Extract, clean, and transform edge data from nml file
+
+    edges = pd.DataFrame(nml.trees)
+
+    edges = edges.drop(columns=['nodes', 'color', 'name', 'groupId'])
+    edges = edges.rename(columns={"id": "tree_id"})
+    edges = edges.explode('edges')
+
+    new_col_list = ['source_node','target_node']
+    for n ,col in enumerate(new_col_list):
+        edges[col] = edges['edges'].apply(lambda location: location[n])
+
+    edges = edges.drop(columns=['edges'])
+
+    ### Merge nodes into edges to get path lengths
+
+    edges = edges.merge(nodes[['id', 'position_x', 'position_y', 'position_z', 'label']], left_on='source_node', right_on='id')
+    edges = edges.merge(nodes[['id', 'position_x', 'position_y', 'position_z', 'label']], left_on='target_node', right_on='id', suffixes=['_source', '_target'])
+
+    edges = edges.drop(columns=['source_node', 'target_node', 'id_source', 'id_target'])
+
+    edges['path_length'] = np.linalg.norm(edges[['position_x_source', 'position_y_source', 'position_z_source']].values - edges[['position_x_target', 'position_y_target', 'position_z_target']].values )
+
+    edges = edges.drop(columns=[c for c in edges.columns if c.startswith('position_')])
+
+    ### Split error occurs if label at source node and label at target node are different
+
+    edges['has_split_error'] = edges['label_source'] != edges['label_target']
+
+    print(f'split error ratio = {edges.has_split_error.sum() / len(edges):.2f}')
+
+    ### Create third (labels) dataframe to collect information about errors
+
+    labels = edges[['label_target', 'label_source', 'tree_id']]
+
+    labels = labels.drop_duplicates()
+
+    labels = labels[['tree_id', 'label_target']].rename(columns={'label_target':'label'}).append(labels[['tree_id', 'label_source']].rename(columns={'label_source':'label'}))
+
+    labels = labels.drop_duplicates()
+
+    labels = labels.groupby('label', as_index=False).count()
+
+    labels['has_merge_error'] = labels['tree_id'] > 1
+
+    print(f'merge error ratio per label = {labels.has_merge_error.sum()/ len(labels):.2f}')
+
+    ### Use labels information for merge error per edge
+
+    edges = edges.merge(labels[['label', 'has_merge_error']], left_on='label_target', right_on='label')
+    edges = edges.merge(labels[['label', 'has_merge_error']], left_on='label_source', right_on='label')
+    edges['has_merge_error'] = edges['has_merge_error_x'] | edges['has_merge_error_y'] 
+
+    edges = edges.drop(columns=[c for c in edges.columns if (c.endswith('_x') or c.endswith('_y'))])
+
+    edges['is_error_free'] = np.logical_not(edges.has_merge_error | edges.has_split_error)
+
+    # Calculate total path lengths
+    eftpl = edges.path_length[edges.is_error_free].sum() / edges.path_length.sum()
+    
+    return eftpl
