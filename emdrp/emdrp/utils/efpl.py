@@ -158,7 +158,7 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
         
         # iterate over edges
         edge_split[cnt] = np.zeros((o.nedges[n],), dtype=bool)
-        nodes_to_labels[cnt] = float(p.empty_label)*np.ones((o.nnodes[n],1))
+        nodes_to_labels[cnt] = int(p.empty_label)*np.ones(o.nnodes[n], dtype=int)
         for e in range(o.nedges[n]):
             if not o.edges_use[n][e]:
                 continue
@@ -174,10 +174,10 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
             n1subs = n1pt-o.loadcorner+p.python_base
             assert( not (np.any(n1subs < 0) or np.any(n1subs >= o.loadsize)) )
 
-            n1lbl = Vlbls[n1subs[:, 0], n1subs[:, 1], n1subs[:, 2]]
+            n1lbl = Vlbls[n1subs[:, 2], n1subs[:, 1], n1subs[:, 0]]
             n2subs = n2pt-o.loadcorner+p.python_base
             assert( not (np.any(n2subs < 0) or np.any(n2subs >= o.loadsize)) )
-            n2lbl =Vlbls[n2subs[:, 0], n2subs[:, 1], n2subs[:, 2]]
+            n2lbl =Vlbls[n2subs[:, 2], n2subs[:, 1], n2subs[:, 0]]
             
             # edge should have already been excluded on first iteration if unlabeled
             assert( not (n1lbl == p.empty_label or n2lbl == p.empty_label) )
@@ -208,9 +208,9 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
         node_count_hist = np.bincount(things_labels[:,0])
         assert( np.all(node_count_hist == o.nnodes_use) )
     else:
-        things_labels = things_labels[0:things_labels_cnt,:]
-        edge_split = edge_split[0:cnt]
-        nodes_to_labels = nodes_to_labels[0:cnt]
+        things_labels = things_labels[:things_labels_cnt,:]
+        edge_split = edge_split[:cnt+1]
+        nodes_to_labels = nodes_to_labels[:cnt+1]
 
 
     [m_ij, m_ijl, label_merged] = thingsLabelsToConfusion(p, things_labels, cnt+1, nlabels)
@@ -221,16 +221,18 @@ def labelsPassEdges(o,p,Vlbls,nnodes,nlabels,thing_list):
 def thingsLabelsToConfusion(p, things_labels, nThings, nlabels):
     # the full confusion matrix that counts duplicates and includes background
     # also overlap matrix, contingency or confusion matrix
-    m_ij = coo_matrix((np.ones(len(things_labels[:, 0])), (things_labels[:,0], things_labels[:,1]+1)), (nThings, nlabels+1))
+    m_ij = coo_matrix((np.ones(len(things_labels[:, 0])), (things_labels[:,0], things_labels[:,1])), (nThings, nlabels))
 
     # the logical (binary) confusion matrix that does not count duplicates
     # use specified threshold for binarizing.
     m_ijl = (m_ij >= p.m_ij_threshold)
 
     # get boolean of supervoxel labels that contain mergers.
+    label_merged = np.asarray((m_ijl > 1).todense())
+    label_merged = label_merged.sum(axis=0)
     # do not include background label, as these are counted as splits if either node is in background label.
-    label_merged = (m_ijl > 1).sum(0)
-    label_merged = label_merged[2:]
+    label_merged = label_merged[1:]
+
     return  (m_ij, m_ijl, label_merged)
 
 
@@ -447,7 +449,7 @@ def checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_label
     # a merge error has occurred on this path if either node is involved in a merger.
     n1lbl = nodes_to_labels[n][n1]
     n2lbl = nodes_to_labels[n][n2]
-    assert( not (n1lbl == p.empty_label | n2lbl == p.empty_label) )
+    assert( not ((n1lbl == p.empty_label) | (n2lbl == p.empty_label)) )
     # do not count a merger for nodes that fall into background areas, these are counted as splits
     merge_error_occurred = ( ((n1lbl < 0) & label_merged[n1lbl]) | ((n2lbl < 0) & label_merged[n2lbl]) )
 

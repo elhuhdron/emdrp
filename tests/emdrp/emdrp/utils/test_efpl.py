@@ -193,6 +193,25 @@ def test_checkErrorAtEdge_function():
 
     checkErrorAtEdge(p,n,n1,n2,e,pass_, edge_split, label_merged, nodes_to_labels)
 
+
+def test_thingsLabelsToConfusion():
+    p = util_get_params()
+    nThings = 2
+    nlabels = 4
+    things_labels = np.array(
+        [[0, 1],
+        [0, 1],
+        [0, 2],
+        [1, 3],
+        [1, 3],
+        [1, 2]]
+    )
+    label_merged = np.array([False, True, False])
+
+    m_ij, m_ijl, label_merged  = thingsLabelsToConfusion(p, things_labels, nThings, nlabels)
+    assert(np.all(label_merged == label_merged))
+    assert(label_merged.shape == (3,))
+
     return
 
 
