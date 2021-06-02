@@ -53,7 +53,7 @@ class dpWatershedTypes(object):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
             if type(v) is list and k not in ['ThrHi', 'ThrLo', 'fg_types_labels', 'ThrRngSave', 'ThrHiSave',
-                    'ThrLoSave', 'subgroups', 'subgroups_out']:
+                    'ThrLoSave', 'ThrRngLogit', 'ThrRngLogitSave', 'subgroups', 'subgroups_out']:
                 # do not save items that are known to be lists (even if one element) as single elements
                 if len(v)==1 and k not in ['fg_types', 'Tmins']:
                     setattr(self,k,v[0])  # save single element lists as first element
@@ -69,9 +69,13 @@ class dpWatershedTypes(object):
         # initialize class properties
         self.nfg_types = len(self.fg_types); self.types = [self.bg_type] + self.fg_types
         self.ntypes = self.nfg_types + 1
-        self.Ts = np.arange(self.ThrRng[0], self.ThrRng[1], self.ThrRng[2])
-        if self.ThrLo: self.Ts = np.concatenate((np.array(self.ThrLo), self.Ts))
-        if self.ThrHi: self.Ts = np.concatenate((self.Ts, np.array(self.ThrHi)))
+        if len(self.ThrRngLogit) > 0:
+            self.Ts = np.arange(self.ThrRngLogit[0], self.ThrRngLogit[1], self.ThrRngLogit[2])
+            self.Ts = 1. / (1 + np.exp(-self.Ts))
+        else:
+            self.Ts = np.arange(self.ThrRng[0], self.ThrRng[1], self.ThrRng[2])
+            if self.ThrLo: self.Ts = np.concatenate((np.array(self.ThrLo), self.Ts))
+            if self.ThrHi: self.Ts = np.concatenate((self.Ts, np.array(self.ThrHi)))
         self.Ts = np.sort(self.Ts)  # just to be sure
         self.nthresh = self.Ts.size
         self.nTmin = self.Tmins.size
@@ -85,15 +89,20 @@ class dpWatershedTypes(object):
         assert( not self.warpfile or self.method == 'overlap' ) # warps only used for overlap method
 
         # parallel with regular Thr parameters, which thresholds to save in output (default all)
-        if len(self.ThrRngSave) == 0: self.ThrRngSave = self.ThrRng
-        if len(self.ThrLoSave) == 0: self.ThrLoSave = self.ThrLo
-        if len(self.ThrHiSave) == 0: self.ThrHiSave = self.ThrHi
-        self.TsSave = np.arange(self.ThrRngSave[0], self.ThrRngSave[1], self.ThrRngSave[2])
-        if self.ThrLoSave: self.TsSave = np.concatenate((np.array(self.ThrLoSave), self.TsSave))
-        if self.ThrHiSave: self.TsSave = np.concatenate((self.TsSave, np.array(self.ThrHiSave)))
-        #self.TsSave = np.sort(self.TsSave)  # just to be sure
-        #self.TsSaveMask = (self.Ts == self.TsSave)
-        print(self.TsSave, self.ThrRngSave)
+        if len(self.ThrRngLogit) > 0:
+            if len(self.ThrRngLogitSave) > 0:
+                self.TsSave = np.arange(self.ThrRngLogitSave[0], self.ThrRngLogitSave[1], self.ThrRngLogitSave[2])
+                self.TsSave = 1. / (1 + np.exp(-self.TsSave))
+            else:
+                self.TsSave = self.Ts
+        else:
+            if len(self.ThrRngSave) == 0: self.ThrRngSave = self.ThrRng
+            if len(self.ThrLoSave) == 0: self.ThrLoSave = self.ThrLo
+            if len(self.ThrHiSave) == 0: self.ThrHiSave = self.ThrHi
+            self.TsSave = np.arange(self.ThrRngSave[0], self.ThrRngSave[1], self.ThrRngSave[2])
+            if self.ThrLoSave: self.TsSave = np.concatenate((np.array(self.ThrLoSave), self.TsSave))
+            if self.ThrHiSave: self.TsSave = np.concatenate((self.TsSave, np.array(self.ThrHiSave)))
+            self.TsSave = np.sort(self.TsSave)  # just to be sure
         self.TsSaveMask = np.in1d(self.Ts, self.TsSave)
         assert( self.TsSaveMask.sum(dtype=np.int64) == len(self.TsSave) ) # save thresholds not consistent
 
@@ -497,6 +506,12 @@ class dpWatershedTypes(object):
             help='Extra thresholds on high end to save')
         p.add_argument('--ThrLoSave', nargs='*', type=float, default=[],
             help='Extra thresholds on low end to save')
+
+        # this overrides the other ThrRng and uses this logit range (applies logistic)
+        p.add_argument('--ThrRngLogit', nargs=3, type=float, default=[], metavar=('BEG', 'END', 'STP'),
+            help='Python range (start, stop] by linear step for probability (as logit) thresholds')
+        p.add_argument('--ThrRngLogitSave', nargs=3, type=float, default=[], metavar=('BEG', 'END', 'STP'),
+            help='Python range (start, stop] by linear step for probability (as logit) thresholds to save')
 
         p.add_argument('--Tmins', nargs='+', type=int, default=[256],
             help='Minimum component size threshold list (for "peak detection")')

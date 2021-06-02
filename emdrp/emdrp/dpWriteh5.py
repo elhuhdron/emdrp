@@ -31,6 +31,7 @@ import argparse
 import time
 import os
 from emdrp.dpLoadh5 import dpLoadh5
+from tifffile import imread
 
 class dpWriteh5(dpLoadh5):
 
@@ -163,6 +164,8 @@ class dpWriteh5(dpLoadh5):
         if use_const:
             print('Initializing with constant value %d' % (const,))
             data = const * np.ones(self.size, dtype=self.data_type_out)
+        elif ext == 'tif':
+            data = imread(self.inraw)
         elif ext == 'nrrd':
             # stole this from pynrrd (which wasn't working by itself, gave up on it)
             # xxx - new version is available as of early 2016, try migrating to it

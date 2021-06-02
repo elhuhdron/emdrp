@@ -185,7 +185,7 @@ class emLabels(dpWriteh5):
         if no_remap:
             # this removes the components selected labels by setting them to zero
             #   but does not remap the labels (i.e. that label value now just has size zero).
-            sizes[bgsel] = 0; fgcomps = np.arange(1,sizes.size+1,dtype=emLabels.LBLS_DTYPE); fgcomps[bgsel] = 0
+            sizes[bgsel] = 0; fgcomps = np.arange(1,sizes.size+1,dtype=emLabels.LBLS_DTYPE)
         else:
             sizes = sizes[fgsel]; fgcomps = np.cumsum(fgsel,dtype=emLabels.LBLS_DTYPE)
         fgcomps[bgsel] = 0; fgcomps = np.insert(fgcomps,0,0); L = fgcomps[lbls]
