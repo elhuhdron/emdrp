@@ -13,6 +13,7 @@ dependencies:
   - scikit-image
   - python-snappy
   - python==3.8
+  - pandas
   - pip:
     - vtk
     - czifile
