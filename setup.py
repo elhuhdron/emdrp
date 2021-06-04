@@ -15,7 +15,7 @@ pyCext_module = Extension('_pyCext',
 
 pyCppext_module = Extension('_pyCppext',
                     sources = ['emdrp/emdrp/utils/pyCext/pyCppext.cpp'],
-                    extra_compile_args = ['-std=c++11'],
+                    extra_compile_args = ['-O3', '-std=c++11'],
                     include_dirs=include_dirs,
                     )
 
