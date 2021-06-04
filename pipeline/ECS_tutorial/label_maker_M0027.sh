@@ -1,9 +1,9 @@
 
 # run on blue in ~/gits/emdrp/recon/python
 
-fnraw=/home/watkinspv/Data/ECS_tutorial/M0027_11_8x8x4chunks_at_x0012_y0014_z0002.h5
-inpath=/home/watkinspv/Data/ECS_tutorial
-outlabels=/home/watkinspv/Data/ECS_tutorial/M0027_11_labels.h5
+fnraw=/u/erjelli/link_scratch/ECS_tutorial/download/M0027_11_mag1_subvol_8x8x4chunks_at_x0012_y0014_z0002.h5
+inpath=/u/erjelli/link_scratch/ECS_tutorial/download
+outlabels=/u/erjelli/link_scratch/ECS_tutorial/download/M0027_11_labels.h5
 dataset=data_mag1
 rois=roi_M0027.txt
 
@@ -23,7 +23,7 @@ do
     size=${sizes[$count]}
 
     echo processing $chunk
-    dpWriteh5.py --srcfile $fnraw --chunk $chunk --size $size --offset ${offsets[$count]} --outfile $outlabels --dataset $dataset --dataset-out labels --inraw $inpath/${fn}.nrrd --data-type-out uint16 --fillvalue 65535 --inroi $rois --dpW
+    dpWriteh5.py --srcfile $fnraw --chunk $chunk --size $size --offset ${offsets[$count]} --outfile $outlabels --dataset $dataset --dataset-out labels --inraw $inpath/${fn}.tif --data-type-out uint16 --fillvalue 65535 --inroi $rois --dpW
 
     count=`expr $count + 1`
 done

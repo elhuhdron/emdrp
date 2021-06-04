@@ -1,0 +1,21 @@
+name: emasm
+channels:
+  - defaults
+dependencies:
+  - h5py=2.10.0
+  - numpy
+  - pip
+  - scipy
+  - pytest
+  - hypothesis
+  - networkx
+  - matplotlib
+  - scikit-image
+  - python-snappy
+  - python==3.8
+  - pandas
+  - pip:
+    - vtk
+    - czifile
+    - wknml
+    - --editable ../../
