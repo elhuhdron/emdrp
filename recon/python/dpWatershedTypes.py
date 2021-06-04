@@ -53,7 +53,7 @@ class dpWatershedTypes(object):
         # save command line arguments from argparse, see definitions in main or run with --help
         for k, v in vars(args).items():
             if type(v) is list and k not in ['ThrHi', 'ThrLo', 'fg_types_labels', 'ThrRngSave', 'ThrHiSave',
-                    'ThrLoSave', 'ThrRngLogit', 'ThrRngLogitSave', 'subgroups', 'subgroups_out']:
+                    'ThrLoSave', 'ThrRngsLogit', 'ThrLogitSave', 'subgroups', 'subgroups_out']:
                 # do not save items that are known to be lists (even if one element) as single elements
                 if len(v)==1 and k not in ['fg_types', 'Tmins']:
                     setattr(self,k,v[0])  # save single element lists as first element
@@ -69,8 +69,11 @@ class dpWatershedTypes(object):
         # initialize class properties
         self.nfg_types = len(self.fg_types); self.types = [self.bg_type] + self.fg_types
         self.ntypes = self.nfg_types + 1
-        if len(self.ThrRngLogit) > 0:
-            self.Ts = np.arange(self.ThrRngLogit[0], self.ThrRngLogit[1], self.ThrRngLogit[2])
+        if len(self.ThrRngsLogit) > 0:
+            self.Ts = np.arange(0)
+            rngs = np.array(self.ThrRngsLogit).reshape((-1,3))
+            for i in range(rngs.shape[0]):
+                self.Ts = np.concatenate((self.Ts, np.arange(rngs[i,0], rngs[i,1], rngs[i,2])))
             self.Ts = 1. / (1 + np.exp(-self.Ts))
         else:
             self.Ts = np.arange(self.ThrRng[0], self.ThrRng[1], self.ThrRng[2])
@@ -89,10 +92,9 @@ class dpWatershedTypes(object):
         assert( not self.warpfile or self.method == 'overlap' ) # warps only used for overlap method
 
         # parallel with regular Thr parameters, which thresholds to save in output (default all)
-        if len(self.ThrRngLogit) > 0:
-            if len(self.ThrRngLogitSave) > 0:
-                self.TsSave = np.arange(self.ThrRngLogitSave[0], self.ThrRngLogitSave[1], self.ThrRngLogitSave[2])
-                self.TsSave = 1. / (1 + np.exp(-self.TsSave))
+        if len(self.ThrRngsLogit) > 0:
+            if len(self.ThrLogitSave) > 0:
+                self.TsSave = 1. / (1 + np.exp(-self.ThrLogitSave))
             else:
                 self.TsSave = self.Ts
         else:
@@ -508,10 +510,10 @@ class dpWatershedTypes(object):
             help='Extra thresholds on low end to save')
 
         # this overrides the other ThrRng and uses this logit range (applies logistic)
-        p.add_argument('--ThrRngLogit', nargs=3, type=float, default=[], metavar=('BEG', 'END', 'STP'),
-            help='Python range (start, stop] by linear step for probability (as logit) thresholds')
-        p.add_argument('--ThrRngLogitSave', nargs=3, type=float, default=[], metavar=('BEG', 'END', 'STP'),
-            help='Python range (start, stop] by linear step for probability (as logit) thresholds to save')
+        p.add_argument('--ThrRngsLogit', nargs='*', type=float, default=[], 
+            help='Python ranges (start, stop] by linear step for probability (as logit) thresholds')
+        p.add_argument('--ThrLogitSave', nargs='*', type=float, default=[],
+            help='Thresholds by linear step for probability (as logit) to save')
 
         p.add_argument('--Tmins', nargs='+', type=int, default=[256],
             help='Minimum component size threshold list (for "peak detection")')
