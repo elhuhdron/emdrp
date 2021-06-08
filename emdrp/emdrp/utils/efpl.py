@@ -66,7 +66,8 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
         np.any(nodes[idx_columns] >= np.array([[Vlbls.shape[ax_idx] for ax_idx in hdf5_dim_idcs]]), axis=1),
         np.any(nodes[idx_columns] < 0, axis=1))
 
-    print('Warning: Remove {} nodes outside the ROI '.format(np.sum(node_is_outside_volume)))
+    if np.any(node_is_outside_volume):
+        print('Warning: Remove {} nodes outside the ROI '.format(np.sum(node_is_outside_volume)))
 
     node_id_outside = nodes[node_is_outside_volume].id
 
@@ -85,7 +86,8 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
 
     edges = edges.explode('edges')
     edge_is_nan = edges['edges'].isna()
-    print(f'Warning: {np.sum(edge_is_nan)} edges have nan values!')
+    if np.any(edge_is_nan):
+        print(f'Warning: {np.sum(edge_is_nan)} edges have nan values!')
 
     edges = edges[np.logical_not(edges['edges'].isna())]
 
@@ -94,7 +96,8 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
         edges[col] = edges['edges'].apply(lambda location: location[n])
 
     edge_is_outside = edges.source_node.isin(node_id_outside) | edges.target_node.isin(node_id_outside)
-    print(f'Warning: {np.sum(edge_is_outside)} edges lead to nodes outside the ROI')
+    if np.any(edge_is_outside):
+        print(f'Warning: {np.sum(edge_is_outside)} edges lead to nodes outside the ROI')
 
     edges = edges[np.logical_not(edge_is_outside)]    
     edges = edges.drop(columns=['edges'])
