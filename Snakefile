@@ -24,8 +24,11 @@ rule all:
     input:
         #expand(root + '/data_out/tutorial_ECS/xfold/M0007_plots/1000.fig',
         #    ident=['M0007', 'M0027']),
-        root + '/data_vols/M0007_random_test.h5',
-        root + '/data_vols/M0007_original_test.h5',
+        #root + '/data_vols/M0007_random_test.h5',
+        #root + '/data_vols/M0007_original_test.h5',
+        #expand(root + '/data_out/{ident}_{type}_test_output.csv',
+        #    ident=['M0007', 'M0027'],
+        #    type=['original', 'linear-iterpln', 'empty', 'gan-test']),
 
 
 rule store_volume_in_correct_location:
@@ -97,6 +100,25 @@ rule apply_watershed_on_ICS_probability:
         ' --outlabels {output}' +
         ' --ThrRng 0.5 0.999 0.1' +
         ' --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW'
+
+rule calc_efpl:
+    output:
+       root + '/data_out/{ident}_{type}_{extra}_output.csv'
+    input:
+        skelin = lambda wc: config['datasets'][wc.ident]['skeleton'],
+        lblsh5 = root + '/data_out/{ident}_{type}_{extra}_supervoxels.h5',
+    params:
+        data_start =lambda wc: [chunk *128 for chunk in config['datasets'][wc.ident]['chunk']],
+        data_size = lambda wc: config['datasets'][wc.ident]['size']
+    conda:
+        'environment.yml'
+    shell:
+        f'python -u {cwd}/emdrp/emdrp/scripts/calculate_efpl.py' +
+        ' --csv_results {output}' +
+        ' --nml_file {input.skelin}' +
+        ' --h5_file {input.lblsh5}' +
+        ' --size {params.data_size}' +
+        ' --dataset_start {params.data_start}'
 
 rule produce_metrics:
     output:
