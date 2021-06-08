@@ -94,7 +94,7 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
         edges[col] = edges['edges'].apply(lambda location: location[n])
 
     edge_is_outside = edges.source_node.isin(node_id_outside) | edges.target_node.isin(node_id_outside)
-    print(f'Warning: {np.sum(edge_is_outside)} edges lead to node outside the ROI')
+    print(f'Warning: {np.sum(edge_is_outside)} edges lead to nodes outside the ROI')
 
     edges = edges[np.logical_not(edge_is_outside)]    
     edges = edges.drop(columns=['edges'])
