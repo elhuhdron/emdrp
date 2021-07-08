@@ -4,6 +4,8 @@
 configfile: "config.yml"
 root = config['local_data_path']
 
+gpu = "GPU"
+gres = ""
 
 # Workaround for rest2skel; Better: add all shell scripts to PATH environment variable via setup tools ...
 if 'emdrp' in workflow.modules.keys():
@@ -57,7 +59,7 @@ rule merge_predicted_probabilities:
         expand(root + '/data_out/{{ident}}_{{type}}_{{extra}}_{replicate}.0_probs.h5',
             replicate =range(4)),
     wildcard_constraints:
-        ident="(M0007)|(M0027)",
+        ident="(M0007)|(M0027)|(M0007sqz)",
         type="[^_]+",
         extra="[^_]+",
     params:
@@ -89,7 +91,7 @@ rule apply_watershed_on_ICS_probability:
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     resources:
         time='24:00:00', # the runtime depends on the number of labels
-        partition="p.gpu", # since cpu queue is full
+        partition=gpu, # since cpu queue is full
         mem="64000",
         cpus_per_task="2",
     conda:
