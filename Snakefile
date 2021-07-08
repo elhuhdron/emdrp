@@ -76,7 +76,8 @@ rule merge_predicted_probabilities:
         ' --outprobs {output}' +
         ' --chunk {params.chunk}' +
         ' --size {params.size}' +
-        ' --types ICS ECS MEM --ops mean min --dpMergeProbs-verbose'
+        ' --types ICS ECS MEM --ops mean' + 
+        ' --sigmoid --dpM --dpmergeProbs-verbose'
 
 rule apply_watershed_on_ICS_probability:
     output:
