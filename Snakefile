@@ -99,8 +99,7 @@ rule apply_watershed_on_ICS_probability:
         ' --probfile {input}' +
         ' --chunk {params.chunk} --offset 0 0 0 --size {params.size}' +
         ' --outlabels {output}' +
-        ' --ThrRng 0.5 0.999 0.1' +
-        ' --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW'
+        ' --ThrRngLogit 0 16 1 --dpW'
 
 rule calc_efpl:
     output:
