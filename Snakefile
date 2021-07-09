@@ -5,6 +5,7 @@ configfile: "config.yml"
 root = config['local_data_path']
 
 gpu = "GPU"
+cpu = "CPU"
 gres = ""
 
 # Workaround for rest2skel; Better: add all shell scripts to PATH environment variable via setup tools ...
@@ -79,7 +80,7 @@ rule merge_predicted_probabilities:
         ' --chunk {params.chunk}' +
         ' --size {params.size}' +
         ' --types ICS ECS MEM --ops mean' + 
-        ' --sigmoid --dpM --dpmergeProbs-verbose'
+        ' --sigmoid --dpM --dpMergeProbs-verbose'
 
 rule apply_watershed_on_ICS_probability:
     output:
@@ -91,7 +92,7 @@ rule apply_watershed_on_ICS_probability:
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     resources:
         time='24:00:00', # the runtime depends on the number of labels
-        partition=gpu, # since cpu queue is full
+        partition=cpu, 
         mem="64000",
         cpus_per_task="2",
     conda:
@@ -101,7 +102,7 @@ rule apply_watershed_on_ICS_probability:
         ' --probfile {input}' +
         ' --chunk {params.chunk} --offset 0 0 0 --size {params.size}' +
         ' --outlabels {output}' +
-        ' --ThrRngLogit 0 16 1 --dpW'
+        ' --ThrRngsLogit 0 16 1 --dpW'
 
 rule calc_efpl:
     output:
