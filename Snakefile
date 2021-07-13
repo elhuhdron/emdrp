@@ -4,6 +4,9 @@
 configfile: "config.yml"
 root = config['local_data_path']
 
+gpu = "GPU"
+cpu = "CPU"
+gres = ""
 
 # Workaround for rest2skel; Better: add all shell scripts to PATH environment variable via setup tools ...
 if 'emdrp' in workflow.modules.keys():
@@ -24,8 +27,11 @@ rule all:
     input:
         #expand(root + '/data_out/tutorial_ECS/xfold/M0007_plots/1000.fig',
         #    ident=['M0007', 'M0027']),
-        root + '/data_vols/M0007_random_test.h5',
-        root + '/data_vols/M0007_original_test.h5',
+        #root + '/data_vols/M0007_random_test.h5',
+        #root + '/data_vols/M0007_original_test.h5',
+        #expand(root + '/data_out/{ident}_{type}_test_output.csv',
+        #    ident=['M0007', 'M0027'],
+        #    type=['original', 'linear-iterpln', 'empty', 'gan-test']),
 
 
 rule store_volume_in_correct_location:
@@ -54,7 +60,7 @@ rule merge_predicted_probabilities:
         expand(root + '/data_out/{{ident}}_{{type}}_{{extra}}_{replicate}.0_probs.h5',
             replicate =range(4)),
     wildcard_constraints:
-        ident="(M0007)|(M0027)",
+        ident="(M0007)|(M0027)|(M0007sqz)",
         type="[^_]+",
         extra="[^_]+",
     params:
@@ -73,7 +79,8 @@ rule merge_predicted_probabilities:
         ' --outprobs {output}' +
         ' --chunk {params.chunk}' +
         ' --size {params.size}' +
-        ' --types ICS ECS MEM --ops mean min --dpMergeProbs-verbose'
+        ' --types ICS ECS MEM --ops mean' + 
+        ' --sigmoid --dpM --dpMergeProbs-verbose'
 
 rule apply_watershed_on_ICS_probability:
     output:
@@ -85,7 +92,7 @@ rule apply_watershed_on_ICS_probability:
         chunk = lambda wc: config['datasets'][wc.ident]['chunk'],
     resources:
         time='24:00:00', # the runtime depends on the number of labels
-        partition="p.gpu", # since cpu queue is full
+        partition=cpu, 
         mem="64000",
         cpus_per_task="2",
     conda:
@@ -95,8 +102,31 @@ rule apply_watershed_on_ICS_probability:
         ' --probfile {input}' +
         ' --chunk {params.chunk} --offset 0 0 0 --size {params.size}' +
         ' --outlabels {output}' +
-        ' --ThrRng 0.5 0.999 0.1' +
-        ' --ThrHi 0.95 0.99 0.995 0.999 0.99925 0.9995 0.99975 0.9999 0.99995 0.99999 --dpW'
+        ' --ThrRngsLogit 0 16 1 --dpW'
+
+rule calc_efpl:
+    output:
+       root + '/data_out/{ident}_{type}_{extra}_output.csv'
+    input:
+        skelin = lambda wc: config['datasets'][wc.ident]['skeleton'],
+        lblsh5 = root + '/data_out/{ident}_{type}_{extra}_supervoxels.h5',
+    params:
+        data_start =lambda wc: [chunk *128 for chunk in config['datasets'][wc.ident]['chunk']],
+        data_size = lambda wc: config['datasets'][wc.ident]['size']
+    threads:
+        20
+    resources:
+        partition=cpu,
+        time='00:30:00',
+    conda:
+        'environment.yml'
+    shell:
+        f'python -u {cwd}/emdrp/emdrp/scripts/calculate_efpl.py' +
+        ' --csv_results {output}' +
+        ' --nml_file {input.skelin}' +
+        ' --h5_file {input.lblsh5}' +
+        ' --size {params.data_size}' +
+        ' --dataset_start {params.data_start}'
 
 rule produce_metrics:
     output:
