@@ -113,6 +113,11 @@ rule calc_efpl:
     params:
         data_start =lambda wc: [chunk *128 for chunk in config['datasets'][wc.ident]['chunk']],
         data_size = lambda wc: config['datasets'][wc.ident]['size']
+    threads:
+        20
+    resources:
+        partition=cpu,
+        time='00:30:00',
     conda:
         'environment.yml'
     shell:
