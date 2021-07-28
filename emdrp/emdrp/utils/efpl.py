@@ -1,12 +1,46 @@
 import numpy as np
 import pandas as pd
 import wknml
+import h5py
 
 KNOSSOS_BASE =  np.ones((1, 3), dtype=int)
 NML_DIM_ORDER = 'xyz'
 HDF5_DIM_ORDER = 'zyx'
 
 HDF5_BACKGROUND_LABEL = 0
+
+def calc_supervoxel_eftpl(nml_filepath, h5_filepath, dset_vals=None, dset_folder='with_background', dset_suffix='labels',
+    size=None, dset_start=np.zeros((1,3), dtype=int), 
+    ):
+
+    with open(nml_filepath, "rb") as f:
+        nml = wknml.parse_nml(f)
+
+    if dset_vals is None:
+        with h5py.File(h5_filepath, 'r') as h5file:
+            dset = h5file[dset_folder]
+            dset_vals = [str(k) for k in dset.keys()]
+
+    eftpl = np.zeros(len(dset_vals))
+
+    h5_dim_idcs = [HDF5_DIM_ORDER.index(ax) for ax in 'xyz']
+
+    selection = None
+    if size is not None:
+        selection = tuple(slice(dset_start[ax],dset_start[ax]+size[ax]) for ax in h5_dim_idcs)
+
+    for i, dset_val in enumerate(dset_vals):
+        with h5py.File(h5_filepath, 'r') as h5file:
+            dset = h5file['/'.join([dset_folder, dset_val, dset_suffix])]
+            if size is None:
+                Vlbls = dset[:]
+            else:
+                Vlbls = np.zeros(tuple(size[ax] for ax in h5_dim_idcs), dtype=dset.dtype)
+                dset.read_direct(Vlbls, selection)
+        eftpl[i] = calc_eftpl(nml, Vlbls, dset_start)
+
+    return eftpl, dset_vals
+
 
 def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=False):
     
@@ -24,6 +58,21 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
 
     nodes[idx_columns] -= (dataset_start + KNOSSOS_BASE)
 
+    # Comment(erjel): That moment when you wrote an on-point pipeline and realize that you
+    # have to deal with messy data ...
+    hdf5_dim_idcs = np.array([NML_DIM_ORDER.index(ax) for ax in HDF5_DIM_ORDER])
+
+    node_is_outside_volume = np.logical_or(
+        np.any(nodes[idx_columns] >= np.array([[Vlbls.shape[ax_idx] for ax_idx in hdf5_dim_idcs]]), axis=1),
+        np.any(nodes[idx_columns] < 0, axis=1))
+
+    if np.any(node_is_outside_volume):
+        print('Warning: Remove {} nodes outside the ROI '.format(np.sum(node_is_outside_volume)))
+
+    node_id_outside = nodes[node_is_outside_volume].id
+
+    nodes = nodes[np.logical_not(node_is_outside_volume)]
+
     nodes['label'] = Vlbls[tuple(nodes[f'idx_{ax}'] for ax in HDF5_DIM_ORDER)]
 
     position_colums = [f'position_{ax}' for ax in NML_DIM_ORDER]
@@ -36,11 +85,21 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
     edges = edges.rename(columns={"id": "tree_id"})
 
     edges = edges.explode('edges')
+    edge_is_nan = edges['edges'].isna()
+    if np.any(edge_is_nan):
+        print(f'Warning: {np.sum(edge_is_nan)} edges have nan values!')
+
+    edges = edges[np.logical_not(edges['edges'].isna())]
 
     new_col_list = ['source_node','target_node']
     for n ,col in enumerate(new_col_list):
         edges[col] = edges['edges'].apply(lambda location: location[n])
 
+    edge_is_outside = edges.source_node.isin(node_id_outside) | edges.target_node.isin(node_id_outside)
+    if np.any(edge_is_outside):
+        print(f'Warning: {np.sum(edge_is_outside)} edges lead to nodes outside the ROI')
+
+    edges = edges[np.logical_not(edge_is_outside)]    
     edges = edges.drop(columns=['edges'])
 
     ### Merge nodes information into edge data and calculate path lengths
