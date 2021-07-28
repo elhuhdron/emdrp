@@ -217,16 +217,16 @@ class dpSupervoxelClassifier():
             if len(self.iterate_save_ranges) > 0:
                 assert(len(self.iterate_save_ranges) % 3 == 0) # must specify as python-style ranges
                 n = len(self.iterate_save_ranges)//3
-                self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=np.bool)
+                self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=bool)
                 for i in range(n):
                     start, stop, step = self.iterate_save_ranges[3*i:3*i+3]
                     self.iterate_save_mask[range(start,stop,step)] = 1
                 self.iterate_save_mask[stop:] = 1
             else:
-                self.iterate_save_mask = np.ones((self.iterate_count,), dtype=np.bool)
+                self.iterate_save_mask = np.ones((self.iterate_count,), dtype=bool)
         else:
-            self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=np.bool)
-    
+            self.iterate_save_mask = np.zeros((self.iterate_count,), dtype=bool)
+
         if self.iterative_mode:
             # expand the list out to the number of iterations by repeating the last merge percentage
             tmp = np.zeros((self.iterate_count,), dtype=np.double)
@@ -265,7 +265,7 @@ class dpSupervoxelClassifier():
         d = dpFRAG.make_features(self.feature_set, self.has_ECS)
         for k in ['features','features_names','nfeatures']: setattr(self,k,d[k])
 
-        # xxx - make this more systematic for other libraries? 
+        # xxx - make this more systematic for other libraries?
         #   typically using anaconda, for which this should work since built on mkl
         try:
             import mkl
@@ -306,10 +306,10 @@ class dpSupervoxelClassifier():
                     if self.iterative_frag[chunk] is None:
                         frag = dpFRAG.makeBothFRAG(self.labelfile, cchunk, size, offset,
                             [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
-                            self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, 
-                            ['agglomeration_training'], progressBar=self.progress_bar, feature_set=self.feature_set, 
+                            self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups,
+                            ['agglomeration_training'], progressBar=self.progress_bar, feature_set=self.feature_set,
                             has_ECS=self.has_ECS, chunk_subgroups=self.chunk_subgroups, no_agglo_ECS=self.no_agglo_ECS,
-                            pad_prob_svox_perim = not self.prob_svox_context, neighbor_only=self.neighbor_only, 
+                            pad_prob_svox_perim = not self.prob_svox_context, neighbor_only=self.neighbor_only,
                             verbose=self.dpSupervoxelClassifier_verbose)
                         frag.isTraining = True; self.iterative_frag[chunk] = frag
                     else:
@@ -319,7 +319,7 @@ class dpSupervoxelClassifier():
                         [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                         self.raw_dataset, self.gtfile, self.label_subgroups, feature_set=self.feature_set,
                         has_ECS=self.has_ECS, chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only,
-                        pad_prob_svox_perim = not self.prob_svox_context, progressBar=self.progress_bar, 
+                        pad_prob_svox_perim = not self.prob_svox_context, progressBar=self.progress_bar,
                         no_agglo_ECS=self.no_agglo_ECS, verbose=self.dpSupervoxelClassifier_verbose)
                 frag.createFRAG(update = self.iterative_mode)
                 #frag.createFRAG(update = False)
@@ -453,8 +453,8 @@ class dpSupervoxelClassifier():
                     [self.probfile, self.probaugfile], [self.rawfile, self.rawaugfile],
                     self.raw_dataset, self.gtfile, self.outfile, self.label_subgroups, subgroups_out,
                     G=FRAG, progressBar=self.progress_bar, feature_set=self.feature_set, has_ECS=self.has_ECS,
-                    chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only, 
-                    pad_prob_svox_perim = not self.prob_svox_context, no_agglo_ECS=self.no_agglo_ECS, 
+                    chunk_subgroups=self.chunk_subgroups, neighbor_only=self.neighbor_only,
+                    pad_prob_svox_perim = not self.prob_svox_context, no_agglo_ECS=self.no_agglo_ECS,
                     verbose=self.dpSupervoxelClassifier_verbose)
             else:
                 frag = dpFRAG.makeTestingFRAG(self.labelfile, cchunk, size, offset,
@@ -665,8 +665,8 @@ class dpSupervoxelClassifier():
                 clf_preds = np.logical_and(clf_preds,(clf_probs[:,1] > thr))
         yesmerge = (target==1); notmerge = (target==0);
         nyes = yesmerge.sum(dtype=np.int64); nnot = notmerge.sum(dtype=np.int64)
-        fScore, tpr_recall, precision, pixel_error, fpr, tp, tn, fp, fn = pixel_error_fscore( target.astype(np.bool),
-            clf_preds.astype(np.bool) )
+        fScore, tpr_recall, precision, pixel_error, fpr, tp, tn, fp, fn = pixel_error_fscore( target.astype(bool),
+            clf_preds.astype(bool) )
         print('p=%d, n=%d, tp=%d, tn=%d, fp=%d, fn=%d, rec=%.4f, prec=%.4f, fscore=%.4f' % (nyes,nnot,tp,tn,fp,fn,
             tpr_recall,precision,fScore))
 
@@ -837,7 +837,7 @@ class dpSupervoxelClassifier():
             help='Use context for loading probs and supervoxels along edge faces')
         p.add_argument('--no-agglo-ECS', action='store_true', help='Do not agglomerate ECS supervoxels')
         p.add_argument('--useFRAGc', action='store_true', help='Use the C-optimized version of FRAG')
-        
+
         p.add_argument('--dpSupervoxelClassifier-verbose', action='store_true',
             help='Debugging output for dpSupervoxelClassifier')
 
@@ -854,4 +854,3 @@ if __name__ == '__main__':
     else:
         svoxClass.train()
         svoxClass.test()
-

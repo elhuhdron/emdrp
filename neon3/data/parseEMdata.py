@@ -206,7 +206,7 @@ class EMDataParser():
             # let command line override definition in ini file.
             if len(chunk_skip_list) > 0: self.chunk_skip_list = chunk_skip_list
             if len(self.chunk_skip_list) > 0:
-                mask = np.zeros((self.nchunks,), dtype=np.bool)
+                mask = np.zeros((self.nchunks,), dtype=bool)
                 mask[:self.chunk_range_rand] = 1
                 mask[np.array(self.chunk_skip_list, dtype=np.int64)] = 0
                 self.chunk_rand_list = np.nonzero(mask)[0].tolist()
@@ -756,7 +756,7 @@ class EMDataParser():
         #   so that they can be stored in the convnet checkpoints.
         self.batch_meta['prior_total_count'] += self.num_cases_per_batch
         if self.independent_labels:
-            self.batch_meta['prior_train_count'] += labels.astype(np.bool).sum(axis=1)
+            self.batch_meta['prior_train_count'] += labels.astype(bool).sum(axis=1)
         else:
             cnts,edges = np.histogram(labels.astype(np.int32), bins=list(range(0,self.nlabels+1)), range=(0,self.nlabels))
             self.batch_meta['prior_train_count'] += cnts

@@ -70,7 +70,7 @@ def label_affinities(affinities, labels, nextlabel, threshold):
 def binary_warping(source, target, mask=None, gray=None, grayThresholds=None, borderval=False, numiters=-1, slow=False,
         simpleLUT=None, connectivity=1, return_nonSimple=False):
     sz =  [x+2 for x in source.shape]   # need border for neighborhoods around the edge voxels
-    dtype = np.bool; pdtype = np.float32
+    dtype = np.bool_; pdtype = np.float32
     test=np.zeros((2,2),dtype=dtype)
 
     if type(source) != type(test):
@@ -237,7 +237,7 @@ def remove_adjacencies(labels, bwconn):
     if labels.dtype != test.dtype:
         raise Exception('In remove_adjacencies, labels not uint32')
 
-    testB=np.zeros((2,2),dtype=np.bool)
+    testB=np.zeros((2,2),dtype=bool)
     if type(bwconn) != type(testB):
         raise Exception( 'In remove_adjacencies, bwconn is not *NumPy* array')
     if len(bwconn.shape) != 3:
@@ -248,7 +248,7 @@ def remove_adjacencies(labels, bwconn):
         raise Exception( 'In remove_adjacencies, bwconn not correct data type')
     if not all([x%2 for x in bwconn.shape]):
         raise Exception( 'In remove_adjacencies, bwconn shape contains even size(s)')
-        
+
     c = [x//2 for x in bwconn.shape]; bwconn[c[0],c[1],c[2]] = 0; bwconn = np.tril(bwconn) # optimization
 
     sz =  [x+y-1 for x,y in zip(labels.shape, bwconn.shape)]   # need border for neighborhoods around the edges
@@ -305,7 +305,7 @@ def type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_typ
 
     return _pyCext.type_components(labels, voxel_type, supervoxel_type, voxel_out_type, num_types)
 
-def frag_with_borders(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=None, min_step=None, max_step=None, 
+def frag_with_borders(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps=None, min_step=None, max_step=None,
                       nalloc_rag=50, nalloc_borders=1000):
     dtype=np.uint32; test=np.zeros((2,2),dtype=dtype)
     if type(supervoxels) != type(test):
@@ -334,22 +334,22 @@ def frag_with_borders(supervoxels, nsupervoxels, pad=True, nbhd=1, conn=3, steps
         bwconn = nd.morphology.generate_binary_structure(supervoxels.ndim, conn)
 
         neigh_sel_size = 2*nbhd + 1
-        dilate_array = np.zeros((neigh_sel_size,neigh_sel_size,neigh_sel_size), dtype=np.bool)
+        dilate_array = np.zeros((neigh_sel_size,neigh_sel_size,neigh_sel_size), dtype=bool)
         dilate_array[neigh_sel_size//2,neigh_sel_size//2,neigh_sel_size//2] = 1;
         neigh_sel = nd.morphology.binary_dilation(dilate_array, bwconn, nbhd)
         neigh_sel_indices = np.transpose(np.nonzero(neigh_sel)) - (neigh_sel_size//2)
 
         #calculate steps based on neighborhood size - C-order!
         steps = np.array([(x[0]*sz[1]*sz[2] + x[1]*sz[2] + x[2]) for x in neigh_sel_indices], dtype=np.int32)
-        
+
         # remove double checking of edges between voxels by removing symmetrical negative steps
         # NOTE: the cpp code is optimized assuming that steps is positive, so removing this requires cpp code mods.
         steps = steps[steps > 0]
-        
+
         # steps range used in Cpp-code so that we don't look out-of-bounds
         min_step = steps.min(); max_step = steps.max()
 
-    list_of_edges, list_of_borders = _pyCppext.frag_with_borders(svox, nsupervoxels, steps, min_step, max_step, 
+    list_of_edges, list_of_borders = _pyCppext.frag_with_borders(svox, nsupervoxels, steps, min_step, max_step,
                                                                  nalloc_rag, nalloc_borders)
 
     if return_steps:

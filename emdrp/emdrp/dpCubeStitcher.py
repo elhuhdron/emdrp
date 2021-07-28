@@ -195,7 +195,7 @@ class dpCubeStitcher(emLabels):
             ncomps += cur_ncomps
 
             # remove the left offset for the write, saves time since offsets cross chunking boundaries
-            sel_novlp = np.ones(self.size, dtype=np.bool)
+            sel_novlp = np.ones(self.size, dtype=bool)
             if not is_left_border[0]:
                 sel_novlp[:self.overlap[0],:,:] = 0; self.offset[0] += self.overlap[0]; self.size[0] -= self.overlap[0]
             if not is_left_border[1]:
@@ -283,4 +283,3 @@ if __name__ == '__main__':
 
     stitcher = dpCubeStitcher(args)
     stitcher.stitch()
-

@@ -117,7 +117,7 @@ class dpWatershedTypes(object):
         self.skeletonize = False
 
         # print out all initialized variables in verbose mode
-        if self.dpWatershedTypes_verbose: 
+        if self.dpWatershedTypes_verbose:
             print('dpWatershedTypes, verbose mode:\n'); print(vars(self))
             print_cpu_info_linux() # for debugging runtime variance on biowulf
 
@@ -143,7 +143,7 @@ class dpWatershedTypes(object):
                 for i in range(self.ntypes): probs[i][loadh5.data_cube==i] = 1
             else:
                 # optionally "clean" labels by removing small bg and fg components for each foreground type
-                fgbwlabels = np.zeros(self.size, dtype=np.bool)
+                fgbwlabels = np.zeros(self.size, dtype=bool)
                 for i in range(self.nfg_types):
                     # background connected components and threshold
                     comps, nlbls = nd.measurements.label(loadh5.data_cube!=i+1)
@@ -196,7 +196,7 @@ class dpWatershedTypes(object):
         # optionally apply filters in attempt to fill small background (membrane) probability gaps.
         if self.close_bg > 0:
             # create structuring element
-            n = 2*self.close_bg + 1; h = self.close_bg; strel = np.zeros((n,n,n),dtype=np.bool); strel[h,h,h]=1;
+            n = 2*self.close_bg + 1; h = self.close_bg; strel = np.zeros((n,n,n),dtype=bool); strel[h,h,h]=1;
             strel = nd.binary_dilation(strel,iterations=self.close_bg)
 
             # xxx - this was the only thing tried here that helped some but didn't work well against the skeletons
@@ -242,7 +242,7 @@ class dpWatershedTypes(object):
         # at last iteration keep all remaining components.
         # do this separately for foreground types.
         for k in range(self.nTmin):
-            for i in range(self.nfg_types): bwseeds[i] = np.zeros(self.size, dtype=np.bool, order='C')
+            for i in range(self.nfg_types): bwseeds[i] = np.zeros(self.size, dtype=bool, order='C')
             for i in range(self.nthresh):
                 if self.dpWatershedTypes_verbose:
                     print('creating supervoxels at threshold = %.8f with Tmin = %d' % (self.Ts[i], self.Tmins[k]))
@@ -307,14 +307,14 @@ class dpWatershedTypes(object):
                             # make an unconnected version of bwlabels by warping out but with mask only for this type
                             # everything above current threshold is already labeled, so only need to use gray thresholds
                             #    starting below the current threshold level.
-                            bwlabels, diff, self.simpleLUT = binary_warping(bwlabels, np.ones(self.size,dtype=np.bool),
+                            bwlabels, diff, self.simpleLUT = binary_warping(bwlabels, np.ones(self.size,dtype=bool),
                                 mask=voxTypeSel[j], borderval=False, slow=True, simpleLUT=self.simpleLUT,
                                 connectivity=self.connectivity, gray=probs[j+1],
                                 grayThresholds=self.Ts[i-1::-1].astype(np.float32, order='C'))
                         else:
                             assert( self.method == 'comps' )     # bad method option
                             # make an unconnected version of bwlabels by warping out but with mask only for this type
-                            bwlabels, diff, self.simpleLUT = binary_warping(bwlabels, np.ones(self.size,dtype=np.bool),
+                            bwlabels, diff, self.simpleLUT = binary_warping(bwlabels, np.ones(self.size,dtype=bool),
                                 mask=voxTypeSel[j], borderval=False, slow=True, simpleLUT=self.simpleLUT,
                                 connectivity=self.connectivity)
 
@@ -418,7 +418,7 @@ class dpWatershedTypes(object):
 
             # make an unconnected version of bwlabels by warping out but with mask only for this type
             bw = cur_bwlabels[:,:,None].copy(order='C'); msk = cur_mask[:,:,None].copy(order='C')
-            bw, diff, self.simpleLUT = binary_warping(bw, np.ones(s2,dtype=np.bool),
+            bw, diff, self.simpleLUT = binary_warping(bw, np.ones(s2,dtype=bool),
                 mask=msk, borderval=False, slow=True, simpleLUT=self.simpleLUT, connectivity=self.connectivity)
             cur_fill_bwlabels = bw[:,:,0]
 
@@ -510,7 +510,7 @@ class dpWatershedTypes(object):
             help='Extra thresholds on low end to save')
 
         # this overrides the other ThrRng and uses this logit range (applies logistic)
-        p.add_argument('--ThrRngsLogit', nargs='*', type=float, default=[], 
+        p.add_argument('--ThrRngsLogit', nargs='*', type=float, default=[],
             help='Python ranges (start, stop] by linear step for probability (as logit) thresholds')
         p.add_argument('--ThrLogitSave', nargs='*', type=float, default=[],
             help='Thresholds by linear step for probability (as logit) to save')
@@ -534,9 +534,9 @@ class dpWatershedTypes(object):
         p.add_argument('--close-bg', nargs=1, type=int, default=[0], choices=range(5),
             help='Diamond radius of structuring element to try to fill in background (membrane) gaps')
         p.add_argument('--subgroups', nargs='*', type=str, default=[], metavar=('GRPS'),
-            help='List of groups to identify subgroup for the input datasets (empty for top level)')            
+            help='List of groups to identify subgroup for the input datasets (empty for top level)')
         p.add_argument('--subgroups-out', nargs='*', type=str, default=[], metavar=('GRPS'),
-            help='List of groups to identify subgroup for the output datasets (empty for top level)')            
+            help='List of groups to identify subgroup for the output datasets (empty for top level)')
         p.add_argument('--dpWatershedTypes-verbose', action='store_true',
             help='Debugging output for dpWatershedTypes')
 
@@ -548,4 +548,3 @@ if __name__ == '__main__':
 
     ws = dpWatershedTypes(args)
     ws.watershed_cube()
-

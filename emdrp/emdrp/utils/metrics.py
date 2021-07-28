@@ -80,11 +80,11 @@ def warping_error( lbl_truth, lbl_proposed, doComps=True, simpleLUT=None, connec
 
     if doComps:
         lbls, nSplits = nd.measurements.label(classified == nonSimpleTypes['dic']['RESULT_SPLIT'],
-            structure=np.ones((3,3,3),dtype=np.bool))
+            structure=np.ones((3,3,3),dtype=bool))
         nonSimpleTypesOut = np.zeros(lbls.shape, dtype=lbls.dtype)
         nonSimpleTypesOut[lbls > 0] = nonSimpleTypes['dic']['RESULT_SPLIT']
         lbls, nMerges = nd.measurements.label(classified == nonSimpleTypes['dic']['RESULT_MERGE'],
-            structure=np.ones((3,3,3),dtype=np.bool))
+            structure=np.ones((3,3,3),dtype=bool))
         nonSimpleTypesOut[lbls > 0] = nonSimpleTypes['dic']['RESULT_MERGE']
     else:
         nSplits = (classified == nonSimpleTypes['dic']['RESULT_SPLIT']).sum(dtype=np.int64)
@@ -277,4 +277,3 @@ def adapated_rand_error_resample_getsamples(nSamples, pCI, ares, precs, recs):
     i = np.argsort(ares); ares = ares[i]; precs = precs[i]; recs = recs[i]
     #print(ares[pmed], precs[pmed], recs[pmed], ares[[plo,phi]], precs[[plo,phi]], recs[[plo,phi]])
     return ares[pmed], precs[pmed], recs[pmed], ares[[plo,phi]], precs[[plo,phi]], recs[[plo,phi]]
-

@@ -226,7 +226,7 @@ class dpLabelMesher(emLabels):
             # store vertices and faces for future reference
             self.nVertices[i] = self.vertices[i].shape[0]
             self.nFaces[i] = self.faces[i].shape[0]
-            
+
             # calculate surface area based on units in vertices
             self.surface_area[i] = mesh_surface_area(vertices, faces)
 
@@ -388,7 +388,7 @@ class dpLabelMesher(emLabels):
                 # decided to use a fixed point for the vertex coordinates
                 vertices = np.fix((self.vertices[i] - mins)*self.vertex_divisor)
                 str_seed = ('%08d' % self.seeds[i])
-                self.writeData(h5file, beg, end, str_seed, self.faces[i], vertices, self.nVoxels[i], 
+                self.writeData(h5file, beg, end, str_seed, self.faces[i], vertices, self.nVoxels[i],
                                surface_area=self.surface_area[i])
 
             self.nlabels = self.seeds[self.seed_range[1]-1]
@@ -634,7 +634,7 @@ class dpLabelMesher(emLabels):
                 zf.close()
                 # read the merge list
                 merge_list = inmerge.decode("utf-8").split('\n'); nlines = len(merge_list); n = nlines // 4
-    
+
                 # read the skeletons
                 info, meta, commentsString = knossos_read_nml(krk_contents=inskel.decode("utf-8")); m = len(info)
             else:
@@ -650,7 +650,7 @@ class dpLabelMesher(emLabels):
             self.nSVoxels = np.zeros((n,), dtype=np.uint64); self.nVoxels = np.zeros((n,), dtype=np.uint64)
 
             # iterated over objects to be meshed, render all the meshes in the mergelist for each object
-            obj_cnt = 0; obj_sel = np.zeros((n,),dtype=np.bool)
+            obj_cnt = 0; obj_sel = np.zeros((n,),dtype=bool)
             for i in range(n):
                 self.allPolyData[i] = vtk.vtkAppendPolyData()
 
@@ -660,7 +660,7 @@ class dpLabelMesher(emLabels):
                     cobj = int(tomerge[0]); tomerge = tomerge[3:]
                 else:
                     cobj = i+1; tomerge = np.array([cobj])
-                    
+
                 if nobjs > 0 and cobj not in self.merge_objects: continue
                 obj_cnt += 1; obj_sel[i] = 1; cmap_cnt = (obj_cnt - 1) % self.cmap.shape[0]
 
@@ -719,7 +719,7 @@ class dpLabelMesher(emLabels):
             self.skel_lblMappers = m * [None]; self.skel_lblActors = m * [None]
 
             # iterate over skeletons to be rendered
-            skel_cnt = 0; skel_sel = np.zeros((m,),dtype=np.bool)
+            skel_cnt = 0; skel_sel = np.zeros((m,),dtype=bool)
             for i in range(m):
                 if nskels > 0 and info[i]['thingID'] not in self.skeletons: continue
                 skel_cnt += 1; skel_sel[i] = 1; cmap_cnt = (skel_cnt - 1) % self.cmap.shape[0]
@@ -847,7 +847,7 @@ class dpLabelMesher(emLabels):
         self.nFaces = np.zeros((n,), dtype=np.uint64); self.nVertices = np.zeros((n,), dtype=np.uint64);
         self.nSVoxels = np.zeros((n,), dtype=np.uint64);
 
-        obj_cnt = 0; obj_sel = np.zeros((n,),dtype=np.bool)
+        obj_cnt = 0; obj_sel = np.zeros((n,),dtype=bool)
 
         if self.write_ply:
            plyWriter = vtk.vtkPLYWriter()
@@ -1087,7 +1087,7 @@ if __name__ == '__main__':
         # merge meshes from multiple mesh files (necessary if superchunks have been stitched)
         seg2mesh.mergeMeshInfiles()
     elif len(seg2mesh.mesh_infiles) > 0:
-        # print out combined stats for mesh files over multiple superchunks      
+        # print out combined stats for mesh files over multiple superchunks
         seg2mesh.readMeshInfiles()
     else:
         # standard mode, mesh all supervoxels in a single labeled volume (superchunk in one hdf5 label file)

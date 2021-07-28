@@ -104,7 +104,7 @@ frag = dpFRAG.makeTestingFRAG(labelfile, chunk, size, offset,
 # boundary size is saved in frag.eperim
 frag.ovlp_attrs += ['ovlp_cur_dilate']
 
-# get list of edges after creation of rag// 
+# get list of edges after creation of rag//
 list_of_edges = np.zeros((size_of_edges,2), dtype=np.uint32)
 count = np.zeros(2, dtype=np.uint32)
 list_of_borders = np.zeros((0, batch_borders), dtype=np.uint32)
@@ -122,7 +122,7 @@ neigh_sel_indices = np.transpose(np.nonzero(neigh_sel))
 neigh_sel_indices = neigh_sel_indices - (neigh_sel_size//2)
 neigh_sel_indices = np.array(neigh_sel_indices, dtype = np.int)
 
-#sel_indices = np.array([False,False,True,False, True, True, False, True, True,False, False, True,False,False,True, False, True,True,False, False,True,False,True,True, False,True,True],dtype=np.bool)
+#sel_indices = np.array([False,False,True,False, True, True, False, True, True,False, False, True,False,False,True, False, True,True,False, False,True,False,True,True, False,True,True],dtype=bool)
 #neigh_sel_indices = neigh_sel_indices[sel_indices==True]
 
 #calculate the jump steps required for 2X dilation to check for borders. Always look two times the actual dilation to
@@ -165,7 +165,7 @@ list_of_borders[:,0] = tmp_edges[:,0]
 list_of_borders[:,1] = tmp_edges[:,1]
 list_of_borders[:,2] = 3;
 
-# tmp data structure for edges calculated for each label 
+# tmp data structure for edges calculated for each label
 tmp_lab_edges = np.zeros((frag.nsupervox,np.int(tmp_edge_size)), dtype = np.uint32)
 tmp_lab_edges[:,0] = 2;
 tmp_lab_edges[:,1] = np.arange(1,frag.nsupervox+1)
@@ -226,7 +226,7 @@ if do_cpu_rag:
         print('\tdone in %.4f s' % (time.time() - t))
 
 if validate:
-   
+
     file_name = 'tmp-edge-list-cpu.txt'
     reference_edges = np.fromfile(file_name, dtype=np.int32, sep=" ").reshape((-1,2), order='C')
     print(reference_edges)
@@ -260,4 +260,3 @@ if validate:
           else:
             print(generated_borders[i])
             print(reference_borders[i])
- 

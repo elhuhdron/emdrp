@@ -45,7 +45,7 @@ outfile             = '/Data/' + username + '/tmp_agglo_out.h5'
 probaugfile         = ''
 #probaugfile         = '/Data/' + username + '/full_datasets/neon_sixfold/mbfergus32/huge_probs.h5'
 
-# Input raw EM augmented data                                                                    
+# Input raw EM augmented data
 rawaugfile          = ''
 #rawaugfile          = '/Data/datasets/raw/M0007_33_39x35x7chunks_Forder_aug.h5'
 
@@ -80,15 +80,15 @@ structuring_element = nd.morphology.generate_binary_structure(vol_dim, connectiv
 
 time1 = 0
 time2 = 0
-svox_bnd = nd.measurements.find_objects(sample_supervoxels, nsupervox) 
- 
+svox_bnd = nd.measurements.find_objects(sample_supervoxels, nsupervox)
+
 for i in range(1,nsupervox):
-    pbnd = tuple([slice(x.start-(2*dilation_iter),x.stop+(2*dilation_iter)) for x in svox_bnd[i-1]])  
+    pbnd = tuple([slice(x.start-(2*dilation_iter),x.stop+(2*dilation_iter)) for x in svox_bnd[i-1]])
     svox_cur = sample_supervoxels[pbnd]
     svox_sel = (svox_cur == i)
-    svox_sel_out = np.zeros((svox_sel.shape), dtype=np.bool)
+    svox_sel_out = np.zeros((svox_sel.shape), dtype=bool)
     t = time.time();
-    dilation.dilate(svox_sel, structuring_element, svox_sel_out, dilation_iter, blockdim, np.asarray((svox_sel.shape), dtype=np.uint32)) 
+    dilation.dilate(svox_sel, structuring_element, svox_sel_out, dilation_iter, blockdim, np.asarray((svox_sel.shape), dtype=np.uint32))
     time1 += time.time() - t
     #svox_sel_out = svox_sel_out.astype(dtype=bool)
     nbrlbls = np.unique(svox_cur[svox_sel_out])
@@ -98,7 +98,7 @@ print('gpu done in %.4f s' % time1)
 
 
 for j in range(1, nsupervox):
-    #incase of dilation greater than 1 the inout binary mask changes. Hence 
+    #incase of dilation greater than 1 the inout binary mask changes. Hence
     #required to reintialize the binary mask
     pbnd = tuple([slice(x.start-(2*dilation_iter),x.stop+(2*dilation_iter)) for x in svox_bnd[j-1]])
     svox_cur = sample_supervoxels[pbnd]
@@ -108,7 +108,7 @@ for j in range(1, nsupervox):
     time2 += time.time() - t;
     n_lbls = np.unique(svox_cur[svox_sel_out_gndtrth])
     n_lbls = n_lbls[np.logical_and(n_lbls != j, n_lbls !=0)]
- 
+
 print('original done in %.4f s' % time2)
 
 '''if((svox_sel_out == svox_sel_out_gndtrth).all()):

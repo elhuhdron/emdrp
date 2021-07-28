@@ -231,22 +231,22 @@ class emLabels(dpWriteh5):
     @staticmethod
     def remove_adjacencies_6conn(labels):
         bgmask = (labels > 0)    # to mask out labels that border on background to prevent erosion
-        adjmask = np.zeros(labels.shape, dtype=np.bool)
+        adjmask = np.zeros(labels.shape, dtype=bool)
 
         d = (np.diff(labels,axis=0) != 0)
         d = np.logical_and(np.logical_and(bgmask[:-1,:,:], d), np.logical_and(bgmask[1:,:,:], d))
-        dc = np.zeros(labels.shape, dtype=np.bool); dc[:-1,:,:] = d; dc[1:,:,:] = np.logical_or(dc[1:,:,:], d)
+        dc = np.zeros(labels.shape, dtype=bool); dc[:-1,:,:] = d; dc[1:,:,:] = np.logical_or(dc[1:,:,:], d)
         adjmask = np.logical_or(adjmask, dc); del d, dc
 
         d = (np.diff(labels,axis=1) != 0)
         d = np.logical_and(np.logical_and(bgmask[:,:-1,:], d), np.logical_and(bgmask[:,1:,:], d))
-        dc = np.zeros(labels.shape, dtype=np.bool); dc[:,:-1,:] = d; dc[:,1:,:] = np.logical_or(dc[:,1:,:], d)
+        dc = np.zeros(labels.shape, dtype=bool); dc[:,:-1,:] = d; dc[:,1:,:] = np.logical_or(dc[:,1:,:], d)
         adjmask = np.logical_or(adjmask, dc); del d, dc
 
         if labels.shape[2] > 1:
             d = (np.diff(labels,axis=2) != 0)
             d = np.logical_and(np.logical_and(bgmask[:,:,:-1], d), np.logical_and(bgmask[:,:,1:], d))
-            dc = np.zeros(labels.shape, dtype=np.bool); dc[:,:,:-1] = d; dc[:,:,1:] = np.logical_or(dc[:,:,1:], d)
+            dc = np.zeros(labels.shape, dtype=bool); dc[:,:,:-1] = d; dc[:,:,1:] = np.logical_or(dc[:,:,1:], d)
             adjmask = np.logical_or(adjmask, dc); del d, dc
 
         # not guaranteed to be left with the same number of components, so rerun
@@ -258,7 +258,7 @@ class emLabels(dpWriteh5):
     '''
     @staticmethod
     def ucskeletonize(uclabels, mask=None, sampling=None, nShrinkEndPoints=0):
-        if mask is None: mask = np.ones(uclabels.shape, dtype=np.bool)
+        if mask is None: mask = np.ones(uclabels.shape, dtype=bool)
         if sampling is None:
             sampling = np.ones((3,),dtype=np.double)
         else:
@@ -284,10 +284,10 @@ class emLabels(dpWriteh5):
         # this method assumes that original labels were unconnected.
         # xxx - add connectivity to this function and send it to binary_warping for loading simpleLUT
         bwlabels, diff = binary_warping((uclabels > 0).copy(order='C'),
-            np.zeros(uclabels.shape,dtype=np.bool), mask=amask, borderval=False, slow=True)
+            np.zeros(uclabels.shape,dtype=bool), mask=amask, borderval=False, slow=True)
         if nShrinkEndPoints > 0:
             # now warp down a few more iterations to move anchor endpoints away from the object borders
-            bwlabels, diff = binary_warping(bwlabels.copy(order='C'), np.zeros(uclabels.shape,dtype=np.bool),
+            bwlabels, diff = binary_warping(bwlabels.copy(order='C'), np.zeros(uclabels.shape,dtype=bool),
                 mask=mask, borderval=False, slow=True, numiters=nShrinkEndPoints)
         # run connected components to get label values
         return nd.measurements.label(bwlabels)
@@ -296,10 +296,10 @@ class emLabels(dpWriteh5):
                         ## "node"-ize instead of skeletonize
                         ## warp all the way down to points for each object.
                         #skbwlabels, diff = binary_warping(bwlabels.copy(order='C'),
-                        #    np.zeros(self.size,dtype=np.bool), mask=cVoxTypeSel, borderval=False, slow=True)
+                        #    np.zeros(self.size,dtype=bool), mask=cVoxTypeSel, borderval=False, slow=True)
                         ## now warp back up a few iterations to make circles or spheres around points
                         #skbwlabels, diff = binary_warping(skbwlabels.copy(order='C'),
-                        #    np.ones(self.size,dtype=np.bool), mask=cVoxTypeSel, borderval=False, slow=True, numiters=2)
+                        #    np.ones(self.size,dtype=bool), mask=cVoxTypeSel, borderval=False, slow=True, numiters=2)
                         ## run connected components to get label values
                         #sklabels = np.zeros(self.size, dtype=emLabels.LBLS_DTYPE); sknlabels = 0;
                         #sknlabels = label_components(skbwlabels.astype(emLabels.LBLS_DTYPE), sklabels, sknlabels+1)
@@ -338,7 +338,7 @@ class emLabels(dpWriteh5):
         for n in range(ncolor):
             #nbrlbls = np.unique(wlabels[nd.morphology.binary_dilation(wlabels==(ind_obj[n]+1),structure=struct)])
             nbrlbls = np.unique(wlabels[nd.morphology.binary_dilation(wlabels==(ind_obj[n]+1))])
-            sel = np.zeros((nlabels,),dtype=np.bool); sel[nbrlbls-1] = 1; neighbors[n,sel[sel_obj]] = 1
+            sel = np.zeros((nlabels,),dtype=bool); sel[nbrlbls-1] = 1; neighbors[n,sel[sel_obj]] = 1
         neighbors.flatten()[::ncolor] = 0   # remove diagonal
 
         G = nx.Graph(neighbors)
@@ -350,7 +350,7 @@ class emLabels(dpWriteh5):
             'strategy_connected_sequential','strategy_connected_sequential_dfs',
             'strategy_connected_sequential_bfs','strategy_saturation_largest_first',
         ]
-        interchange = np.ones((len(strategies),),dtype=np.bool); interchange[[2,6]] = 0; minclrs = ncolor
+        interchange = np.ones((len(strategies),),dtype=bool); interchange[[2,6]] = 0; minclrs = ncolor
         for i in range(len(strategies)):
             tmp = nx.coloring.greedy_color(G, strategy=eval('nx.coloring.'+strategies[i]),
                 interchange=bool(interchange[i]))
@@ -424,5 +424,3 @@ class emProbabilities(dpWriteh5):
         if inraw: writeh5.writeFromRaw()
         else: writeh5.writeCube(data)
         return writeh5
-
-

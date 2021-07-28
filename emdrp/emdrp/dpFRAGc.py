@@ -257,7 +257,7 @@ class dpFRAG(emLabels):
         # NOTE: MUST do this here before most inits so that dataset properties are loaded properly
         # xxx - ugly, svox context was never helping, so instead only use this for probs
         self.chunk_subgroups_txt = 'chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())
-        #if self.chunk_subgroups: 
+        #if self.chunk_subgroups:
         #    self.keep_subgroups = True
         #    self.subgroups = ['chunk_x%04d_y%04d_z%04d' % tuple(self.chunk.tolist())] + self.subgroups
         #    self.inith5() # MUST so that dataset properties are loaded
@@ -299,7 +299,7 @@ class dpFRAG(emLabels):
         self.readCubeToBuffers()
         assert((np.iinfo(self.data_cube.dtype).max > self.data_cube).all())
 
-        # optionally remove ECS supervoxels entirely (set to background) 
+        # optionally remove ECS supervoxels entirely (set to background)
         if self.remove_ECS and self.has_ECS:
             self.data_cube[self.data_cube > self.data_attrs['types_nlabels'][0]] = 0
         relabel, sizes, mapping = emLabels.relabel_sequential(self.data_cube, return_mapping=True)
@@ -317,7 +317,7 @@ class dpFRAG(emLabels):
             #self.isECS = (mapping > self.data_attrs['types_nlabels'][0])
             self.nsupervox_merge = np.searchsorted(mapping, self.data_attrs['types_nlabels'][0])
             self.nsupervox_nomerge = self.nsupervox - self.nsupervox_merge
-        
+
         self.supervoxels_noperim = relabel.astype(self.lbl_dtype, copy=False)
         self.supervoxels = np.lib.pad(self.supervoxels_noperim, self.spad, 'constant', constant_values=0)
         self.supervoxels_zeroperim = self.supervoxels
@@ -347,7 +347,7 @@ class dpFRAG(emLabels):
                 for j in range(self.naugments):
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.prob_types[i]+self.augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [], 
+                        subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [],
                         verbose=self.dpLoadh5_verbose)
                     data = loadh5.data_cube
 
@@ -363,7 +363,7 @@ class dpFRAG(emLabels):
                 if self.static_augments[j][0] != '_':
                     loadh5 = dpLoadh5.readData(srcfile=self.probaugfile, dataset=self.static_augments[j],
                         chunk=self.chunk.tolist(), offset=offset.tolist(), size=size.tolist(),
-                        subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [], 
+                        subgroups=[self.chunk_subgroups_txt] if self.chunk_subgroups else [],
                         verbose=self.dpLoadh5_verbose)
                     data = loadh5.data_cube
 
@@ -480,13 +480,13 @@ class dpFRAG(emLabels):
             self.gt = None; self.ngtlbl = -1
 
         if self.dpFRAG_verbose:
-            print('\tdone in %.4f s, %d supervoxels, %d merge-able supervoxels, %d gt labels' % (time.time() - t, 
+            print('\tdone in %.4f s, %d supervoxels, %d merge-able supervoxels, %d gt labels' % (time.time() - t,
                 self.nsupervox, self.nsupervox_merge, self.ngtlbl))
 
     def createFRAG(self, features=True, update=False):
         if self.dpFRAG_verbose:
             print('Creating FRAG'); ttime = time.time()
-            
+
         #if self.dpFRAG_verbose:
         #    print('\tFind objects'); t = time.time()
         ## get bounding boxes for each supervoxel
@@ -498,26 +498,26 @@ class dpFRAG(emLabels):
         if self.dpFRAG_verbose:
             print('\tCalculating RAG and border voxels'); t = time.time()
         if hasattr(self, 'steps'):
-            list_of_edges, list_of_borders = frag_with_borders(self.supervoxels, self.nsupervox_merge, pad=False, 
+            list_of_edges, list_of_borders = frag_with_borders(self.supervoxels, self.nsupervox_merge, pad=False,
                 steps=self.steps, min_step=self.min_step, max_step=self.max_step)
-        else:            
+        else:
             list_of_edges, list_of_borders, self.steps, self.min_step, self.max_step = frag_with_borders(\
                 self.supervoxels, self.nsupervox_merge, pad=False, nbhd=self.neighbor_perim, conn=self.connectivity)
         if self.dpFRAG_verbose:
             print('\t\tdone in %.4f s' % (time.time() - t))
-        nedges = list_of_edges.shape[0]; 
+        nedges = list_of_edges.shape[0];
 
         if update and hasattr(self,'FRAG') and self.FRAG is not None:
             assert( self.nsupervox_merge == self.FRAG.number_of_nodes() )
-            
+
             ## HIASSERT, compare graphs
             #G = nx.Graph(); G.add_nodes_from(range(1,self.nsupervox_merge+1)); G.add_edges_from(list_of_edges)
             #assert( nx.difference(self.FRAG, G).number_of_edges() == 0 )
         else:
             # initialize FRAG based on RAG computed in C-code
             # do not even include "do not merge" supervoxels as nodes in the FRAG at all
-            self.FRAG = nx.Graph(); self.FRAG.add_nodes_from(range(1,self.nsupervox_merge+1)); 
-            
+            self.FRAG = nx.Graph(); self.FRAG.add_nodes_from(range(1,self.nsupervox_merge+1));
+
             # this is the first iteration, add the edges calculated from the C-code
             self.FRAG.add_edges_from(list_of_edges)
 
@@ -549,7 +549,7 @@ class dpFRAG(emLabels):
             #   In this special case the supervoxel is skipped because all([]) evaluates to True.
             if update:
                 if all([('features' in x) for x in self.FRAG[i].values()]) or \
-                        all([('features' in x) for x in self.FRAG[j].values()]): 
+                        all([('features' in x) for x in self.FRAG[j].values()]):
                     continue
                 previ = self.prev_max_node + i; prevj = self.prev_max_node + j
                 loadovlp = 'ovlp_attrs' in self.FRAG[i][j]
@@ -558,7 +558,7 @@ class dpFRAG(emLabels):
             svox_size = self.svox_sizes[i-1]
             lsvox_size = self.voxel_size_xform(svox_size)
             ljsvox_size = self.voxel_size_xform(self.svox_sizes[j-1])
-            
+
             # get bounding box of the border voxels for this edge and add overlap perimeter
             border_voxels = np.transpose(np.unravel_index(list_of_borders[e], self.supervoxels.shape))
             bmin = border_voxels.min(axis=0); bmax = border_voxels.max(axis=0)+1
@@ -568,7 +568,7 @@ class dpFRAG(emLabels):
             ovlp_svox_cur = self.supervoxels[aobnd]
 
             # create mask for overlap within the overlap bounding box
-            ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=np.bool)
+            ovlp_cur = np.zeros(ovlp_svox_cur.shape,dtype=bool)
             ovlp_cur.flat[np.ravel_multi_index((border_voxels - bmin + self.perim).T, ovlp_svox_cur.shape)] = 1
 
             # SIMPLEST FEATURES: calculate mean features in the overlapping area between the neighbors.
@@ -696,7 +696,7 @@ class dpFRAG(emLabels):
                 for k in range(self.npcaang):
                     f[F['pca_angle_small' + str(k)]] = mj['angles'][k]
                     f[F['pca_angle_large' + str(k)]] = mi['angles'][k]
-                
+
             for k in range(self.npcaang):
                 f[F['pca_angle' + str(k)]] = angles_ij[k]
             for k in range(self.nprob_types):
@@ -802,13 +802,13 @@ class dpFRAG(emLabels):
         supervox_map = np.zeros((self.nsupervox+1,),dtype=self.lbl_dtype)
         compsG = nx.connected_components(aggloG); ncomps = 0
         svox_sizes = np.zeros((self.nsupervox,),dtype=np.int64)
-        
+
         # this is used for re-creating the graph after agglo without creating a new graph.
         # appends nodes that are beyond current last node. typcially this was nsupervox, but added the "do not merge"
         #   mode for which these supervoxels are not added to the graph at all.
         # this property indicates the last max node of the graph (also used in optimization).
         self.prev_max_node = self.nsupervox_merge
-        
+
         for nodes in compsG:
             # SINGLETON NODE: single supervoxel that is not undergoing any merging (agglomeration)
 
@@ -884,7 +884,7 @@ class dpFRAG(emLabels):
         self.data_cube = self.supervoxels_noperim
         self.data_attrs['types_nlabels'] = [self.nsupervox]
         self.supervoxels_zeroperim = self.supervoxels
-        
+
         # write out the agglomerated supervoxels (without perimeter context)
         verbose = self.dpWriteh5_verbose; self.dpWriteh5_verbose = self.dpFRAG_verbose;
         if doWrite:
@@ -1100,7 +1100,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeTrainingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile,
-            subgroups=[], G=None, progressBar=False, feature_set=None, has_ECS=True, chunk_subgroups=False, 
+            subgroups=[], G=None, progressBar=False, feature_set=None, has_ECS=True, chunk_subgroups=False,
             neighbor_only=False, pad_prob_svox_perim=False, no_agglo_ECS=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -1133,8 +1133,8 @@ class dpFRAG(emLabels):
         return frag
 
     @classmethod
-    def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile=None, 
-            subgroups=[], subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True, 
+    def makeTestingFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, outfile=None,
+            subgroups=[], subgroups_out=[], G=None, progressBar=False, feature_set=None, has_ECS=True,
             chunk_subgroups=False, neighbor_only=False, pad_prob_svox_perim=False, no_agglo_ECS=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -1169,7 +1169,7 @@ class dpFRAG(emLabels):
 
     @classmethod
     def makeBothFRAG(cls, labelfile, chunk, size, offset, probfiles, rawfiles, raw_dataset, gtfile, outfile=None,
-            subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True, 
+            subgroups=[], subgroups_out=None, G=None, progressBar=False, feature_set=None, has_ECS=True,
             neighbor_only=False, chunk_subgroups=False, pad_prob_svox_perim=False, no_agglo_ECS=False, verbose=False):
         parser = argparse.ArgumentParser(description='class:dpFRAG',
             formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -1221,7 +1221,7 @@ class dpFRAG(emLabels):
         p.add_argument('--testin', nargs=1, type=str, default='', help='Input file for loading testing data (dill)')
         #p.add_argument('--perim', nargs=3, type=int, default=[16,16,8], metavar=('X', 'Y', 'Z'), #choices=range(1,20),
         #    help='Size of bounding box around overlap for object features')
-        p.add_argument('--sperim', nargs=1, type=int, default=16, metavar=('S'), 
+        p.add_argument('--sperim', nargs=1, type=int, default=16, metavar=('S'),
             help='Size of one side of bounding box around overlap for object features (3D calculated using sampling)')
         p.add_argument('--remove-ECS', dest='remove_ECS', action='store_true',
             help='Set to remove ECS supervoxels (set to 0)')
@@ -1275,4 +1275,3 @@ if __name__ == '__main__':
         frag.agglomerate(data['target'])
     else:
         assert(False)   # only specify training output or testing input on command line
-

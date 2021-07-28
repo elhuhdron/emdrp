@@ -29,7 +29,7 @@
 # "Cleaning" is used both for:
 #       (1) cleaning up manually annotated ground truth (GT) labels (typically from single labeler)
 #       (2) cleaning up automated labels (supervoxels) as a last step before meshing.
-#       (3) cleaning up and calculating paths for "proof-reading" or "boot-strapping" 
+#       (3) cleaning up and calculating paths for "proof-reading" or "boot-strapping"
 #             xxx - this method did not work super well, so has been abandoned for now
 # xxx - better quantification of the value of these steps, (2) has been difficult to measure but (1) could be measured
 #   cleaned supervoxels are at least aesthetically much more pleasing than before cleaning
@@ -105,11 +105,11 @@ class dpCleanLabels(emLabels):
                     if self.minpath_skel:
                         # optionally skeletonize keeping original minpath points as anchors
                         bwlabels, diff, simpleLUT = binary_warping(bwlabels.copy(order='C'),
-                            np.zeros(self.size,dtype=np.bool), mask=(~selmin).copy(order='C'), borderval=False,
+                            np.zeros(self.size,dtype=bool), mask=(~selmin).copy(order='C'), borderval=False,
                             slow=True, connectivity=self.fg_connectivity)
                         # fill back out slightly so more easily viewed in itksnap
                         bwlabels, diff, simpleLUT = binary_warping(bwlabels.copy(order='C'),
-                            np.ones(self.size,dtype=np.bool), borderval=False, slow=True, simpleLUT=simpleLUT,
+                            np.ones(self.size,dtype=bool), borderval=False, slow=True, simpleLUT=simpleLUT,
                             connectivity=self.fg_connectivity, numiters=1)
                     paths[bwlabels] = 1
             self.data_cube = paths
@@ -157,12 +157,12 @@ class dpCleanLabels(emLabels):
                 Lcrpsel = (image_with_brd[pbnd] == j+1); Lcrp = Lcrpsel.astype(np.double)
                 # smoothing operation just box filter on cropped binarized label
                 Lfilt = nd.filters.uniform_filter(Lcrp, size=smooth_size, mode='constant')
-                
+
                 # this feature allows for variable contour level depending on if object splits apart
                 if len(self.contour_lvl) > 1:
                     # get the original number of components for the object
                     nlabels_orig = nd.measurements.label(Lcrpsel, self.fgbwconn)[1]
-                    for c in np.arange(self.contour_lvl[1], self.contour_lvl[0]-self.contour_lvl[2]/10, 
+                    for c in np.arange(self.contour_lvl[1], self.contour_lvl[0]-self.contour_lvl[2]/10,
                                        -self.contour_lvl[2]):
                         # incase smoothing below contour level, use without smoothing
                         if not (Lfilt > c).any(): Lfilt = Lcrp
@@ -176,7 +176,7 @@ class dpCleanLabels(emLabels):
                     # incase smoothing below contour level, use without smoothing
                     if not (Lfilt > contour_level).any(): Lfilt = Lcrp
                     csel = (Lfilt > contour_level)
-                    
+
                 # assign smoothed output for current label
                 lbls[pbnd][csel] = j+1
 
@@ -198,7 +198,7 @@ class dpCleanLabels(emLabels):
                     ', ignoring ECS label %d' % (ECS_label,) if ECS_label else ''))
                 t = time.time()
 
-            self.data_cube = emLabels.remove_adjacencies_nconn(labels, bwconn=np.ones((r,r,r),dtype=np.bool))
+            self.data_cube = emLabels.remove_adjacencies_nconn(labels, bwconn=np.ones((r,r,r),dtype=bool))
             if ECS_label: self.data_cube[sel_ECS] = ECS_label
 
             if self.dpCleanLabels_verbose:
@@ -221,14 +221,14 @@ class dpCleanLabels(emLabels):
                 # iterate over labels, fill each label within bounding box
                 svox_bnd = nd.measurements.find_objects(self.data_cube)
                 if self.dpCleanLabels_verbose:
-                    print('\t\tdone in %.4f s' % (time.time() - t)); t = time.time(); 
+                    print('\t\tdone in %.4f s' % (time.time() - t)); t = time.time();
                     verbose = self.dpCleanLabels_verbose; self.dpCleanLabels_verbose = False
                 nSeeds = len(svox_bnd); lbls = np.zeros(self.size, dtype=self.data_cube.dtype)
                 for j in range(nSeeds):
                     csel, selbg, msk = self.cavity_fill_voxels(self.data_cube[svox_bnd[j]] == j+1, tab=True)
                     lbls[svox_bnd[j]][csel] = j+1
                 del self.data_cube; self.data_cube = lbls
-                
+
                 if verbose:
                     print('\tdone in %.4f s' % (time.time() - t)); self.dpCleanLabels_verbose = True
             else:
@@ -259,7 +259,7 @@ class dpCleanLabels(emLabels):
 
             # do a normal cavity fill after labels smaller than cavity_fill_minsize are removed
             labels, selbg, msk = self.cavity_fill_voxels(data, tab=True); del msk, selbg
-                
+
             if self.dpCleanLabels_verbose:
                 print('\tReplacing non-cavity labels')
             sel_not_fill = np.logical_and(labels_orig > 0, labels == 0)
@@ -376,11 +376,11 @@ class dpCleanLabels(emLabels):
         tabc = '\t' if tab else ''
         if self.dpCleanLabels_verbose:
             print('%sRemoving cavities using conn %d' % (tabc, self.bg_connectivity,)); t = time.time()
-            
+
         selbg = (data == 0)
         if self.dpCleanLabels_verbose:
             print('%s\tnumber bg vox before = %d' % (tabc, selbg.sum(dtype=np.int64),))
-        labels = np.ones([x + 2 for x in data.shape], dtype=np.bool)
+        labels = np.ones([x + 2 for x in data.shape], dtype=bool)
         labels[1:-1,1:-1,1:-1] = selbg
         # don't connect the top and bottom xy planes
         labels[1:-1,1:-1,0] = 0; labels[1:-1,1:-1,-1] = 0
@@ -393,7 +393,7 @@ class dpCleanLabels(emLabels):
         if self.dpCleanLabels_verbose:
             print('%s\tnumber bg vox after = %d' % (tabc, (filled==0).sum(dtype=np.int64),))
             print('%s\tdone in %.4f s' % (tabc, time.time() - t))
-        
+
         return filled, selbg, msk
 
     def getECS(self, labels):
@@ -402,7 +402,7 @@ class dpCleanLabels(emLabels):
         elif self.ECS_label < 0:
             ECS_label = labels.max(); sel_ECS = (labels == ECS_label)
         else:
-            sel_ECS = np.zeros(labels.shape, dtype=np.bool); ECS_label = None
+            sel_ECS = np.zeros(labels.shape, dtype=bool); ECS_label = None
         return sel_ECS, ECS_label
 
     def setECS(self, labels, sel_ECS, ECS_label, nlabels):
@@ -447,7 +447,7 @@ class dpCleanLabels(emLabels):
         # rerun labeling (connected components)
         p.add_argument('--relabel', action='store_true', help='Re-label components (run connected components)')
         # write background (membrane mask) using the voxel type
-        p.add_argument('--apply-bg-mask', action='store_true', 
+        p.add_argument('--apply-bg-mask', action='store_true',
                        help='Write voxel-type background (membrane) mask to supervoxels')
         # recompute voxel type based on majority winner for each supervoxel
         p.add_argument('--get-svox-type', action='store_true', help='Recompute supervoxel type using majority method')

@@ -390,7 +390,7 @@ class dpLoadh5(object):
             }
         # gipl type to numpy
         numpy_types = {
-            65:np.double,64:np.single,1:np.bool,
+            65:np.double,64:np.single,1:np.bool_,
             7:np.int8,8:np.uint8,15:np.int16,16:np.uint16,32:np.int32,31:np.uint32,
             }
         bit_lengths = {
@@ -532,7 +532,7 @@ class dpLoadh5(object):
         p.add_argument('--dpLoadh5-verbose', action='store_true', help='Debugging output for dpLoadh5')
 
 
-    
+
 
 
 if __name__ == '__main__':
@@ -544,4 +544,3 @@ if __name__ == '__main__':
     loadh5 = dpLoadh5(args)
     loadh5.readCubeToBuffers()
     loadh5.writeRaw()
-

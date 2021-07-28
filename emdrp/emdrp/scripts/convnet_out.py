@@ -1,17 +1,17 @@
 # The MIT License (MIT)
-# 
+#
 # Copyright (c) 2016 Paul Watkins, National Institutes of Health / NINDS
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 # Top level script for generating supervoxels / running metrics.
-# Adapted from top level script for revision of ECS paper. 
-# 
+# Adapted from top level script for revision of ECS paper.
+#
 # Ideally this top-level script eventually morphs into some top-level control for EMDRP...
 
 
@@ -50,14 +50,14 @@ params = {
     'groups' : ['none', 'small', 'large', 'huge'],
     'groups_vals' : [0.6, 6, 11, 24],
     'groups_xlim' : [-3,27.5],
-    'groups_xlbl' : 'Mean Amount of ECS (%)', 
+    'groups_xlbl' : 'Mean Amount of ECS (%)',
     'blocks' : range(1,nblocks+1),
     'inpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/runs',
     #'loadpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/runs/out/20150918',
     'loadpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/runs/out/test',
     'outpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/runs/out',
-    'size' : [640, 576, 1], 'offset' : [0, 0, 8], 'lblbits' : 16, 'chunks' : [[[0, 0, 0]]*nblocks]*ngroups, 
-    'thrRng' : [0.6, 0.999, 0.01], 
+    'size' : [640, 576, 1], 'offset' : [0, 0, 8], 'lblbits' : 16, 'chunks' : [[[0, 0, 0]]*nblocks]*ngroups,
+    'thrRng' : [0.6, 0.999, 0.01],
     'thrHi' : [0.995, 0.999, 0.9995, 0.9999, 0.99995, 0.99999, 0.999995, 0.999999],
     'thrLo' : [0.3, 0.4, 0.5],
     'Tmins' : [64],
@@ -94,17 +94,17 @@ params = {
     'groups' : ['none', 'huge'],
     'groups_vals' : [0.6, 24],
     'groups_xlim' : [-3,27.5],
-    'groups_xlbl' : 'Mean Amount of ECS (%)', 
+    'groups_xlbl' : 'Mean Amount of ECS (%)',
     'blocks' : range(1,nblocks+1),
     'inpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed',
     'loadpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out/test',
     'outpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out',
-    'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbits' : 16, 
-    'chunks' : [ 
+    'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbits' : 16,
+    'chunks' : [
         [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],     # none ECS
         [[19,22,2], [17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2]],     # huge ECS
-        ], 
-    'thrRng' : [0.6, 0.999, 0.01], 
+        ],
+    'thrRng' : [0.6, 0.999, 0.01],
     'thrHi' : [0.995, 0.999, 0.9995, 0.9999, 0.99995, 0.99999, 0.999995, 0.999999],
     'thrLo' : [0.3, 0.4, 0.5],
     #'Tmins' : [16, 32, 64, 128],
@@ -112,9 +112,9 @@ params = {
     'global_mins' : True,
     'group_single' : True,
     # merge all
-    'merge_probs' : ['_xyz_0_probs.h5', '_xzy_0_probs.h5', '_zyx_0_probs.h5', '_xyz_1_probs.h5', '_xyz_2_probs.h5'], 
-    'merge_weightings' : [1.0,0.5,0.5,1.0,1.0],    
-    'merge_orderings' : ['xyz','xzy','zyx','xyz','xyz'],   
+    'merge_probs' : ['_xyz_0_probs.h5', '_xzy_0_probs.h5', '_zyx_0_probs.h5', '_xyz_1_probs.h5', '_xyz_2_probs.h5'],
+    'merge_weightings' : [1.0,0.5,0.5,1.0,1.0],
+    'merge_orderings' : ['xyz','xzy','zyx','xyz','xyz'],
     'gt_labels' : [
         'M0027_11_labels_briggmankl_watkinspv_33x37x7chunks_Forder.h5',
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
@@ -149,35 +149,35 @@ params = {
     'groups' : ['none', 'huge'],
     'groups_vals' : [0.6, 24],
     'groups_xlim' : [-3,27.5],
-    'groups_xlbl' : 'Mean Amount of ECS (%)', 
+    'groups_xlbl' : 'Mean Amount of ECS (%)',
     'blocks' : range(1,nblocks+1),
     #'inpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed',
     'inpath' : '/Data/pwatkins/full_datasets/newestECSall',
     'loadpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out',
     'outpath' : '/Data/pwatkins/full_datasets/newestECSall',
-    'size' : [1024, 1024, 480], 'offset' : [0, 0, 32], 'lblbits' : 32, 
+    'size' : [1024, 1024, 480], 'offset' : [0, 0, 32], 'lblbits' : 32,
     #'size' : [64, 64, 64], 'offset' : [0, 0, 32], 'lblbits' : 32, # for test
-    #'chunks' : [ 
+    #'chunks' : [
     #    [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],     # none ECS
     #    [[19,22,2], [17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2]],     # huge ECS
-    #    ], 
-    'chunks' : [ 
+    #    ],
+    'chunks' : [
         [[12,14,2], ],     # corner none ECS
         [[16,17,0], ],     # corner huge ECS
-        ], 
-    #'thrRng' : [0.95, 0.999, 0.01], 
+        ],
+    #'thrRng' : [0.95, 0.999, 0.01],
     #'thrHi' : [0.995, 0.999, 0.9995, 0.9999, 0.99995],
-    'thrRng' : [0.3, 0.999, 0.1], 
+    'thrRng' : [0.3, 0.999, 0.1],
     'thrHi' : [0.95, 0.975, 0.99, 0.995, 0.999, 0.9995, 0.9999, 0.99995, 0.99999, 0.999995, 0.999999],
     'thrLo' : [],
     #'Tmins' : [8, 16, 32, 64, 128, 256],
     'Tmins' : [256],
     'group_single' : True,
     # merge all
-    'merge_probs' : ['_all_xyz_0_probs.h5', '_all_xzy_0_probs.h5', '_all_zyx_0_probs.h5', '_all_xyz_1_probs.h5', 
-        '_all_xyz_2_probs.h5'], 
-    'merge_weightings' : [1.0,0.5,0.5,1.0,1.0],    
-    'merge_orderings' : ['xyz','xzy','zyx','xyz','xyz'],   
+    'merge_probs' : ['_all_xyz_0_probs.h5', '_all_xzy_0_probs.h5', '_all_zyx_0_probs.h5', '_all_xyz_1_probs.h5',
+        '_all_xyz_2_probs.h5'],
+    'merge_weightings' : [1.0,0.5,0.5,1.0,1.0],
+    'merge_orderings' : ['xyz','xzy','zyx','xyz','xyz'],
     'gt_labels' : [
         'M0027_11_labels_briggmankl_watkinspv_33x37x7chunks_Forder.h5',
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
@@ -211,17 +211,17 @@ params = {
     'groups' : ['none', 'none', 'none'],
     'groups_vals' : [2,4,6],
     'groups_xlim' : [-2,8],
-    'groups_xlbl' : 'prob merge groups', 
+    'groups_xlbl' : 'prob merge groups',
     'blocks' : range(1,nblocks+1),
     'inpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed',
     'loadpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out/20150817_mergecompare',
     'outpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed/out',
-    'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbits' : 16, 
+    'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbits' : 16,
     'chunks' : [ [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],    # none ECS
-        [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],    # none ECS        
-        [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],    # none ECS        
-        ], 
-    'thrRng' : [0.5, 1.0, 0.01], 
+        [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],    # none ECS
+        [[16,17,4], [18,15,3], [13,15,3], [13,20,3], [18,20,3], [18,20,4]],    # none ECS
+        ],
+    'thrRng' : [0.5, 1.0, 0.01],
     'thrHi' : [0.995, 0.999, 0.9995, 0.9999],
     'thrLo' : [],
     'group_single' : True,
@@ -271,26 +271,26 @@ params = {
     'groups_vals' : [5, 10, 15, 20],
     #'groups_vals' : [5, 10],
     'groups_xlim' : [0,15],
-    'groups_xlbl' : 'groups', 
+    'groups_xlbl' : 'groups',
     'blocks' : range(1,nblocks+1),
     'inpath' : '/home/watkinspv/Data/convnet_out/cube_recons/newestECS/sixfold_threed',
     'loadpath' : '/Data/pwatkins/full_datasets/newestECSall/20151001',
     'outpath' : '/Data/pwatkins/full_datasets/newestECSall/20151001',
-    'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbitsgt' : 16, 'lblbits' : 32,  
-    #'size' : [64,64,64], 'offset' : [32,32,32], 'lblbitsgt' : 16, 'lblbits' : 32, 
-    'chunks' : [ 
-        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],     
-        ], 
-    #'chunks' : [ 
-    #    [[17,19,2]],     
-    #    [[17,19,2]],     
-    #    [[17,19,2]],     
-    #    [[17,19,2]],     
-    #    ], 
-    'thrRng' : [0.3, 0.999, 0.1], 
+    'size' : [128, 128, 128], 'offset' : [0, 0, 0], 'lblbitsgt' : 16, 'lblbits' : 32,
+    #'size' : [64,64,64], 'offset' : [32,32,32], 'lblbitsgt' : 16, 'lblbits' : 32,
+    'chunks' : [
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+        [[17,19,2], [17,23,1], [22,23,1], [22,18,1], [22,23,2], [19,22,2]],
+        ],
+    #'chunks' : [
+    #    [[17,19,2]],
+    #    [[17,19,2]],
+    #    [[17,19,2]],
+    #    [[17,19,2]],
+    #    ],
+    'thrRng' : [0.3, 0.999, 0.1],
     'thrHi' : [0.95, 0.975, 0.99, 0.995, 0.999, 0.9995, 0.9999, 0.99995, 0.99999, 0.999995, 0.999999],
     'thrLo' : [],
     #'Tmins' : [64],
@@ -298,9 +298,9 @@ params = {
     'global_mins' : True,
     'group_single' : True,
     # merge all
-    'merge_probs' : ['_xyz_0_probs.h5', '_xzy_0_probs.h5', '_zyx_0_probs.h5', '_xyz_1_probs.h5', '_xyz_2_probs.h5'], 
-    'merge_weightings' : [1.0,0.5,0.5,1.0,1.0],    
-    'merge_orderings' : ['xyz','xzy','zyx','xyz','xyz'],   
+    'merge_probs' : ['_xyz_0_probs.h5', '_xzy_0_probs.h5', '_zyx_0_probs.h5', '_xyz_1_probs.h5', '_xyz_2_probs.h5'],
+    'merge_weightings' : [1.0,0.5,0.5,1.0,1.0],
+    'merge_orderings' : ['xyz','xzy','zyx','xyz','xyz'],
     'gt_labels' : [
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
         'M0007_33_labels_briggmankl_watkinspv_39x35x7chunks_Forder.h5',
@@ -386,7 +386,7 @@ for i in range(ngroups):
                     ('--ThrRng 0.5 0.6 0.1 --TminSrc 20 --ThrHi  --outlabelsbits %d ' % lblbits)
                 if skeletonize: torun += '--skeletonize '
                 print('\n' + torun); t = time.time()
-                os.system(torun)                
+                os.system(torun)
                 print('\tdone in %.4f s' % (time.time() - t))
 
         # merge network probability outputs by averaging
@@ -406,11 +406,11 @@ for i in range(ngroups):
                         ('--srcfiles %s --dim-orderings %s ' % (' '.join(fpins), ' '.join(mo))) +\
                         ('--weightings %s ' % (' '.join([str(x) for x in mw])))
                     print('\n' + torun); t = time.time()
-                    os.system(torun)                
+                    os.system(torun)
                     print('\tdone in %.4f s' % (time.time() - t))
                 else:
                     copyfile(os.path.join(inpath,fpins[0]),fpout)
-    
+
         if export_raw:
             fpin = os.path.join(loadpath, fn + op)
             if os.path.isfile(fpin):
@@ -420,9 +420,9 @@ for i in range(ngroups):
                         ('--chunk %d %d %d --offset %d %d %d --size %d %d %d ' % tuple(chunks[i][j] + offset + size)) +\
                         ('--dataset %s --data-type float32 --outraw %s ' % (t,fpout))
                     print('\n' + torun); t = time.time()
-                    os.system(torun)                
+                    os.system(torun)
                     print('\tdone in %.4f s' % (time.time() - t))
-                
+
             fpin = raw_data[i]
             if os.path.isfile(fpin):
                 fpout = os.path.join(outpath,ofn+og+'_data.nrrd')
@@ -430,9 +430,9 @@ for i in range(ngroups):
                     ('--chunk %d %d %d --offset %d %d %d --size %d %d %d ' % tuple(chunks[i][j] + offset + size)) +\
                     ('--dataset data_mag1 --outraw %s ' % (fpout))
                 print('\n' + torun); t = time.time()
-                os.system(torun)                
+                os.system(torun)
                 print('\tdone in %.4f s' % (time.time() - t))
-    
+
         # watershed network outputs at multiple thresholds
         fpin = os.path.join(inpath, fn, output_data) if not is_merge else os.path.join(outpath, fn + op)
         fpout = os.path.join(outpath, fn + on)
@@ -448,7 +448,7 @@ for i in range(ngroups):
             if probWatershed: torun += '--probWatershed '
             if skimWatershed: torun += '--skimWatershed '
             print('\n' + torun); t = time.time()
-            os.system(torun)                
+            os.system(torun)
             print('\tdone in %.4f s' % (time.time() - t))
 
 
@@ -458,13 +458,13 @@ def load_gt_cat(fpgt, fpout, i, j):
         # load ground truth labels and components (watershedded version generated above)
         loadh5 = emVoxelType.readVoxType(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size)
         gtLbls = loadh5.data_cube
-        loadh5 = emLabels.readLabels(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size, 
+        loadh5 = emLabels.readLabels(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size,
             data_type=lbldtypegt, subgroups=['with_background', '%.8f' % 0.5])
         gtComps = loadh5.data_cube; gtComps_types_nlabels = loadh5.data_attrs['types_nlabels']
         # remove the ECS components for calculating metrics
         gtComps[gtComps > gtComps_types_nlabels[0]] = 0
         try:
-            loadh5 = emLabels.readLabels(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size, 
+            loadh5 = emLabels.readLabels(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size,
                 data_type=lbldtypegt, subgroups=['skeletonized', '%.8f' % 0.5])
         except:
             skeletonize = False
@@ -476,19 +476,19 @@ def load_gt_cat(fpgt, fpout, i, j):
             #gtSkelComps, sizes = emLabels.thresholdSizes(gtSkelComps, minSize=-14)
     else:
         # load ground truth and components from segmented labels file
-        loadh5 = emLabels.readLabels(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size, 
+        loadh5 = emLabels.readLabels(srcfile=fpgt, chunk=chunks[i][j], offset=offset, size=size,
             data_type=lbldtypegt)
         gtComps = loadh5.data_cube; gtIsECS = (gtComps == gt_ECS_label);
         gtLbls = np.zeros(gtComps.shape, dtype=np.uint8)
         gtLbls[np.logical_and(gtComps > 0, np.logical_not(gtIsECS))] = 1; gtLbls[gtIsECS] = 2;
         # remove the ECS components for calculating metrics
-        gtComps[gtIsECS] = 0; n = gtComps.max(); gtComps[gtComps == n] = gt_ECS_label; 
+        gtComps[gtIsECS] = 0; n = gtComps.max(); gtComps[gtComps == n] = gt_ECS_label;
         gtComps_types_nlabels = [n-1, 1]    # do not have number of ECS objects from GT
-        
+
     # load network output max prob categories (voxelTypes, "labels")
     loadh5 = emVoxelType.readVoxType(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size)
     outLbls = loadh5.data_cube; attrs = loadh5.data_attrs
-                
+
     return gtLbls, gtComps, gtComps_types_nlabels, gtSkelComps, outLbls, attrs
 
 
@@ -497,37 +497,37 @@ def load_prp_param(k):
 
     # current params are [threshold, Tmin] in F-order unravel
     kp = np.unravel_index(k, szparams, order='F')
-    if nTmin == 1: subgroups = ['%.8f' % (thresholds[k],)] 
+    if nTmin == 1: subgroups = ['%.8f' % (thresholds[k],)]
     else: subgroups = ['%d' % (Tmins[kp[1]],), '%.8f' % (thresholds[kp[0]],)]
 
-    # if one of these does not load then usually this means something was really bad about the 
+    # if one of these does not load then usually this means something was really bad about the
     #   network output (xxx - investigate why watershed doesn't handle this gracefully).
     # just skip these ones and leave them as no data points
     try:
         # load components at this threshold, normal, fully watershedded and without label adjacencies
-        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size, 
+        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size,
             data_type=lbldtype, subgroups=['with_background'] + subgroups)
         outComps = loadh5.data_cube; outComps_types_nlabels = loadh5.data_attrs['types_nlabels']
-        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size, 
+        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size,
             data_type=lbldtype, subgroups=['zero_background'] + subgroups)
         outCompsFull = loadh5.data_cube; outCompsFull_types_nlabels = loadh5.data_attrs['types_nlabels']
-        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size, 
+        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size,
             data_type=lbldtype, subgroups=['no_adjacencies'] + subgroups)
         outCompsNoAdj = loadh5.data_cube
-        
+
         # remove the ECS components for calculating metrics for non-fully-watershedded versions
         outComps[outComps > outComps_types_nlabels[0]] = 0
         outCompsNoAdj[outCompsNoAdj > outComps_types_nlabels[0]] = 0
     except:
         # hack to use this script to do gala comparisons
-        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size, 
+        loadh5 = emLabels.readLabels(srcfile=fpout, chunk=chunks[i][j], offset=offset, size=size,
             data_type=lbldtype, subgroups=['with_background'] + subgroups)
         outComps = loadh5.data_cube; outComps_types_nlabels = loadh5.data_attrs['types_nlabels']
         outCompsFull = loadh5.data_cube; outCompsFull_types_nlabels = loadh5.data_attrs['types_nlabels']
         outCompsNoAdj = loadh5.data_cube
 
     return subgroups, outComps, outComps_types_nlabels, outCompsFull, outCompsNoAdj
-    
+
 
 def calcGTRands(gtCompsR):
     ris = np.zeros((ngroups,nblocks),dtype=np.double)
@@ -540,7 +540,7 @@ def calcGTRands(gtCompsR):
             fpout = os.path.join(loadpath, fn + on)
             #if not (os.path.isfile(fpgt) and os.path.isfile(fpout) and \
             #    (not sel_metrics or (i*nblocks + j + 1) in sel_metrics)): continue
-                
+
             gtLbls, gtComps, gtComps_types_nlabels, gtSkelComps, outLbls, attrs = load_gt_cat(fpgt, fpout, i, j)
             are,prec,rec,ris[i,j] = adapted_rand_error( gtCompsR, gtComps, nogtbg=True, getRI=True )
     return ris
@@ -568,7 +568,7 @@ if run_metrics:
             fpout = os.path.join(loadpath, fn + on)
             if not (os.path.isfile(fpgt) and os.path.isfile(fpout) and \
                 (not sel_metrics or (i*nblocks + j + 1) in sel_metrics)): continue
-                
+
             gtLbls, gtComps, gtComps_types_nlabels, gtSkelComps, outLbls, attrs = load_gt_cat(fpgt, fpout, i, j)
 
             print('calculating metrics for ' + fn + on + (' chunk %d %d %d' % tuple(chunks[i][j]))); t = time.time()
@@ -602,15 +602,15 @@ if run_metrics:
                     #'voxel_sizes_out' : ma.array(np.zeros((ngroups,nblocks,nparams,2),dtype=np.int64),mask=True),
                     'rand_index_gts' : ma.array(np.zeros((ngroups,nblocks,ngroups,nblocks),dtype=np.double),mask=True),
                     'ari_gtnorm' : ma.array(np.zeros((ngroups,nblocks,nparams),dtype=np.double),mask=True),
-                    }                
+                    }
                 globals().update(metrics)
             else:
                 assert( all([x==y for x,y in zip(metrics['thresholds'],attrs['thresholds'])]) )
                 assert( all([x==y for x,y in zip(metrics['Tmins'],attrs['Tmins'])]) )
-                    
+
             # calculate the categorization error
             cat_error[i,j] = (gtLbls != outLbls).sum(dtype=np.int64) / float(outLbls.size)
-                
+
             # save the number of ground truth labels and voxel sizes
             nlabels[i,j] = gtComps_types_nlabels[0]
             voxel_sizes[i][j] = emLabels.getSizes(gtComps)[1:]
@@ -632,12 +632,12 @@ if run_metrics:
                 # calculate the ISBI2013 rand error (gala, excludes gt background) using the full out components
                 are, prec, rec = ev.adapted_rand_error(outCompsFull, gtComps, all_stats=True)
                 are_gala[i,j,k] = are; are_precrec_gala[i,j,k,:] = np.array([prec,rec])
-                    
+
                 # calculate the split variation of information (gala) using full out components
                 split_vi_gala[i,j,k,:] = ev.split_vi(outCompsFull, gtComps)
 
                 # calculate the adapted rand index using the expected value by from comparing different GTs
-                sel = np.ones((ngroups,nblocks),dtype=np.bool); sel[i,j] = False; eri = rand_index_gts[i,j,sel].mean()
+                sel = np.ones((ngroups,nblocks),dtype=bool); sel[i,j] = False; eri = rand_index_gts[i,j,sel].mean()
                 are,prec,rec,ri,ari_gtnorm[i,j,k] = adapted_rand_error( gtComps, outComps, nogtbg=True, getRI=True,
                     eri=eri )
 
@@ -645,28 +645,28 @@ if run_metrics:
                 if skeletonize:
                     # calculate rand error at gt skeletonization points only (similar to skeleton nodes)
                     #   using full out components to avoid nodes falling into background
-                        
+
                     # rand error with skels
                     are, prec, rec = adapted_rand_error(gtSkelComps, outCompsFull, nogtbg=True)
                     are_skel[i,j,k] = are; are_precrec_skel[i,j,k,:] = np.array([prec,rec])
-                       
-                # calculate rand error using a sampling method that tries to fairly compare different datasets by 
+
+                # calculate rand error using a sampling method that tries to fairly compare different datasets by
                 #   sampling the same number of points and same number of objects from each block.
                 # nObjects and nPoints are chosen as min number of objects and pixels per obj over all tiles / objs
                 if nReSamples > 0:
                     ares_resamp[i,j,k,:], precs_resamp[i,j,k,:], recs_resamp[i,j,k,:] = \
-                        adapted_rand_error_resample_objects_points(gtComps, outCompsFull, nObjects=71, nPoints=20, 
+                        adapted_rand_error_resample_objects_points(gtComps, outCompsFull, nObjects=71, nPoints=20,
                         nSamples=nReSamples, getDistros=True, nThreads=10)
-                        
+
                 '''
                 # calculate our warping metric using the out with adjacencies removed
                 # NOTE: gt components were created using connected components, so adjacencies are already removed
                 # OR gt components were generated with adjacencies pre-removed with label checker (for 3d gt)
-                wrp, nsplits, nmerges, nonsimple, simpleLUT = warping_error(gtComps.astype(np.bool,order='C'), 
-                    outCompsNoAdj.astype(np.bool,order='C'), doComps=True, simpleLUT=simpleLUT)
+                wrp, nsplits, nmerges, nonsimple, simpleLUT = warping_error(gtComps.astype(bool,order='C'),
+                    outCompsNoAdj.astype(bool,order='C'), doComps=True, simpleLUT=simpleLUT)
                 wrp_err[i,j,k] = wrp; wrp_sltmrg[i,j,k,:] = np.array([nmerges,nsplits])
                 '''
-                    
+
                 '''
                 # hack to save warping outputs
                 og = out_group if isinstance(out_group, str) else out_group[i]
@@ -676,7 +676,7 @@ if run_metrics:
                 tmp = nonsimple; sel = (tmp > 0); tmp[sel] = tmp[sel] % (dlut.shape[0]-1)
                 tifffile.imsave(os.path.join(outpath,ofn+og+'_wrp.tif'), dlut[tmp.transpose(2,1,0),:], compress=5)
                 '''
-                    
+
                 # store number of ICS/ECS labels for normal and fully watershedded and ICS labels for no adajacency
                 nlabels_out[i,j,k,:] = outComps_types_nlabels
             print('\tdone in %.4f s' % (time.time() - t))
@@ -717,7 +717,7 @@ if make_plots or export_images:
     if nReSamples > 0:
         # make resamps as medians of resamp distros
         are_resamp = np.median( ares_resamp, axis=3 )
-        are_prec_rec_resamp = np.concatenate( (np.median(precs_resamp, axis=3, keepdims=True), 
+        are_prec_rec_resamp = np.concatenate( (np.median(precs_resamp, axis=3, keepdims=True),
             np.median(recs_resamp, axis=3, keepdims=True)), axis=3 )
 
     # shape of all scalar metrics is (ngroups,nblocks,nparams)
@@ -739,7 +739,7 @@ if make_plots or export_images:
         min_dist_wrp_sltmrg_obj = dist_wrp_sltmrg_obj[i,:,amin_dist_wrp_sltmrg_obj]
         amin_wrp_err = np.median(wrp_err,axis=1).argmin(axis=1)
         min_wrp_err = wrp_err[i,:,amin_wrp_err]
-        
+
         if nReSamples > 0:
             # take all resamp samples but only at mins
             #'ares_resamp' : ma.array(np.zeros((ngroups,nblocks,nparams,nReSamples),dtype=np.double),mask=True),
@@ -748,11 +748,11 @@ if make_plots or export_images:
         # mins across thresholds
         min_are_gala = are_gala.min(axis=2)
         amin_are_gala = are_gala.argmin(axis=2)
-        min_are_skel = are_skel.min(axis=2); 
+        min_are_skel = are_skel.min(axis=2);
         amin_are_skel = are_skel.argmin(axis=2)
-        min_are_resamp = are_resamp.min(axis=2); 
+        min_are_resamp = are_resamp.min(axis=2);
         amin_are_resamp = are_resamp.argmin(axis=2)
-        #min_ari_gtnorm = ari_gtnorm.min(axis=2); 
+        #min_ari_gtnorm = ari_gtnorm.min(axis=2);
         #amin_ari_gtnorm = ari_gtnorm.argmin(axis=2)
         min_dist_vi_gala = dist_vi_gala.min(axis=2)
         amin_dist_vi_gala = dist_vi_gala.argmin(axis=2)
@@ -760,7 +760,7 @@ if make_plots or export_images:
         amin_dist_wrp_sltmrg_obj = dist_wrp_sltmrg_obj.argmin(axis=2)
         min_wrp_err = wrp_err.min(axis=2)
         amin_wrp_err = wrp_err.argmin(axis=2)
-        
+
         # xxx - fix however to select min_ares_resamp here
 
     # repmat of percentage ecs for blocks
@@ -771,7 +771,7 @@ if make_plots or export_images:
 def scatter_err_plots(errs, strs, ylims, plsize, dostats, groups_vals_rep_loc=None, jitter=0.25):
     if groups_vals_rep_loc is None: groups_vals_rep_loc = groups_vals_rep
     for i in range(len(errs)):
-        if plot_setlims and ylims: ax = pl.subplot( plsize[0],plsize[1],i+1, adjustable='box', 
+        if plot_setlims and ylims: ax = pl.subplot( plsize[0],plsize[1],i+1, adjustable='box',
             aspect=(groups_xlim[1]-groups_xlim[0])/(ylims[i][1]-ylims[i][0]) )
         else: ax = pl.subplot(plsize[0],plsize[1],i+1)
         x = groups_vals_rep_loc.reshape((-1,));
@@ -784,16 +784,16 @@ def scatter_err_plots(errs, strs, ylims, plsize, dostats, groups_vals_rep_loc=No
         # Hide the right and top spines
         ax.spines['right'].set_visible(False); ax.spines['top'].set_visible(False)
         # Only show ticks on the left and bottom spines
-        ax.yaxis.set_ticks_position('left'); ax.xaxis.set_ticks_position('bottom')        
+        ax.yaxis.set_ticks_position('left'); ax.xaxis.set_ticks_position('bottom')
         if plot_setlims and ylims: plt.xlim(groups_xlim); plt.ylim(ylims[i])
         pl.xlabel(groups_xlbl); pl.ylabel(strs[i])
         ax.set_xticks(groups_vals); #ax.set_xticklabels(['10', '100', '1000', '10000', '100000'])
-        
-    
+
+
         if dostats[i]:
             # overall differences between groups
             H,p = mstats.kruskalwallis(*[errs[i][j,:] for j in range(ngroups)])
-    
+
             # pairwise comparisons - check matlab code for multiple comparisons, decided to drop this
             pvals = []; Uvals = []; pstr = ''; cnt=0
             #for j in range(ngroups):
@@ -802,14 +802,14 @@ def scatter_err_plots(errs, strs, ylims, plsize, dostats, groups_vals_rep_loc=No
                     U,pval = mstats.mannwhitneyu(errs[i][j,:],errs[i][k,:], use_continuity=False)
                     #U,pval = stats.ranksums(errs[i][j,:],errs[i][k,:])
                     pvals.append(pval); Uvals.append(U); pstr += '%dto%d %g %g ' % (j,k,pvals[-1],Uvals[-1]); cnt += 1
-                    if (cnt%3)==0: pstr += '\n'; 
+                    if (cnt%3)==0: pstr += '\n';
             plt.title('med=%s\np=(%g,%g)\n%s' % (' '.join(['%g' % (x,) for x in np.median(errs[i],axis=1)]),p,H,pstr))
         else:
             plt.title('med=%s' % (' '.join(['%g' % (x,) for x in np.median(errs[i],axis=1)]),))
 
 if make_plots:
     print('generating plots')
-    
+
     from matplotlib import pylab as pl
     from matplotlib import pyplot as plt
     import matplotlib as mpl
@@ -822,7 +822,7 @@ if make_plots:
 
     # none, small, large, huge
     # blue, green, yellow, red
-    clrs = np.array([[0.28235294, 0.23921569, 0.54509804], [0.33333333, 0.41960784, 0.18431373], [1, 0.54901961, 0], 
+    clrs = np.array([[0.28235294, 0.23921569, 0.54509804], [0.33333333, 0.41960784, 0.18431373], [1, 0.54901961, 0],
         [0.54509804, 0, 0]]).T
 
     figno+=1
@@ -832,7 +832,7 @@ if make_plots:
         #sizes = [voxel_sizes_groups, voxel_sizes_skel_groups]
         #strs = ['GT voxels per object (log10)', 'skel GT voxels per object (log10)']
         #plsize = [1,2]
-        
+
         sizes = [voxel_sizes_groups]
         strs = ['GT voxels per object']
         plsize = [1,1]
@@ -841,11 +841,11 @@ if make_plots:
         dx = 0.1; xrng = [1,6.5]; x = np.arange(xrng[0], xrng[1], dx); cx = np.arange(xrng[0]+dx/2, xrng[1]-dx/2, dx);
         for i in range(len(sizes)):
             ax = pl.subplot(plsize[0],plsize[1],i+1)
-            
+
             for j in range(ngroups):
                 # xxx - any purpose of range=(x.min(),x.max() ???
                 hx,edges = np.histogram(np.log10(sizes[i][j]), bins=x)
-                plt.plot(np.power(10,cx), np.cumsum(hx)/hx.sum(dtype=np.double), color=clrs[:,j], 
+                plt.plot(np.power(10,cx), np.cumsum(hx)/hx.sum(dtype=np.double), color=clrs[:,j],
                     label=str(groups_vals[j]))
             pl.ylabel('cdf'); pl.xlabel(strs[i])
             plt.xlim(np.power(10,xrng)); plt.ylim([-0.05, 1.05])
@@ -855,37 +855,37 @@ if make_plots:
             ax.set_xticks([10, 100, 1e3, 1e4, 1e5, 1e6]); ax.set_xticklabels(['10', '100', '1000', '10000', '100000', '1000000'])
             ax.set_yticks([0, 0.25, 0.5, 0.75, 1])
             #plt.legend(loc='lower right')
-            
+
             pvals = []; Dvals = []; pstr = ''; cnt=0
             #for j in range(ngroups):
             for j in range(1):
                 for k in range(j+1,ngroups):
                     D,pval = stats.ks_2samp(sizes[i][j], sizes[i][k])
                     pvals.append(pval); Dvals.append(D); pstr += '%dto%d %g %g ' % (j,k,pvals[-1],Dvals[-1]); cnt += 1
-                    if (cnt%3)==0: pstr += '\n'; 
-    
+                    if (cnt%3)==0: pstr += '\n';
+
             plt.title('med=%s\n%s' % \
                 (' '.join(['%g' % (n,) for n in [np.median(sizes[i][k]) for k in range(ngroups)]]),pstr))
 
     figno+=1
     if figmask[figno-baseno]:
         pl.figure(figno);
-        
+
         #errs = [nlabels, nlabels_skel, voxel_sizes_median, voxel_sizes_skel_median]
-        #strs = ['GT Number of Objects', 'Skel GT Number of Objects', 
+        #strs = ['GT Number of Objects', 'Skel GT Number of Objects',
         #    'GT Object Voxel Size Medians', 'Skel GT Object Voxel Size Medians']
         #ylims = [];
         #plsize = [2,2]
         #dostats = [True, False, True, False]
-        
+
         errs = [nlabels, voxel_sizes_median]
         strs = ['GT Number of Objects', 'GT Object Voxel Size Medians']
         ylims = [];
         plsize = [1,2]
         dostats = [True, True]
-        
+
         scatter_err_plots(errs, strs, ylims, plsize, dostats)
-        
+
     figno+=1
     if figmask[figno-baseno]:
         pl.figure(figno);
@@ -896,36 +896,36 @@ if make_plots:
         #errs = [cat_error, min_are_gala, min_ari_gtnorm, min_dist_wrp_sltmrg_obj]
         #strs = ['Categorization Error', 'Adapted Rand Error', '1 - Adjusted Rand Index', '(Splits + Merges) / Object']
         #errs = [cat_error, min_are_resamp, min_are_gala, min_dist_wrp_sltmrg_obj]
-        #strs = ['Categorization Error', 'Resampled Adapted Rand Error', 'Adapted Rand Error', 
+        #strs = ['Categorization Error', 'Resampled Adapted Rand Error', 'Adapted Rand Error',
         #    '(Splits + Merges) / Object']
         #errs = [cat_error, min_wrp_err, min_dist_vi_gala, min_dist_wrp_sltmrg_obj]
         #strs = ['Categorization Error', 'Warping Error', 'Variation of Information', '(Splits + Merges) / Object']
-        #ylims = [[0,0.11], [0,0.08], [0,0.34], [0,1]];  # for 2d 
+        #ylims = [[0,0.11], [0,0.08], [0,0.34], [0,1]];  # for 2d
         ylims = [[0,0.16], [0,0.5], [0,2.5], [0,20]];  # for 3d
         plsize = [2,2]
         #dostats = [True, True, True, True]
         dostats = [False, False, False, False]
         '''
-                                
+
         '''
         errs = [cat_error, min_are_resamp, min_dist_wrp_sltmrg_obj]
         strs = ['Categorization Error', 'Resampled Adapted Rand Error', '(Splits + Merges) / Object']
-        ylims = [[0,0.12], [0,0.225], [0,1]];  # for 2d 
+        ylims = [[0,0.12], [0,0.225], [0,1]];  # for 2d
         plsize = [2,2]
         dostats = [True, True, True]
         '''
 
         errs = [min_are_gala, min_dist_vi_gala]
         strs = ['Adapted Rand Error', 'Variation of Information']
-        ylims = [[0,0.12], [0,0.225]];  # for 2d 
+        ylims = [[0,0.12], [0,0.225]];  # for 2d
         plsize = [1,2]
         dostats = [False, False, False, False]
-        
+
         scatter_err_plots(errs, strs, ylims, plsize, dostats)
 
     figno+=1
     if figmask[figno-baseno]:
-        pl.figure(figno); 
+        pl.figure(figno);
 
         '''
         errs = [1-are_precrec_gala, split_vi_gala, wrp_sltmrg_obj, ]
@@ -940,7 +940,7 @@ if make_plots:
         plsize = [2,2]
         plot_mean = False
         '''
-        
+
         '''
         errs = [wrp_sltmrg_obj, ]
         amins = [amin_dist_wrp_sltmrg_obj, ]
@@ -960,7 +960,7 @@ if make_plots:
         titles = ['Adapted Rand', 'Split Variation of Information',  ]
         plsize = [1,2]
         plot_mean = True
-        
+
         for i in range(len(errs)):
             if plot_setlims: ax = pl.subplot(plsize[0],plsize[1],i+1, adjustable='box', aspect=1)
             else: ax = pl.subplot(plsize[0],plsize[1],i+1)
@@ -983,38 +983,38 @@ if make_plots:
                     m = np.zeros((nblocks,2),dtype=np.double)
                     for k in range(nblocks): m[k,:] = errs[i][j,k,amins[i][j,k],:]
                 if plot_mean:
-                    mu = np.mean(m,axis=0); 
+                    mu = np.mean(m,axis=0);
                     ##su = np.std(m,axis=0) / np.sqrt(cat_error[j,:].count(axis=0))   # divide ngroups for SEM
                 else:
-                    mu = np.median(m,axis=0); 
+                    mu = np.median(m,axis=0);
                 plt.scatter(mu[1],mu[0],color=clrs[:,j],s=20)
                 ##plt.scatter(mu[0]-su[0],mu[1]-su[1],color=clrs[:,j],s=20,marker='x')
                 ##plt.scatter(mu[0]+su[0],mu[1]+su[1],color=clrs[:,j],s=20,marker='x')
             # Hide the right and top spines
             ax.spines['right'].set_visible(False); ax.spines['top'].set_visible(False)
             # Only show ticks on the left and bottom spines
-            ax.yaxis.set_ticks_position('left'); ax.xaxis.set_ticks_position('bottom')        
-            if plot_setlims: plt.xlim(lims[i]); plt.ylim(lims[i]); 
+            ax.yaxis.set_ticks_position('left'); ax.xaxis.set_ticks_position('bottom')
+            if plot_setlims: plt.xlim(lims[i]); plt.ylim(lims[i]);
             pl.xlabel(xstrs[i]); pl.ylabel(ystrs[i])
             plt.title(titles[i])
 
     figno+=1
     if figmask[figno-baseno]:
-        pl.figure(figno); 
+        pl.figure(figno);
         #min_ares_resamp = ares_resamp[range(ngroups),:,amin_are_resamp,:].reshape((ngroups, nblocks*nReSamples))
-        
+
         errs = [min_ares_resamp]
         strs = ['ReSamp ARE']
-        ylims = [];   
+        ylims = [];
         plsize = [1,1]
         dostats = [True]
         gv = np.array(groups_vals, dtype=np.double).reshape((ngroups,1)).repeat(nblocks*nReSamples,axis=1)
-        
+
         scatter_err_plots(errs, strs, ylims, plsize, dostats, groups_vals_rep_loc=gv, jitter=0.8)
 
     figno+=1
     if figmask[figno-baseno]:
-        pl.figure(figno); 
+        pl.figure(figno);
         #'rand_index_gts' : ma.array(np.zeros((ngroups,nblocks,ngroups,nblocks),dtype=np.double),mask=True),
         pl.imshow(rand_index_gts.reshape((ntotal,ntotal)),interpolation='nearest')
         pl.ylabel('GT (controls BG)'); pl.xlabel('to GT')
@@ -1031,14 +1031,14 @@ if make_plots:
             plt.savefig(os.path.join(outpath, fignames[i] + '.png'), dpi=72)
             plt.savefig(os.path.join(outpath, fignames[i] + '.eps'))
     else:
-        #http://stackoverflow.com/questions/12439588/how-to-maximize-a-plt-show-window-using-python 
+        #http://stackoverflow.com/questions/12439588/how-to-maximize-a-plt-show-window-using-python
         #print('#1 Backend:',plt.get_backend())
         #figManager = plt.get_current_fig_manager()
         #figManager.window.showMaximized()
         pl.show()
- 
 
- 
+
+
 
 if export_images:
     #amin_out = np.zeros((ngroups,nblocks),dtype=np.int64)
@@ -1050,7 +1050,7 @@ if export_images:
     amin_out = amin_dist_wrp_sltmrg_obj
     min_out = min_dist_wrp_sltmrg_obj
     amin_str = 'wrpsltmrgobj'
-    
+
 
     # distinguishable colors lut
     dlut = np.fromfile('/usr/local/Fiji.app/luts/distinguish2.lut',dtype=np.uint8).reshape([3,-1]).T
@@ -1060,7 +1060,7 @@ if export_images:
     # https://kuler.adobe.com/Theme-26-color-theme-3895203/
     #({'04' '68' 'bf' '14' 'a6' '70' 'f2' 'bc' '1b' 'f2' '29' '29'})/255,[3 4])'; % 90's couch
     # 90's couch plus one
-    c4lut = np.array([int(x,16) for x in ['99','99','99', '04','68','bf', '14','a6','70', 'f2','bc','1b', 
+    c4lut = np.array([int(x,16) for x in ['99','99','99', '04','68','bf', '14','a6','70', 'f2','bc','1b',
         'f2','29','29', 'da','cc','ab']],dtype=np.uint8).reshape((-1,3))
 
     print('iterating over watersheds to export images')
@@ -1075,10 +1075,10 @@ if export_images:
             fpout = os.path.join(loadpath, fn + on)
             if os.path.isfile(fpgt) and os.path.isfile(fpout):
                 gtLbls, gtComps, gtComps_types_nlabels, gtSkelComps, outLbls, attrs = load_gt_cat(fpgt, fpout, i, j)
-                
+
                 k = amin_out[i] if global_mins else amin_out[i,j]
                 subgroups, outComps, outComps_types_nlabels, outCompsFull, outCompsNoAdj = load_prp_param(k)
-                
+
                 print('exporting images for ' + ofn + on + (' chunk %d %d %d' % tuple(chunks[i][j]))); t = time.time()
 
                 # annotated categorization error figure
@@ -1095,18 +1095,18 @@ if export_images:
 
                 # gt components
                 tmp = gtComps; sel = (tmp > 0); tmp[sel] = tmp[sel] % (dlut.shape[0]-1)
-                tifffile.imsave(os.path.join(outpath,ofn+og+'_gtComps.tif'), 
+                tifffile.imsave(os.path.join(outpath,ofn+og+'_gtComps.tif'),
                     dlut[tmp.transpose(2,1,0),:], compress=5)
                 # four coloring: xxx - add option
                 #clut = emLabels.color(gtComps, c4lut, graySize=9, chromatic=4,
                 #    sampling=attrs['scale'] if hasattr(attrs,'scale') else None)
-                #tifffile.imsave(os.path.join(outpath,ofn+og+'_gtComps.tif'), 
+                #tifffile.imsave(os.path.join(outpath,ofn+og+'_gtComps.tif'),
                 #    clut[gtComps.transpose(2,1,0),:], compress=5)
-                
+
                 if skeletonize:
                     # gt skeletonized components
                     tmp = gtSkelComps; sel = (tmp > 0); tmp[sel] = tmp[sel] % (dlut.shape[0]-1)
-                    tifffile.imsave(os.path.join(outpath,ofn+og+'_gtSkComps.tif'), 
+                    tifffile.imsave(os.path.join(outpath,ofn+og+'_gtSkComps.tif'),
                         dlut[tmp.transpose(2,1,0),:], compress=5)
 
                 # out labels
@@ -1123,5 +1123,3 @@ if export_images:
                 #    sampling=attrs['scale'] if hasattr(attrs,'scale') else None)
                 #tifffile.imsave(os.path.join(outpath,ofn+og+'_outComps_min%s_%s_%.6f_%dcolors.tif' % (amin_str,
                 #    '_'.join(subgroups), min_out[i,j], nclrs)), clut[outComps.transpose(2,1,0),:], compress=5)
-                
-

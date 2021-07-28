@@ -90,7 +90,7 @@ class dpAggProbs(emProbabilities):
             ovlp_size[ovlp_sel] = self.overlap[ovlp_sel]; ovlp_size[ovlp_neg] = -ovlp_size[ovlp_neg]
             ovlp_offset = self.offset.copy()
             ovlp_offset[ovlp_neg] += (self.size[ovlp_neg] - ovlp_size[ovlp_neg])
-            chunk_sel = np.ones(self.size, dtype=np.bool)
+            chunk_sel = np.ones(self.size, dtype=bool)
             str_pslcs = ['self.overlap[j]:,:,:', ':,self.overlap[j]:,:', ':,:,self.overlap[j]:']
             str_nslcs = [':self.overlap[j],:,:', ':,:self.overlap[j],:', ':,:,:self.overlap[j]']
             for j in range(dpWriteh5.ND):

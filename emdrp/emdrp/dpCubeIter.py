@@ -114,7 +114,7 @@ class dpCubeIter(object):
             self.filemodulators_overlap_volume_step = self.filemodulators_overlap_volume_step_inner * \
                 self.filemodulators_overlap_cube_size
             self.filemodulators_overlap_volume_size = np.prod(self.filemodulators_overlap_volume_step)
-        
+
         if len(self.filepaths_affixes) == 0:
             self.filepaths_affixes = [False for x in range(self.nflags)]
         else:
@@ -136,7 +136,7 @@ class dpCubeIter(object):
             use_volume_size = self.volume_size
             use_volume_step = self.volume_step
             cur_ovlp = np.zeros((3,),dtype=np.int32)
-        
+
         for cur_index in range(use_volume_size):
             # the current volume indices, including the right and left remainders
             cur_volume = np.array(np.unravel_index(cur_index, use_volume_step), dtype=np.int64)
@@ -144,7 +144,7 @@ class dpCubeIter(object):
             if self.filemodulators_overlap_on:
                 # this is basically a completely seperate mode, consider as another script?
                 left_offset, is_left_border, is_right_border = [np.zeros((3,),dtype=np.int32) for i in range(3)]
-                is_left_remainder, is_right_remainder = [np.zeros((3,),dtype=np.bool) for i in range(2)]
+                is_left_remainder, is_right_remainder = [np.zeros((3,),dtype=bool) for i in range(2)]
 
                 cur_fm_volume = cur_volume // fm_cube_size
                 cur_chunk = (cur_volume * self.cube_size) - 2*cur_fm_volume + self.volume_range_beg
@@ -162,19 +162,19 @@ class dpCubeIter(object):
                 is_not_left_remainder = np.logical_not(is_left_remainder)
                 #is_not_right_remainder = np.logical_not(is_right_remainder)
                 assert( not (np.logical_and(is_left_remainder, is_right_remainder)).any() ) # bad use case
-    
+
                 # left and right remainders are offset from the start of the previous and last chunks respectfully
                 cur_volume[is_not_left_remainder] -= self.left_remainder[is_not_left_remainder]
                 cur_chunk = cur_volume * self.cube_size + self.volume_range_beg
                 cur_chunk[is_left_remainder] -= self.cube_size[is_left_remainder]
-    
+
                 left_offset = self.overlap.copy(); right_offset = self.overlap.copy();
-                if not self.leave_edge: 
+                if not self.leave_edge:
                     right_offset[is_right_border] = 0; left_offset[is_left_border] = 0
-    
+
                 # default size is adding left and right offsets
                 size = self.cube_size_voxels + left_offset + right_offset
-    
+
                 # special cases for remainder blocks
                 size[is_left_remainder] = self.left_remainder_size[is_left_remainder] + right_offset[is_left_remainder]
                 size[is_right_remainder] = self.right_remainder_size[is_right_remainder] + \
@@ -274,9 +274,9 @@ class dpCubeIter(object):
         p.add_argument('--cmdfile', nargs=1, type=str, default='',
                        help='Full name and path of text file containing command')
         p.add_argument('--cmd', nargs=1, type=str, default='', help='Specify command on command line as string')
-        p.add_argument('--pre-cmd', nargs=1, type=str, default='', 
+        p.add_argument('--pre-cmd', nargs=1, type=str, default='',
                        help='Semi-colon delimited command to print before generated command')
-        p.add_argument('--post-cmd', nargs=1, type=str, default='', 
+        p.add_argument('--post-cmd', nargs=1, type=str, default='',
                        help='Semi-colon delimited command to print after generated command')
         # arguments that modulate each parameter that is being iterated by cubeiter
         p.add_argument('--fileflags', nargs='*', type=str, default=[],
