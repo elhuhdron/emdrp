@@ -98,6 +98,54 @@ def test_calc_efpl_simple2():
     calc_eftpl(nml, Vlbls, dataset_start)
 
 
+def test__calc_efpl__use_correct_edge_lengths():
+    """ Github issue: https://github.com/elhuhdron/emdrp/issues/4
+    
+    Check that the norm between edge node positions is calculated along the
+    correct axis.
+    """
+    import wknml
+
+    trees = [
+        wknml.Tree(
+            id = 0,
+            color = (255, 255, 0, 1),
+            name="neuron1",
+            nodes = [
+                wknml.Node(id = 0, position=(1,1,1), radius=1),
+                wknml.Node(id = 1, position=(1,1,3), radius=1),
+                wknml.Node(id = 2, position=(1,2,1), radius=1)
+            ],
+            edges = [
+                wknml.Edge(source=0, target=1),
+                wknml.Edge(source=0, target=2)
+            ],
+            groupId = 1,
+        )
+    ]
+
+    nml = wknml.NML(
+        parameters=wknml.NMLParameters(
+            name="Test",
+            scale=(1, 1, 1),
+        ),
+        trees=trees,
+        branchpoints=[],
+        comments=[],
+        groups=[],
+    )
+
+
+    Vlbls = np.ones((5,5,5), dtype=np.uint32)
+    dataset_start = np.zeros((1, 3), dtype=int)
+
+    Vlbls[:, 1:, :] = 2
+
+    efpl = calc_eftpl(nml, Vlbls, dataset_start)
+
+    assert(efpl == 2/3)
+
+
 def util_get_nml():
     import wknml
     trees = [
