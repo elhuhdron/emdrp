@@ -111,7 +111,7 @@ def calc_eftpl(nml, Vlbls, dataset_start=np.zeros((1,3), dtype=int), verbose=Fal
 
     edges['path_length'] = np.linalg.norm(
             edges[ [pos + '_source' for pos in position_colums] ].values
-            - edges[ [pos + '_target' for pos in position_colums] ].values
+            - edges[ [pos + '_target' for pos in position_colums] ].values, axis=1
         )
 
     edges = edges.drop(columns=[c for c in edges.columns if c.startswith('position_')])
